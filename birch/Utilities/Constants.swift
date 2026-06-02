@@ -34,10 +34,10 @@ enum Constants {
 
   // MARK: - Keychain Keys
 
-  static let keychainPINHashKey = "com.hellbender.pin.hash"
-  static let keychainPINLengthKey = "com.hellbender.pin.length"
-  static let keychainFailedAttemptsKey = "com.hellbender.pin.failedAttempts"
-  static let keychainLockoutExpiryKey = "com.hellbender.pin.lockoutExpiry"
+  static let keychainPINHashKey = "com.birch.pin.hash"
+  static let keychainPINLengthKey = "com.birch.pin.length"
+  static let keychainFailedAttemptsKey = "com.birch.pin.failedAttempts"
+  static let keychainLockoutExpiryKey = "com.birch.pin.lockoutExpiry"
 
   /// Available auto-refresh intervals in seconds
   static let autoRefreshStops: [Double] = [30, 60, 120, 300, 600]
