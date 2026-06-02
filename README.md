@@ -62,8 +62,8 @@ All dependencies are managed via Swift Package Manager and resolve automatically
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/newtonick/hellbender-wallet.git
-   cd hellbender-wallet
+   git clone https://github.com/Birch-Wallet/birch-wallet.git
+   cd birch-wallet
    ```
 2. Open `birch.xcodeproj` in Xcode
 3. SPM dependencies resolve automatically on first open
@@ -205,7 +205,7 @@ fastlane/screenshots/
 
 - **Website**: [birchwallet.app](https://birchwallet.app)
 - **TestFlight Beta**: [Join the beta](https://testflight.apple.com/join/PuHVwJDJ)
-- **Author**: [newtonick](https://github.com/newtonick/hellbender-wallet/)
+- **Author**: [newtonick](https://github.com/newtonick)
 
 ## License
 
