@@ -283,6 +283,129 @@ struct DescriptorTests {
     #expect(fromMixed == fromAllTpub, "Descriptor built from Vpub+tpub mix should equal all-tpub descriptor")
   }
 
+  // MARK: - Permutation Independence (BIP-67 canonical ordering)
+
+  @Test func anyPermutationOfCosignersProducesSameDescriptor() {
+    let cosigners = Self.mixedFormatCosigners
+    let permutations: [[(xpub: String, fingerprint: String, derivationPath: String)]] = [
+      [cosigners[0], cosigners[1], cosigners[2]],
+      [cosigners[0], cosigners[2], cosigners[1]],
+      [cosigners[1], cosigners[0], cosigners[2]],
+      [cosigners[1], cosigners[2], cosigners[0]],
+      [cosigners[2], cosigners[0], cosigners[1]],
+      [cosigners[2], cosigners[1], cosigners[0]],
+    ]
+
+    let reference = BitcoinService.buildDescriptor(
+      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4, isChange: false
+    )
+
+    for (i, perm) in permutations.enumerated() {
+      let desc = BitcoinService.buildDescriptor(
+        requiredSignatures: 2, cosigners: perm, network: .testnet4, isChange: false
+      )
+      #expect(desc == reference, "Permutation \(i) should produce the same descriptor")
+    }
+  }
+
+  @Test func anyPermutationOfCosignersProducesSameCombinedDescriptor() {
+    let cosigners = Self.mixedFormatCosigners
+    let permutations: [[(xpub: String, fingerprint: String, derivationPath: String)]] = [
+      [cosigners[0], cosigners[1], cosigners[2]],
+      [cosigners[1], cosigners[0], cosigners[2]],
+      [cosigners[2], cosigners[1], cosigners[0]],
+    ]
+
+    let reference = BitcoinService.buildCombinedDescriptor(
+      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4
+    )
+
+    for (i, perm) in permutations.enumerated() {
+      let desc = BitcoinService.buildCombinedDescriptor(
+        requiredSignatures: 2, cosigners: perm, network: .testnet4
+      )
+      #expect(desc == reference, "Combined permutation \(i) should produce the same descriptor")
+    }
+  }
+
+  @Test func setupWizardBuildDescriptorsMatchesBitcoinService() {
+    let cosigners = Self.mixedFormatCosigners
+
+    let vm = SetupWizardViewModel()
+    vm.requiredSignatures = 2
+    vm.totalCosigners = 3
+    vm.network = .testnet4
+    vm.initializeCosigners()
+    for i in 0 ..< cosigners.count {
+      vm.cosignerXpubs[i] = cosigners[i].xpub
+      vm.cosignerFingerprints[i] = cosigners[i].fingerprint
+      vm.cosignerDerivationPaths[i] = cosigners[i].derivationPath
+    }
+    vm.buildDescriptors()
+
+    let serviceExternal = BitcoinService.buildDescriptor(
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+    )
+    let serviceInternal = BitcoinService.buildDescriptor(
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true
+    )
+
+    #expect(vm.externalDescriptor == serviceExternal,
+            "SetupWizardViewModel should produce the same external descriptor as BitcoinService")
+    #expect(vm.internalDescriptor == serviceInternal,
+            "SetupWizardViewModel should produce the same internal descriptor as BitcoinService")
+  }
+
+  @Test func setupWizardPermutationIndependence() {
+    let cosigners = Self.mixedFormatCosigners
+
+    let vm1 = SetupWizardViewModel()
+    vm1.requiredSignatures = 2
+    vm1.totalCosigners = 3
+    vm1.network = .testnet4
+    vm1.initializeCosigners()
+    for i in 0 ..< cosigners.count {
+      vm1.cosignerXpubs[i] = cosigners[i].xpub
+      vm1.cosignerFingerprints[i] = cosigners[i].fingerprint
+      vm1.cosignerDerivationPaths[i] = cosigners[i].derivationPath
+    }
+    vm1.buildDescriptors()
+
+    let vm2 = SetupWizardViewModel()
+    vm2.requiredSignatures = 2
+    vm2.totalCosigners = 3
+    vm2.network = .testnet4
+    vm2.initializeCosigners()
+    let reversed = [cosigners[2], cosigners[1], cosigners[0]]
+    for i in 0 ..< reversed.count {
+      vm2.cosignerXpubs[i] = reversed[i].xpub
+      vm2.cosignerFingerprints[i] = reversed[i].fingerprint
+      vm2.cosignerDerivationPaths[i] = reversed[i].derivationPath
+    }
+    vm2.buildDescriptors()
+
+    #expect(vm1.externalDescriptor == vm2.externalDescriptor,
+            "Reversed cosigner order should produce the same external descriptor")
+    #expect(vm1.internalDescriptor == vm2.internalDescriptor,
+            "Reversed cosigner order should produce the same internal descriptor")
+  }
+
+  @Test func realCosignersPinnedDescriptor() {
+    let expected = "wsh(sortedmulti(2," +
+      "[f9755e5b/48'/1'/0'/2']tpubDE2JvCZ3g8tEX3yegvXFn9cpzUyA2EEg6EwS7sAHcPER9yA6nFKdGPyLzsswYWa3SvEbKFmUiyFe9QQrpVpKwxojCud4ThNEv8R3j411Lcs/<0;1>/*," +
+      "[d03ce438/48'/1'/0'/2']tpubDE4AYPPuhwTk7ENvANSMNU84wRecxjikg4e1WFHE4a6fxsNogCqnA7zzxyDoXp93JeyWNViXEKnkqaysaCrZRnTZDLYXnmbt7zrGxWYc3Mx/<0;1>/*," +
+      "[acc95047/48'/1'/0'/2']tpubDFEegnzQJr8LdYmGh1dGy3vqVgWtZ5w6q2cw4fbXhp15A29hvpf4NtAeFNvmmDRFTzeu1CveXs6dK2iPVADn2fSXWAQhHZhtLRGeHLmiBi5/<0;1>/*))"
+
+    let desc = BitcoinService.buildCombinedDescriptor(
+      requiredSignatures: 2,
+      cosigners: Self.mixedFormatCosigners,
+      network: .testnet4
+    )
+
+    let rawDesc = String(desc.prefix(while: { $0 != "#" }))
+    #expect(rawDesc == expected, "Descriptor body should match the pinned expected value")
+  }
+
   @Test func descriptorSortsByNormalizedXpubForBIP67() {
     // The user-supplied example: cosigners entered in [Vpub, tpub, tpub] order
     // with fingerprints [d03ce438, f9755e5b, acc95047]. After normalization,

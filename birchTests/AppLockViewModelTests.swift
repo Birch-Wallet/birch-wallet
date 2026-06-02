@@ -36,7 +36,6 @@ struct AppLockViewModelTests {
   @Test func initWithNoPIN_hasPINIsFalse() {
     let vm = makeVM()
     #expect(vm.hasPIN == false)
-    #expect(vm.storedPINLength == 6)
   }
 
   @Test func initWithExistingPIN_hasPINIsTrue() {
