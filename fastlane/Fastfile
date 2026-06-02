@@ -13,10 +13,10 @@ end
 
 # Device matrix — must match what is available in Simulator.
 DEVICES = {
-  "iPhone 17 Pro Max" => "platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.4",
-  "iPhone 17 Pro"     => "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4",
-  "iPhone 11 Pro Max" => "platform=iOS Simulator,name=iPhone 11 Pro Max,OS=26.4",
-  "iPhone 13 mini"    => "platform=iOS Simulator,name=iPhone 13 mini,OS=26.4",
+  "iPhone 17 Pro Max" => "platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.5",
+  "iPhone 17 Pro"     => "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5",
+  "iPhone 11 Pro Max" => "platform=iOS Simulator,name=iPhone 11 Pro Max,OS=26.5",
+  "iPhone 13 mini"    => "platform=iOS Simulator,name=iPhone 13 mini,OS=26.5",
 }
 
 platform :ios do
