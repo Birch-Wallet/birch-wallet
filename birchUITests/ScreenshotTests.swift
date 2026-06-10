@@ -27,6 +27,19 @@ final class ScreenshotTests: XCTestCase {
     app = nil
   }
 
+  /// Resolve a main tab by its label across both layouts.
+  /// iPhone renders the `TabView` as a bottom tab bar (buttons live under
+  /// `tabBars`). iPadOS renders the modern `Tab(...)` API as a top tab bar
+  /// whose items are plain top-level `buttons` not contained in any `tabBars`
+  /// element. Prefer the tab bar when one exists, otherwise fall back to a
+  /// top-level button match.
+  private func tabButton(_ name: String) -> XCUIElement {
+    if app.tabBars.firstMatch.exists {
+      return app.tabBars.buttons[name]
+    }
+    return app.buttons[name].firstMatch
+  }
+
   @MainActor
   func testScreenshotTour() {
     setupSnapshot(app)
@@ -116,25 +129,27 @@ final class ScreenshotTests: XCTestCase {
     sleep(12)
 
     // Enable "Show Fiat Price" in Settings before capturing Transactions
-    let settingsTabEarly = app.tabBars.buttons["Settings"]
+    let settingsTabEarly = tabButton("Settings")
     XCTAssertTrue(settingsTabEarly.waitForExistence(timeout: 5), "Settings tab should exist")
     settingsTabEarly.tap()
     sleep(1)
 
     let fiatToggle = app.switches["showFiatPriceToggle"]
     XCTAssertTrue(fiatToggle.waitForExistence(timeout: 5), "Show Fiat Price toggle should exist in Settings")
+    // Tap near the trailing edge of the row where the switch thumb lives. A
+    // plain fiatToggle.tap() lands in the center of the accessibility frame,
+    // which for a full-width Toggle row hits the label, not the control. The
+    // 0.95 offset puts the tap on the switch on both iPhone and the much wider
+    // iPad row (where the switch sits ~960pt out in a 992pt-wide frame).
+    let toggleThumb = fiatToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
     if fiatToggle.value as? String == "0" {
-      // Tap the right edge of the row where the switch thumb lives. A plain
-      // fiatToggle.tap() lands in the center of the accessibility frame,
-      // which for a Toggle with a two-line VStack label can hit the label
-      // area without flipping the switch.
-      fiatToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+      toggleThumb.tap()
       sleep(1)
     }
     XCTAssertEqual(fiatToggle.value as? String, "1", "Show Fiat Price toggle should be on after tap")
 
     // Return to Transactions tab
-    let transactionsTabEarly = app.tabBars.buttons["Transactions"]
+    let transactionsTabEarly = tabButton("Transactions")
     XCTAssertTrue(transactionsTabEarly.waitForExistence(timeout: 5), "Transactions tab should exist")
     transactionsTabEarly.tap()
     // Give the fiat rates fetch (kicked off when the toggle flipped) time to
@@ -193,7 +208,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 08 - Receive
 
-    let receiveTab = app.tabBars.buttons["Receive"]
+    let receiveTab = tabButton("Receive")
     XCTAssertTrue(receiveTab.waitForExistence(timeout: 5), "Receive tab should exist")
     receiveTab.tap()
     let viewAllAddresses = app.buttons["View All Addresses"]
@@ -222,7 +237,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 11 - Send (lands on recipients step)
 
-    let sendTab = app.tabBars.buttons["Send"]
+    let sendTab = tabButton("Send")
     XCTAssertTrue(sendTab.waitForExistence(timeout: 5), "Send tab should exist")
     sendTab.tap()
     // SendFlowView headline is a static text "Send" — wait for it to avoid
@@ -232,7 +247,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 12 - UTXOs
 
-    let utxosTab = app.tabBars.buttons["UTXOs"]
+    let utxosTab = tabButton("UTXOs")
     XCTAssertTrue(utxosTab.waitForExistence(timeout: 5), "UTXOs tab should exist")
     utxosTab.tap()
     let utxosHeader = app.staticTexts["UTXOs"]
@@ -255,7 +270,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 14 - Settings
 
-    let settingsTab = app.tabBars.buttons["Settings"]
+    let settingsTab = tabButton("Settings")
     XCTAssertTrue(settingsTab.waitForExistence(timeout: 5), "Settings tab should exist")
     settingsTab.tap()
     sleep(1)
@@ -263,7 +278,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: Navigate to Transactions and open wallet picker
 
-    let transactionsTab = app.tabBars.buttons["Transactions"]
+    let transactionsTab = tabButton("Transactions")
     XCTAssertTrue(transactionsTab.waitForExistence(timeout: 5), "Transactions tab should exist")
     transactionsTab.tap()
     sleep(1)
@@ -465,7 +480,7 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - Send Flow Screenshots
 
     // Navigate to Send tab
-    let sendTabFlow = app.tabBars.buttons["Send"]
+    let sendTabFlow = tabButton("Send")
     XCTAssertTrue(sendTabFlow.waitForExistence(timeout: 5), "Send tab should exist")
     sendTabFlow.tap()
     _ = app.staticTexts["Send"].waitForExistence(timeout: 5)
