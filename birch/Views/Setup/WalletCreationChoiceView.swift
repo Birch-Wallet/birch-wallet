@@ -48,6 +48,10 @@ struct WalletCreationChoiceView: View {
         }
       }
       .padding(.horizontal, 24)
+      // Cap the choice cards to a readable width so they center on wide layouts
+      // (iPad) instead of stretching edge-to-edge. On iPhone the screen is
+      // narrower than this cap, so the cards stay full-width as before.
+      .frame(maxWidth: 480)
 
       Spacer()
 

@@ -1,10 +1,11 @@
-# Devices to capture — full App Store iPhone set.
-# iPad deferred until iPad support ships.
+# Devices to capture — full App Store iPhone set + iPad 13" (required by App
+# Review because the app declares iPad support, TARGETED_DEVICE_FAMILY = 1,2).
 devices([
   "iPhone 17 Pro Max",
   "iPhone 17 Pro",
   "iPhone 11 Pro Max",
   "iPhone 13 mini",
+  "iPad Pro 13-inch (M5)",
 ])
 
 languages(["en-US"])

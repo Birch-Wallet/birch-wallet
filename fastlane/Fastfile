@@ -17,6 +17,7 @@ DEVICES = {
   "iPhone 17 Pro"     => "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5",
   "iPhone 11 Pro Max" => "platform=iOS Simulator,name=iPhone 11 Pro Max,OS=26.5",
   "iPhone 13 mini"    => "platform=iOS Simulator,name=iPhone 13 mini,OS=26.5",
+  "iPad Pro 13-inch (M5)" => "platform=iOS Simulator,name=iPad Pro 13-inch (M5),OS=26.5",
 }
 
 platform :ios do
@@ -25,6 +26,11 @@ platform :ios do
     # ── 0. Clear previous output so stale files don't accumulate ────────
     FileUtils.rm_rf(File.expand_path("screenshots/dark", __dir__))
     FileUtils.rm_rf(File.expand_path("screenshots/light", __dir__))
+
+    # Shut down any simulators left booted (e.g. from a manual test run) so the
+    # per-device appearance/status-bar overrides in run_screenshot_pass apply to
+    # the right device. Belt-and-suspenders alongside targeting by name.
+    sh("xcrun simctl shutdown all 2>/dev/null || true")
 
     # ── 1. Build for testing once ────────────────────────────────────────
     # Produces birch.app, birchUITests-Runner.app, and the
@@ -57,6 +63,14 @@ platform :ios do
     FileUtils.rm_rf(thirteen_mini_holding)
     FileUtils.mkdir_p(thirteen_mini_holding)
 
+    #   * iPad Pro 13": frameit has no 13" iPad frame (its bundled iPad frames
+    #     stop at 12.9"), and the App Store accepts bare iPad screenshots. Move
+    #     iPad captures out of frameit's path so it doesn't choke on an unknown
+    #     device, then restore them bare in step 8 (no framing applied).
+    ipad_holding = File.expand_path("screenshots/_ipad_bare", __dir__)
+    FileUtils.rm_rf(ipad_holding)
+    FileUtils.mkdir_p(ipad_holding)
+
     ["dark", "light"].each do |mode|
       dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
 
@@ -66,6 +80,14 @@ platform :ios do
       Dir.glob("#{dir}/iPhone 13 mini-*.png").each do |src|
         next if src.include?("_framed")
         FileUtils.mv(src, "#{mode_holding}/#{File.basename(src)}")
+      end
+
+      # Move iPad captures out of frameit's path; remember the mode.
+      ipad_mode_holding = "#{ipad_holding}/#{mode}"
+      FileUtils.mkdir_p(ipad_mode_holding)
+      Dir.glob("#{dir}/iPad*.png").each do |src|
+        next if src.include?("_framed")
+        FileUtils.mv(src, "#{ipad_mode_holding}/#{File.basename(src)}")
       end
     end
 
@@ -105,6 +127,18 @@ platform :ios do
       end
     end
     FileUtils.rm_rf(thirteen_mini_holding)
+
+    # ── 8. Restore iPad captures (bare — no frame available for 13") ────
+    # iPad goes to the App Store unframed; just return the bare captures to
+    # en-US/ so they land in the normal upload tree.
+    ["dark", "light"].each do |mode|
+      src_dir          = File.expand_path("screenshots/#{mode}/en-US", __dir__)
+      ipad_mode_holding = "#{ipad_holding}/#{mode}"
+      Dir.glob("#{ipad_mode_holding}/*.png").each do |src|
+        FileUtils.mv(src, "#{src_dir}/#{File.basename(src)}")
+      end
+    end
+    FileUtils.rm_rf(ipad_holding)
   end
 
   # ────────────────────────────────────────────────────────────────────────
@@ -119,11 +153,15 @@ platform :ios do
       sh("xcrun simctl boot '#{name}' 2>/dev/null || true")
       sleep(5) # let SpringBoard settle
 
-      # Appearance
-      sh("xcrun simctl ui booted appearance #{mode}")
+      # Appearance. Target the device by name, NOT `booted`: if any other
+      # simulator is also up (e.g. a sim left booted from a manual test run),
+      # `booted` is ambiguous and the override silently no-ops, leaving the
+      # capture in the wrong appearance.
+      sh("xcrun simctl ui '#{name}' appearance #{mode}")
 
-      # Clean status bar: 9:41, full battery, full signal
-      sh("xcrun simctl status_bar booted override " \
+      # Clean status bar: 9:41, full battery, full signal. Also targeted by
+      # name for the same reason as appearance above.
+      sh("xcrun simctl status_bar '#{name}' override " \
          "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
          "--cellularMode active --operatorName '' --cellularBars 4 " \
          "--batteryState charged --batteryLevel 100 2>/dev/null || true")
@@ -153,7 +191,7 @@ platform :ios do
       end
 
       # Reset status bar and shut down
-      sh("xcrun simctl status_bar booted clear 2>/dev/null || true")
+      sh("xcrun simctl status_bar '#{name}' clear 2>/dev/null || true")
       sh("xcrun simctl shutdown '#{name}' 2>/dev/null || true")
     end
   end
