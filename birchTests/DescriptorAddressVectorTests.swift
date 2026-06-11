@@ -116,9 +116,9 @@ struct DescriptorAddressVectorTests {
 
   func bitcoinNetwork(from name: String) -> BitcoinNetwork {
     switch name {
-    case "mainnet": return .mainnet
-    case "testnet4": return .testnet4
-    default: return .testnet4
+    case "mainnet": .mainnet
+    case "testnet4": .testnet4
+    default: .testnet4
     }
   }
 
