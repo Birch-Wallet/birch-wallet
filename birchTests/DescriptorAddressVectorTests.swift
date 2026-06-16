@@ -96,9 +96,10 @@ struct DescriptorAddressVectorTests {
     guard vm.parseImportedDescriptor() else { return nil }
 
     let bdkNetwork = BitcoinService.shared.bdkNetwork(from: network)
+    let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
     do {
-      let extDesc = try Descriptor(descriptor: vm.externalDescriptor, network: bdkNetwork)
-      let chgDesc = try Descriptor(descriptor: vm.internalDescriptor, network: bdkNetwork)
+      let extDesc = try Descriptor(descriptor: vm.externalDescriptor, networkKind: bdkNetworkKind)
+      let chgDesc = try Descriptor(descriptor: vm.internalDescriptor, networkKind: bdkNetworkKind)
       let persister = try Persister.newInMemory()
       let wallet = try Wallet(
         descriptor: extDesc,

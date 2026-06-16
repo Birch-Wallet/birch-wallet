@@ -213,9 +213,10 @@ final class BitcoinService {
     let persister = try Persister.newSqlite(path: dbPath.path)
 
     addToLog("Parsing external descriptor (\(extDescStr.count) chars): \(extDescStr)")
-    let externalDesc = try Descriptor(descriptor: extDescStr, network: network)
+    let descriptorNetworkKind = bdkNetworkKind(from: profile.bitcoinNetwork)
+    let externalDesc = try Descriptor(descriptor: extDescStr, networkKind: descriptorNetworkKind)
     addToLog("Parsing internal/change descriptor")
-    let changeDesc = try Descriptor(descriptor: intDescStr, network: network)
+    let changeDesc = try Descriptor(descriptor: intDescStr, networkKind: descriptorNetworkKind)
 
     // Try loading existing wallet first, create new if not found
     let w: Wallet
@@ -1432,6 +1433,13 @@ final class BitcoinService {
     case .testnet4: .testnet4
     case .testnet3: .testnet
     case .signet: .signet
+    }
+  }
+
+  func bdkNetworkKind(from network: BitcoinNetwork) -> NetworkKind {
+    switch network {
+    case .mainnet: .main
+    case .testnet4, .testnet3, .signet: .test
     }
   }
 }
