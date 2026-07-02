@@ -6,6 +6,8 @@ import SwiftData
 @Observable
 @MainActor
 final class SetupWizardViewModel {
+  private let logger = AppLog(.wizard)
+
   enum Step: Int, CaseIterable {
     case welcome
     case creationChoice
@@ -223,6 +225,7 @@ final class SetupWizardViewModel {
 
     externalDescriptor = "wsh(sortedmulti(\(requiredSignatures),\(externalKeys)))"
     internalDescriptor = "wsh(sortedmulti(\(requiredSignatures),\(internalKeys)))"
+    logger.info("Built \(requiredSignatures)-of-\(totalCosigners) descriptors on \(network.displayName): \(externalDescriptor)")
   }
 
   var combinedDescriptor: String {
@@ -392,6 +395,12 @@ final class SetupWizardViewModel {
   // MARK: - Navigation
 
   func goToNext() {
+    let fromStep = currentStep
+    defer {
+      if currentStep != fromStep {
+        logger.info("Wizard step: \(fromStep) -> \(currentStep)")
+      }
+    }
     switch currentStep {
     case .welcome:
       currentStep = .creationChoice
@@ -427,7 +436,9 @@ final class SetupWizardViewModel {
       do {
         _ = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
         _ = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
+        logger.info("Imported descriptor validated: \(externalDescriptor)")
       } catch {
+        logger.error("Imported descriptor invalid: \(error.localizedDescription)")
         importDescriptorError = "Invalid descriptor: \(error.localizedDescription)"
         return
       }
@@ -472,6 +483,7 @@ final class SetupWizardViewModel {
       _ = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
       _ = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
     } catch {
+      logger.error("Descriptor validation failed while saving wallet: \(error.localizedDescription)")
       throw AppError.descriptorInvalid("\(error.localizedDescription)")
     }
 
@@ -520,10 +532,15 @@ final class SetupWizardViewModel {
 
     do {
       try modelContext.save()
+      logger.info(
+        "Saved new \(requiredSignatures)-of-\(totalCosigners) wallet '\(profile.name)' (\(profile.id)) "
+          + "on \(network.displayName) via \(creationMode == .createNew ? "new wallet" : "descriptor import")"
+      )
     } catch {
       // Rollback UserDefaults if save fails
       UserDefaults.standard.removeObject(forKey: Constants.activeWalletIDKey)
       UserDefaults.standard.removeObject(forKey: Constants.hasCompletedOnboardingKey)
+      logger.error("Failed to save new wallet '\(profile.name)': \(error.localizedDescription)")
       throw error
     }
   }

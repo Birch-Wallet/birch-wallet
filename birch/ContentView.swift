@@ -1,9 +1,8 @@
 import LocalAuthentication
-import OSLog
 import SwiftData
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "AppLifecycle")
+private let logger = AppLog(.app)
 
 struct ContentView: View {
   @Query private var wallets: [WalletProfile]

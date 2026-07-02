@@ -1,9 +1,8 @@
-import OSLog
 import SwiftData
 import SwiftUI
 import URKit
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "WalletInfo")
+private let logger = AppLog(.wallet)
 
 struct WalletInfoView: View {
   @Environment(\.modelContext) private var modelContext
@@ -396,7 +395,7 @@ struct WalletInfoView: View {
           Toggle(isOn: Binding(
             get: { wallet.privacyMode },
             set: { new in
-              logger.info("Privacy mode \(new ? "enabled" : "disabled", privacy: .public)")
+              logger.info("Privacy mode \(new ? "enabled" : "disabled")")
               wallet.privacyMode = new
             }
           )) {
@@ -482,7 +481,7 @@ struct WalletInfoView: View {
     isTestingConnection = true
     connectionTestResult = nil
     let config = wallet.electrumConfig
-    logger.info("Testing Electrum connection to \(config.url, privacy: .public)")
+    logger.info("Testing Electrum connection to \(config.url)")
     Task {
       do {
         let height = try await BitcoinService.shared.testElectrumConnection(config: config)
@@ -520,7 +519,7 @@ struct WalletInfoView: View {
   private func saveName() {
     let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
     if !trimmed.isEmpty {
-      logger.info("Wallet name changed to \(trimmed, privacy: .private)")
+      logger.info("Wallet name changed to \(trimmed)")
       wallet.name = trimmed
     }
     isEditingName = false

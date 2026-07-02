@@ -1,8 +1,7 @@
-import OSLog
 import SwiftData
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "UTXODetail")
+private let logger = AppLog(.utxo)
 
 struct UTXODetailView: View {
   let utxo: UTXOItem

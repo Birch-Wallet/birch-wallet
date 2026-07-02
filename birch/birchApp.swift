@@ -30,6 +30,12 @@ struct birchApp: App {
     } catch {
       fatalError("Failed to create ModelContainer: \(error)")
     }
+
+    LogFileStore.shared.performStartupMaintenance()
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+    let os = ProcessInfo.processInfo.operatingSystemVersionString
+    AppLog(.app).info("App launch — Birch \(version) (\(build)), \(os)")
   }
 
   var body: some Scene {

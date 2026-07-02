@@ -2,7 +2,6 @@ import BitcoinDevKit
 import Combine
 import Foundation
 import Network
-import OSLog
 import SwiftData
 
 // MARK: - Fee Source
@@ -21,7 +20,7 @@ enum FeeSource: String, CaseIterable {
   }
 }
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "BitcoinService")
+private let logger = AppLog(.sync)
 
 @Observable
 @MainActor
@@ -60,10 +59,12 @@ final class BitcoinService {
     syncState = state
   }
 
+  private static let syncLogTimestampFormatter = ISO8601DateFormatter()
+
   private func addToLog(_ message: String) {
-    let timestamp = ISO8601DateFormatter().string(from: Date())
+    let timestamp = Self.syncLogTimestampFormatter.string(from: Date())
     let entry = "[\(timestamp)] \(message)"
-    logger.info("\(message, privacy: .public)")
+    logger.info(message)
     syncLog.append(entry)
     if syncLog.count > 100 {
       syncLog.removeFirst()
@@ -300,6 +301,12 @@ final class BitcoinService {
     setSyncState(.syncing("Connecting…"), for: syncProfileId)
     addToLog("Starting sync (needsFullScan: \(needsFullScan))")
 
+    // Capture pre-sync state so completion can log deltas.
+    let syncStartTime = Date()
+    let balanceBefore = balance
+    let txCountBefore = transactions.count
+    let utxoCountBefore = utxos.count
+
     do {
       // Try to reconnect if client is nil (e.g. app started offline)
       if electrumClient == nil, let profile = currentProfile {
@@ -438,7 +445,16 @@ final class BitcoinService {
       let now = Date()
       lastSyncDate = now
       setSyncState(.synced(now), for: syncProfileId)
-      addToLog("Sync completed successfully")
+
+      let duration = String(format: "%.1f", now.timeIntervalSince(syncStartTime))
+      let balanceDelta = Int64(balance) - Int64(balanceBefore)
+      let balanceDeltaStr = balanceDelta >= 0 ? "+\(balanceDelta)" : "\(balanceDelta)"
+      addToLog(
+        "Sync completed successfully in \(duration)s (\(lastSyncType.description)): "
+          + "balance \(balanceBefore) -> \(balance) sats (\(balanceDeltaStr)), "
+          + "txs \(txCountBefore) -> \(transactions.count), "
+          + "utxos \(utxoCountBefore) -> \(utxos.count), tip \(chainTipHeight)"
+      )
     } catch {
       let errorMsg = "\(error)"
       addToLog("Sync failed with error: \(errorMsg)")
@@ -852,13 +868,22 @@ final class BitcoinService {
     let sourceRaw = UserDefaults.standard.string(forKey: Constants.feeSourceKey) ?? FeeSource.electrum.rawValue
     let source = FeeSource(rawValue: sourceRaw) ?? .electrum
 
-    switch source {
-    case .mempoolSpace:
-      return try await fetchMempoolFees()
-    case .electrum:
-      return try await fetchElectrumFees()
-    case .fixed:
-      return RecommendedFees(fast: 5.0, medium: 2.0, slow: 1.0)
+    do {
+      let fees: RecommendedFees = switch source {
+      case .mempoolSpace:
+        try await fetchMempoolFees()
+      case .electrum:
+        try await fetchElectrumFees()
+      case .fixed:
+        RecommendedFees(fast: 5.0, medium: 2.0, slow: 1.0)
+      }
+      logger.info(
+        "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB"
+      )
+      return fees
+    } catch {
+      logger.error("Fee estimation from \(source.rawValue) failed: \(error)")
+      throw error
     }
   }
 
@@ -1018,8 +1043,16 @@ final class BitcoinService {
 
     let base64 = psbt.serialize()
     guard let bytes = Data(base64Encoded: base64) else {
+      logger.error("PSBT creation failed: could not decode serialized PSBT base64")
       throw AppError.psbtFinalizeFailed("Failed to decode PSBT base64")
     }
+    let recipientSummary = recipients
+      .map { "\($0.isSendMax ? "max" : "\($0.amount)") sats to \($0.address)" }
+      .joined(separator: ", ")
+    logger.info(
+      "Created PSBT: \(inputCount) inputs, \(recipients.count) recipients [\(recipientSummary)], "
+        + "fee \(fee) sats @ \(feeRate) sat/vB\(changeAddress.map { ", change \(changeAmount ?? 0) sats to \($0)" } ?? "")"
+    )
     return PSBTResult(base64: base64, bytes: bytes, fee: fee, changeAmount: changeAmount, changeAddress: changeAddress, inputCount: inputCount)
   }
 
@@ -1142,13 +1175,22 @@ final class BitcoinService {
 
   func broadcastPSBT(_ psbtData: Data) async throws -> String {
     guard let client = electrumClient else {
+      logger.error("Broadcast failed: not connected to Electrum server")
       throw AppError.electrumConnectionFailed("Not connected to server")
     }
 
     let (_, tx) = try finalizePSBT(psbtData)
-    return try await Task.detached { [client] in
-      try client.transactionBroadcast(tx: tx).description
-    }.value
+    logger.info("Broadcasting finalized tx (\(psbtData.count) byte PSBT) via \(currentProfile?.electrumConfig.url ?? "unknown")")
+    do {
+      let result = try await Task.detached { [client] in
+        try client.transactionBroadcast(tx: tx).description
+      }.value
+      logger.info("Broadcast succeeded: tx \(result)")
+      return result
+    } catch {
+      logger.error("Broadcast failed: \(error)")
+      throw error
+    }
   }
 
   // MARK: - PSBT Import Validation

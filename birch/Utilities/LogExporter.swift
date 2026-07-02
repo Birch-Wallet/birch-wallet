@@ -1,47 +1,56 @@
 import Foundation
-import OSLog
 
+/// Query + formatting layer over `LogFileStore`. Reads persisted entries (which
+/// survive app restarts) and renders them for the in-app viewer and share/copy
+/// export.
 enum LogExporter {
-  /// Collects recent app logs from the unified logging system.
-  /// - Parameter hours: How many hours back to look (default 1).
-  /// - Returns: A formatted string of log entries, newest last.
-  static func collectLogs(hours: Double = 1) throws -> String {
-    let store = try OSLogStore(scope: .currentProcessIdentifier)
-    let cutoff = store.position(date: Date().addingTimeInterval(-hours * 3600))
-    let subsystem = Bundle.main.bundleIdentifier ?? "birch"
+  private static let timestampFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+    return f
+  }()
 
-    let entries = try store.getEntries(at: cutoff, matching: NSPredicate(format: "subsystem == %@", subsystem))
-
-    var lines: [String] = []
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-
-    for entry in entries {
-      guard let logEntry = entry as? OSLogEntryLog else { continue }
-      let timestamp = formatter.string(from: logEntry.date)
-      let level = levelString(logEntry.level)
-      lines.append("[\(timestamp)] [\(level)] [\(logEntry.category)] \(logEntry.composedMessage)")
+  /// Fetch entries from the last `hours`, optionally filtered by level set,
+  /// category set, and a case-insensitive substring search over the message.
+  /// Passing `nil` for a filter means "no filtering on that dimension".
+  static func fetch(
+    hours: Double,
+    levels: Set<LogLevel>? = nil,
+    categories: Set<String>? = nil,
+    search: String = ""
+  ) async -> [LogEntry] {
+    let since = Date().addingTimeInterval(-hours * 3600)
+    let entries = await LogFileStore.shared.entries(since: since)
+    let trimmedSearch = search.trimmingCharacters(in: .whitespacesAndNewlines)
+    return entries.filter { entry in
+      if let levels, !levels.contains(entry.l) { return false }
+      if let categories, !categories.contains(entry.c) { return false }
+      if !trimmedSearch.isEmpty, !entry.m.localizedCaseInsensitiveContains(trimmedSearch) { return false }
+      return true
     }
-
-    if lines.isEmpty {
-      return "No log entries found in the last \(Int(hours)) hour(s)."
-    }
-
-    let header = "Birch Logs — Exported \(formatter.string(from: Date()))\n"
-      + "Entries: \(lines.count) (last \(Int(hours))h)\n"
-      + String(repeating: "─", count: 60) + "\n"
-
-    return header + lines.joined(separator: "\n")
   }
 
-  private static func levelString(_ level: OSLogEntryLog.Level) -> String {
-    switch level {
-    case .debug: "DEBUG"
-    case .info: "INFO"
-    case .notice: "NOTICE"
-    case .error: "ERROR"
-    case .fault: "FAULT"
-    default: "UNKNOWN"
+  /// Render one entry as `[timestamp] [LEVEL] [category] message`.
+  static func format(_ entry: LogEntry) -> String {
+    "[\(timestampFormatter.string(from: entry.t))] [\(entry.l.display)] [\(entry.c)] \(entry.m)"
+  }
+
+  /// Join a set of entries into a single body string, oldest first.
+  static func format(_ entries: [LogEntry]) -> String {
+    entries.map(format).joined(separator: "\n")
+  }
+
+  /// Full shareable text: a header (matching the prior export style) plus body.
+  static func exportText(_ entries: [LogEntry], rangeDescription: String, filterDescription: String? = nil) -> String {
+    guard !entries.isEmpty else {
+      return "No log entries found in the last \(rangeDescription)."
     }
+    var header = "Birch Logs — Exported \(timestampFormatter.string(from: Date()))\n"
+      + "Entries: \(entries.count) (last \(rangeDescription))\n"
+    if let filterDescription, !filterDescription.isEmpty {
+      header += "Filters: \(filterDescription)\n"
+    }
+    header += String(repeating: "─", count: 60) + "\n"
+    return header + format(entries)
   }
 }

@@ -1,9 +1,8 @@
 import Foundation
 import Observation
-import OSLog
 import SwiftData
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "BumpFeeViewModel")
+private let logger = AppLog(.send)
 
 @Observable
 @MainActor

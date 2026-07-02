@@ -1,9 +1,8 @@
 import LocalAuthentication
-import OSLog
 import SwiftData
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "Settings")
+private let logger = AppLog(.app)
 
 struct SettingsView: View {
   @Environment(\.modelContext) private var modelContext
@@ -89,7 +88,7 @@ private struct AppearanceSettingsRow: View {
     .foregroundStyle(Color.hbTextPrimary)
     .onChange(of: themeRaw) { _, new in
       if let t = AppTheme(rawValue: new) {
-        logger.info("Theme changed to \(t.displayName, privacy: .public)")
+        logger.info("Theme changed to \(t.displayName)")
         ThemeManager.shared.apply(t)
       }
     }
@@ -153,9 +152,9 @@ private struct AppIconSettingsRow: View {
     UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
       Task { @MainActor in
         if let error {
-          logger.error("Failed to set app icon: \(error.localizedDescription, privacy: .public)")
+          logger.error("Failed to set app icon: \(error.localizedDescription)")
         } else {
-          logger.info("App icon changed to \(option.displayName, privacy: .public)")
+          logger.info("App icon changed to \(option.displayName)")
           selected = option
         }
       }
@@ -235,7 +234,7 @@ private struct FeeSettingsRow: View {
     .foregroundStyle(Color.hbTextPrimary)
     .listRowBackground(Color.hbSurface)
     .onChange(of: feeSourceRaw) { _, new in
-      logger.info("Fee source changed to \(new, privacy: .public)")
+      logger.info("Fee source changed to \(new)")
     }
   }
 }
@@ -253,7 +252,7 @@ private struct FiatSettingsRow: View {
       Toggle(isOn: Binding(
         get: { fiatEnabled },
         set: { new in
-          logger.info("Fiat display \(new ? "enabled" : "disabled", privacy: .public)")
+          logger.info("Fiat display \(new ? "enabled" : "disabled")")
           fiatEnabled = new
         }
       )) {
@@ -278,7 +277,7 @@ private struct FiatSettingsRow: View {
         .foregroundStyle(Color.hbTextPrimary)
         .padding(.top, 12)
         .onChange(of: fiatSourceRaw) {
-          logger.info("Fiat source changed to \(fiatSourceRaw, privacy: .public)")
+          logger.info("Fiat source changed to \(fiatSourceRaw)")
           fiatService.resetCache()
           Task { await fiatService.fetchRates() }
         }
@@ -576,48 +575,65 @@ private struct RemovePINSheet: View {
 
 private struct LogExportSheet: View {
   @Environment(\.dismiss) private var dismiss
-  @State private var logText: String = ""
+
+  /// All entries loaded for the current time range, before in-memory filtering.
+  @State private var allEntries: [LogEntry] = []
   @State private var isLoading = true
   @State private var copied = false
   @State private var hours: Double = 1
+  @State private var selectedLevel: LogLevel?
+  @State private var selectedCategory: String?
+  @State private var searchText = ""
+
+  /// Cap on rendered rows to keep the view responsive; export still includes all.
+  private let displayCap = 5000
+
+  private static let timeRanges: [(label: String, hours: Double)] = [
+    ("1h", 1), ("12h", 12), ("24h", 24), ("3d", 72), ("7d", 168),
+  ]
+
+  private var rangeLabel: String {
+    Self.timeRanges.first { $0.hours == hours }?.label ?? "\(Int(hours))h"
+  }
+
+  private var availableCategories: [String] {
+    Set(allEntries.map(\.c)).sorted()
+  }
+
+  private var filteredEntries: [LogEntry] {
+    let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return allEntries.filter { entry in
+      if let selectedLevel, entry.l != selectedLevel { return false }
+      if let selectedCategory, entry.c != selectedCategory { return false }
+      if !search.isEmpty, !entry.m.localizedCaseInsensitiveContains(search) { return false }
+      return true
+    }
+  }
+
+  private var filterDescription: String {
+    var parts: [String] = []
+    if let selectedLevel { parts.append("level \(selectedLevel.display)") }
+    if let selectedCategory { parts.append("category \(selectedCategory)") }
+    let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !search.isEmpty { parts.append("search \"\(search)\"") }
+    return parts.joined(separator: ", ")
+  }
+
+  private var exportText: String {
+    LogExporter.exportText(filteredEntries, rangeDescription: rangeLabel, filterDescription: filterDescription)
+  }
 
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
-        // Time range picker
-        HStack(spacing: 12) {
-          Text("Last")
-            .font(.hbLabel())
-            .foregroundStyle(Color.hbTextSecondary)
-          Picker("", selection: $hours) {
-            Text("1h").tag(1.0)
-            Text("4h").tag(4.0)
-            Text("12h").tag(12.0)
-            Text("24h").tag(24.0)
-          }
-          .pickerStyle(.segmented)
-          .onChange(of: hours) {
-            loadLogs()
-          }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        controls
 
         if isLoading {
           Spacer()
-          ProgressView()
-            .tint(Color.hbBitcoinOrange)
+          ProgressView().tint(Color.hbBitcoinOrange)
           Spacer()
         } else {
-          ScrollView {
-            Text(logText)
-              .font(.hbMono(11))
-              .foregroundStyle(Color.hbTextPrimary)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(12)
-              .textSelection(.enabled)
-          }
-          .background(Color.hbSurfaceElevated)
+          logList
         }
       }
       .background(Color.hbBackground)
@@ -630,9 +646,8 @@ private struct LogExportSheet: View {
         }
         ToolbarItem(placement: .primaryAction) {
           HStack(spacing: 12) {
-            ShareLink(item: logText) {
-              Image(systemName: "square.and.arrow.up")
-                .font(.system(size: 14))
+            ShareLink(item: exportText) {
+              Image(systemName: "square.and.arrow.up").font(.system(size: 14))
             }
             .foregroundStyle(Color.hbBitcoinOrange)
 
@@ -648,24 +663,150 @@ private struct LogExportSheet: View {
     }
   }
 
+  // MARK: Controls
+
+  private var controls: some View {
+    VStack(spacing: 10) {
+      HStack(spacing: 12) {
+        Text("Last")
+          .font(.hbLabel())
+          .foregroundStyle(Color.hbTextSecondary)
+        Picker("", selection: $hours) {
+          ForEach(Self.timeRanges, id: \.hours) { range in
+            Text(range.label).tag(range.hours)
+          }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: hours) { loadLogs() }
+      }
+
+      HStack(spacing: 12) {
+        Menu {
+          Button("All levels") { selectedLevel = nil }
+          ForEach(LogLevel.allCases, id: \.self) { level in
+            Button(level.display) { selectedLevel = level }
+          }
+        } label: {
+          filterLabel(icon: "line.3.horizontal.decrease.circle", text: selectedLevel?.display ?? "All levels")
+        }
+
+        Menu {
+          Button("All categories") { selectedCategory = nil }
+          ForEach(availableCategories, id: \.self) { category in
+            Button(category) { selectedCategory = category }
+          }
+        } label: {
+          filterLabel(icon: "square.grid.2x2", text: selectedCategory ?? "All categories")
+        }
+
+        Spacer()
+      }
+
+      HStack(spacing: 6) {
+        Image(systemName: "magnifyingglass")
+          .font(.system(size: 13))
+          .foregroundStyle(Color.hbTextSecondary)
+        TextField("Search messages", text: $searchText)
+          .font(.hbMono(12))
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+        if !searchText.isEmpty {
+          Button {
+            searchText = ""
+          } label: {
+            Image(systemName: "xmark.circle.fill")
+              .font(.system(size: 13))
+              .foregroundStyle(Color.hbTextSecondary)
+          }
+        }
+      }
+      .padding(8)
+      .background(Color.hbSurface, in: RoundedRectangle(cornerRadius: 8))
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+  }
+
+  private func filterLabel(icon: String, text: String) -> some View {
+    HStack(spacing: 4) {
+      Image(systemName: icon).font(.system(size: 12))
+      Text(text).font(.hbLabel())
+      Image(systemName: "chevron.down").font(.system(size: 9))
+    }
+    .foregroundStyle(Color.hbBitcoinOrange)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 6)
+    .background(Color.hbSurface, in: Capsule())
+  }
+
+  // MARK: Log list
+
+  @ViewBuilder private var logList: some View {
+    let entries = filteredEntries
+    let shown = Array(entries.suffix(displayCap))
+    VStack(spacing: 0) {
+      HStack {
+        Text(entries.count == 1 ? "1 entry" : "\(entries.count) entries")
+          .font(.hbLabel())
+          .foregroundStyle(Color.hbTextSecondary)
+        if entries.count > displayCap {
+          Text("(showing latest \(displayCap))")
+            .font(.hbLabel())
+            .foregroundStyle(Color.hbTextSecondary)
+        }
+        Spacer()
+      }
+      .padding(.horizontal, 16)
+      .padding(.bottom, 6)
+
+      if shown.isEmpty {
+        Spacer()
+        Text("No log entries match.")
+          .font(.hbBody())
+          .foregroundStyle(Color.hbTextSecondary)
+        Spacer()
+      } else {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(shown.enumerated()), id: \.offset) { _, entry in
+              Text(LogExporter.format(entry))
+                .font(.hbMono(11))
+                .foregroundStyle(tint(for: entry.l))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+            }
+          }
+          .padding(12)
+        }
+        .background(Color.hbSurfaceElevated)
+      }
+    }
+  }
+
+  private func tint(for level: LogLevel) -> Color {
+    switch level {
+    case .debug: Color.hbTextSecondary
+    case .info: Color.hbTextPrimary
+    case .warning: Color.hbBitcoinOrange
+    case .error, .critical: Color.hbError
+    }
+  }
+
+  // MARK: Actions
+
   private func loadLogs() {
     isLoading = true
     Task {
-      let text: String
-      do {
-        text = try LogExporter.collectLogs(hours: hours)
-      } catch {
-        text = "Failed to read logs: \(error.localizedDescription)"
-      }
+      let entries = await LogExporter.fetch(hours: hours)
       await MainActor.run {
-        logText = text
+        allEntries = entries
         isLoading = false
       }
     }
   }
 
   private func copyLogs() {
-    UIPasteboard.general.string = logText
+    UIPasteboard.general.string = exportText
     copied = true
     Task {
       try? await Task.sleep(for: .seconds(2))

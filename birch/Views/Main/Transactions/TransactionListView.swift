@@ -1,9 +1,8 @@
-import OSLog
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "TransactionListView")
+private let logger = AppLog(.transactions)
 
 struct TransactionListView: View {
   @Query private var wallets: [WalletProfile]

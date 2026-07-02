@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+private let logger = AppLog(.psbt)
+
 /// Format a fee rate for display, stripping unnecessary trailing zeros.
 func formatFeeRate(_ rate: Double) -> String {
   var s = String(format: "%.2f", rate)
@@ -64,6 +66,7 @@ extension PSBTFlowManaging {
   /// Combine a signed PSBT with the current one, update signature status, auto-save, and navigate.
   func handleSignedPSBT(_ signedBytes: Data, modelContext: ModelContext? = nil) async {
     isProcessing = true
+    let signaturesBefore = signaturesCollected
     do {
       let previousBytes = psbtBytes
       let (updatedBase64, updatedBytes) = try await psbtBitcoinService.combinePSBTs(
@@ -82,12 +85,19 @@ extension PSBTFlowManaging {
         signaturesCollected += 1
       }
 
+      if updatedBytes == previousBytes {
+        logger.warning("Signed PSBT added no new signatures (duplicate or unrelated PSBT)")
+      } else {
+        logger.info("Merged signed PSBT: signatures \(signaturesBefore) -> \(signaturesCollected) of \(requiredSignatures)")
+      }
+
       if updatedBytes != previousBytes, let context = modelContext {
         autoSavePSBT(context: context)
       }
 
       navigateAfterSign()
     } catch {
+      logger.error("Failed to merge signed PSBT: \(error.localizedDescription)")
       errorMessage = error.localizedDescription
     }
     isProcessing = false
@@ -109,6 +119,7 @@ extension PSBTFlowManaging {
     if let existing = try? context.fetch(descriptor).first {
       context.delete(existing)
       try? context.save()
+      logger.info("Deleted saved PSBT '\(existing.name)' (\(existingId))")
     }
     savedPSBTId = nil
   }

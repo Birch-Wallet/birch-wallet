@@ -159,6 +159,7 @@ struct UTXOListView: View {
     guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
     modelContext.insert(FrozenUTXO(walletID: walletID, txid: utxo.txid, vout: utxo.vout))
     try? modelContext.save()
+    AppLog(.utxo).info("Froze UTXO \(utxo.id) (\(utxo.amount) sats)")
   }
 
   private func unfreezeUTXO(_ utxo: UTXOItem) {
@@ -171,6 +172,7 @@ struct UTXOListView: View {
     if let frozen = (try? modelContext.fetch(descriptor))?.first(where: { $0.outpoint == outpoint }) {
       modelContext.delete(frozen)
       try? modelContext.save()
+      AppLog(.utxo).info("Unfroze UTXO \(utxo.id) (\(utxo.amount) sats)")
     }
   }
 }

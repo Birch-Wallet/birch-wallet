@@ -1,8 +1,7 @@
-import OSLog
 import SwiftData
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "Navigation")
+private let logger = AppLog(.app)
 
 struct MainTabView: View {
   @State private var selectedTab = 0
@@ -38,7 +37,7 @@ struct MainTabView: View {
     .tint(Color.hbBitcoinOrange)
     .onChange(of: selectedTab) { _, newTab in
       let name = newTab < Self.tabNames.count ? Self.tabNames[newTab] : "Unknown"
-      logger.info("Tab changed to \(name, privacy: .public)")
+      logger.info("Tab changed to \(name)")
     }
     .onAppear {
       walletID = BitcoinService.shared.currentProfile?.id
