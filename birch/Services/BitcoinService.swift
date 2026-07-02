@@ -845,6 +845,11 @@ final class BitcoinService {
     let fast: Double // Target: ~1 block
     let medium: Double // Target: ~3–6 blocks
     let slow: Double // Target: ~economy
+
+    /// Used when live fee estimation is unavailable (e.g. Electrum not yet
+    /// connected). A conservative flat rate so the send / bump-fee flow stays
+    /// usable instead of leaving the fee field empty.
+    static let fallback = RecommendedFees(fast: 1.5, medium: 1.5, slow: 1.5)
   }
 
   /// Fetches estimated fee rates in sats/vB, dispatching to the selected source
