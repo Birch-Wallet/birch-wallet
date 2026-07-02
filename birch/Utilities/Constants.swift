@@ -28,6 +28,7 @@ enum Constants {
   static let qrEncodingKey = "qrEncoding"
   static let qrDensityKey = "qrDensity"
   static let qrFrameRateKey = "qrFrameRate"
+  static let psbtCompactKey = "psbtCompactQR"
   static let themeKey = "appTheme"
   static let appLockTimeoutKey = "appLockTimeout"
   static let appLockPINEnabledKey = "appLockPINEnabled"
