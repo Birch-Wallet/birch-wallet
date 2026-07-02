@@ -225,14 +225,21 @@ struct PSBTCompactorTests {
 private class CompactorBundleToken {}
 
 private extension Data {
-  init(hex: String) {
-    var data = Data()
-    var index = hex.startIndex
-    while index < hex.endIndex {
-      let next = hex.index(index, offsetBy: 2)
-      data.append(UInt8(hex[index ..< next], radix: 16)!)
-      index = next
+init(hex: String) {
+  precondition(hex.count % 2 == 0, "Hex string must have even length")
+  var data = Data()
+  var index = hex.startIndex
+  while index < hex.endIndex {
+    let next = hex.index(index, offsetBy: 2)
+    let slice = hex[index ..< next]
+    guard let byte = UInt8(slice, radix: 16) else {
+      preconditionFailure("Invalid hex byte: \(slice)")
     }
+    data.append(byte)
+    index = next
+  }
+  self = data
+}
     self = data
   }
 }
