@@ -234,7 +234,7 @@ private struct DescriptorQRSheet: View {
   let descriptorUR: UR?
   @Environment(\.dismiss) private var dismiss
   @State private var isExporting = false
-  @AppStorage(Constants.qrFrameRateKey) private var qrFrameRate: Double = 4.0
+  @AppStorage(Constants.qrFrameRateKey) private var qrFrameRate: Double = 3.0
 
   init(descriptor: String, walletName: String) {
     self.descriptor = descriptor

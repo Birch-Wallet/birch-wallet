@@ -1,8 +1,28 @@
 import Bbqr
 import SwiftData
 import SwiftUI
+import URKit
 
 enum QREncoding: String, CaseIterable { case ur = "UR", bbqr = "BBQR" }
+
+/// Computes the total animated-QR frame count for a PSBT payload at the given
+/// display settings, matching what URDisplaySheet / BBQRDisplayView will render.
+enum QRFrameCounter {
+  static func frames(for bytes: Data, encoding: QREncoding, density: QRDensity) -> Int {
+    // URKit's FountainEncoder requires messageLen >= 10 (see URDisplaySheet)
+    guard bytes.count >= 10 else { return 0 }
+    switch encoding {
+    case .ur:
+      guard let ur = try? URService.encodePSBT(bytes) else { return 0 }
+      return Int(UREncoder(ur, maxFragmentLen: density.urFragmentLen).seqLen)
+    case .bbqr:
+      let options = SplitOptions(encoding: .zlib, minVersion: .v01, maxVersion: density.bbqrMaxVersion)
+      guard let split = try? Split.tryFromData(bytes: bytes, fileType: .psbt, options: options) else { return 0 }
+      return split.parts().count
+    }
+  }
+}
+
 enum QRDensity: String, CaseIterable { case low = "Low", medium = "Medium", high = "High", super_ = "Super" }
 
 extension QRDensity {
@@ -17,10 +37,10 @@ extension QRDensity {
 
   var bbqrMaxVersion: Version {
     switch self {
-    case .low: .v11
-    case .medium: .v19
-    case .high: .v27
-    case .super_: .v35
+    case .low: .v05 // 37×37 modules
+    case .medium: .v09 // 53×53
+    case .high: .v13 // 69×69
+    case .super_: .v17 // 85×85
     }
   }
 
@@ -45,9 +65,10 @@ struct PSBTDisplayView: View {
   @Bindable var viewModel: SendViewModel
   @Environment(\.modelContext) private var modelContext
   @State private var showAdvanced = false
-  @AppStorage(Constants.qrFrameRateKey) private var framesPerSecond: Double = 4.0
+  @AppStorage(Constants.qrFrameRateKey) private var framesPerSecond: Double = 3.0
   @AppStorage(Constants.qrEncodingKey) private var qrEncodingRaw: String = QREncoding.ur.rawValue
   @AppStorage(Constants.qrDensityKey) private var qrDensityRaw: String = QRDensity.medium.rawValue
+  @AppStorage(Constants.psbtCompactKey) private var compactPSBT = true
   @State private var showRestartAlert = false
   @State private var showExitConfirmation = false
   @State private var showBackConfirmation = false
@@ -67,6 +88,23 @@ struct PSBTDisplayView: View {
     QRDensity(rawValue: qrDensityRaw) ?? .medium
   }
 
+  /// The stored density clamped to what the current QR display height allows.
+  /// A persisted "Super" from a taller context (e.g. iPad send screen) must not
+  /// render here over-dense; fall back to the densest available option. The
+  /// stored preference is never rewritten — it stays valid for larger contexts.
+  private var effectiveDensity: QRDensity {
+    let available = QRDensity.available(forHeight: qrDisplayHeight)
+    return available.contains(qrDensity) ? qrDensity : (available.last ?? .medium)
+  }
+
+  private var displayBytes: Data {
+    compactPSBT ? PSBTCompactor.compact(viewModel.psbtBytes) : viewModel.psbtBytes
+  }
+
+  private var frameCount: Int {
+    QRFrameCounter.frames(for: displayBytes, encoding: qrEncoding, density: effectiveDensity)
+  }
+
   var body: some View {
     ScrollView {
       VStack(spacing: 16) {
@@ -82,7 +120,7 @@ struct PSBTDisplayView: View {
           GeometryReader { geo in
             // Re-read inside the closure: GeometryReader defers evaluation to layout
             // time, so psbtBytes may have been cleared since the outer guard ran.
-            let bytes = viewModel.psbtBytes
+            let bytes = displayBytes
             let maxSide = min(geo.size.width, geo.size.height)
             Group {
               if bytes.isEmpty {
@@ -92,17 +130,17 @@ struct PSBTDisplayView: View {
                   data: bytes,
                   urType: "crypto-psbt",
                   framesPerSecond: framesPerSecond,
-                  maxFragmentLen: qrDensity.urFragmentLen
+                  maxFragmentLen: effectiveDensity.urFragmentLen
                 )
-                .id(qrDensity.urFragmentLen)
+                .id("\(effectiveDensity.urFragmentLen)-\(compactPSBT)")
               } else {
                 BBQRDisplayView(
                   data: bytes,
                   fileType: .psbt,
                   framesPerSecond: framesPerSecond,
-                  maxVersion: qrDensity.bbqrMaxVersion
+                  maxVersion: effectiveDensity.bbqrMaxVersion
                 )
-                .id("\(qrDensity.rawValue)-bbqr")
+                .id("\(effectiveDensity.rawValue)-bbqr-\(compactPSBT)")
               }
             }
             .frame(width: maxSide - 10, height: maxSide - 10)
@@ -156,29 +194,52 @@ struct PSBTDisplayView: View {
             Slider(value: $framesPerSecond, in: 1 ... 10, step: 1)
               .tint(Color.hbBitcoinOrange)
 
-            HStack {
-              Text("1")
-                .font(.hbLabel(9))
-                .foregroundStyle(Color.hbTextSecondary)
-              Spacer()
-              Text("10")
-                .font(.hbLabel(9))
-                .foregroundStyle(Color.hbTextSecondary)
-            }
-
             // QR Density
             HStack {
               Text("QR Density")
                 .font(.hbLabel())
                 .foregroundStyle(Color.hbTextSecondary)
               Spacer()
-              Picker("", selection: $qrDensityRaw) {
+              Picker("", selection: Binding(
+                get: { effectiveDensity.rawValue },
+                set: { qrDensityRaw = $0 }
+              )) {
                 ForEach(QRDensity.available(forHeight: qrDisplayHeight), id: \.self) { density in
                   Text(density.rawValue).tag(density.rawValue)
                 }
               }
               .pickerStyle(.segmented)
               .frame(width: QRDensity.available(forHeight: qrDisplayHeight).count > 3 ? 260 : 200)
+            }
+
+            // Compact PSBT
+            HStack {
+              Text("Compact PSBT")
+                .font(.hbLabel())
+                .foregroundStyle(Color.hbTextSecondary)
+              Spacer()
+              Toggle("", isOn: $compactPSBT)
+                .labelsHidden()
+                .tint(Color.hbBitcoinOrange)
+                // The iOS 26+ switch draws slightly wider than its layout bounds
+                // and gets clipped by the DisclosureGroup; inset to compensate
+                .padding(.trailing, 4)
+            }
+
+            Text("Strips non_witness_utxo and global xpubs from the PSBT. Compatible with SeedSigner and Krux; some signers require these fields.")
+              .font(.hbLabel(10))
+              .foregroundStyle(Color.hbTextSecondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+
+            // QR payload stats
+            HStack {
+              Text("QR Payload")
+                .font(.hbLabel())
+                .foregroundStyle(Color.hbTextSecondary)
+              Spacer()
+              Text("\(frameCount) frame\(frameCount == 1 ? "" : "s") / \(displayBytes.count.formatted()) bytes")
+                .font(.hbMono(14))
+                .foregroundStyle(Color.hbTextPrimary)
             }
           }
           .padding(.top, 8)
@@ -255,6 +316,7 @@ struct PSBTDisplayView: View {
     }
     .onChange(of: qrEncodingRaw) { showRestartAlert = true }
     .onChange(of: qrDensityRaw) { showRestartAlert = true }
+    .onChange(of: compactPSBT) { showRestartAlert = true }
     .alert("QR Settings Changed", isPresented: $showRestartAlert) {
       Button("OK") {}
     } message: {
