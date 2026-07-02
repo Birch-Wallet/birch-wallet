@@ -273,12 +273,21 @@ private struct BumpFeePSBTDisplayView: View {
     QRDensity(rawValue: qrDensityRaw) ?? .medium
   }
 
+  /// The stored density clamped to what the current QR display height allows.
+  /// A persisted "Super" from a taller context (e.g. iPad send screen) must not
+  /// render here over-dense; fall back to the densest available option. The
+  /// stored preference is never rewritten — it stays valid for larger contexts.
+  private var effectiveDensity: QRDensity {
+    let available = QRDensity.available(forHeight: qrDisplayHeight)
+    return available.contains(qrDensity) ? qrDensity : (available.last ?? .medium)
+  }
+
   private var displayBytes: Data {
     compactPSBT ? PSBTCompactor.compact(viewModel.psbtBytes) : viewModel.psbtBytes
   }
 
   private var frameCount: Int {
-    QRFrameCounter.frames(for: displayBytes, encoding: qrEncoding, density: qrDensity)
+    QRFrameCounter.frames(for: displayBytes, encoding: qrEncoding, density: effectiveDensity)
   }
 
   var body: some View {
@@ -302,17 +311,17 @@ private struct BumpFeePSBTDisplayView: View {
                   data: bytes,
                   urType: "crypto-psbt",
                   framesPerSecond: framesPerSecond,
-                  maxFragmentLen: qrDensity.urFragmentLen
+                  maxFragmentLen: effectiveDensity.urFragmentLen
                 )
-                .id("\(qrDensity.urFragmentLen)-\(compactPSBT)")
+                .id("\(effectiveDensity.urFragmentLen)-\(compactPSBT)")
               } else {
                 BBQRDisplayView(
                   data: bytes,
                   fileType: .psbt,
                   framesPerSecond: framesPerSecond,
-                  maxVersion: qrDensity.bbqrMaxVersion
+                  maxVersion: effectiveDensity.bbqrMaxVersion
                 )
-                .id("\(qrDensity.rawValue)-bbqr-\(compactPSBT)")
+                .id("\(effectiveDensity.rawValue)-bbqr-\(compactPSBT)")
               }
             }
             .frame(width: maxSide - 10, height: maxSide - 10)
@@ -368,7 +377,10 @@ private struct BumpFeePSBTDisplayView: View {
                 .font(.hbLabel())
                 .foregroundStyle(Color.hbTextSecondary)
               Spacer()
-              Picker("", selection: $qrDensityRaw) {
+              Picker("", selection: Binding(
+                get: { effectiveDensity.rawValue },
+                set: { qrDensityRaw = $0 }
+              )) {
                 ForEach(QRDensity.available(forHeight: qrDisplayHeight), id: \.self) { density in
                   Text(density.rawValue).tag(density.rawValue)
                 }
