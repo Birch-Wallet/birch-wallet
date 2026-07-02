@@ -476,10 +476,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		3C1E1FA32F7B5F63002FDAE2 /* XCRemoteSwiftPackageReference "bdk-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/newtonick/bdk-swift";
+			repositoryURL = "https://github.com/bitcoindevkit/bdk-swift";
 			requirement = {
 				kind = exactVersion;
-				version = "2.3.1-ssl-patch";
+				version = 3.0.0;
 			};
 		};
 		AA00000400000000000000D0 /* XCRemoteSwiftPackageReference "URKit" */ = {

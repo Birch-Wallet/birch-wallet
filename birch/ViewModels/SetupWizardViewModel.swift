@@ -238,9 +238,10 @@ final class SetupWizardViewModel {
 
   func deriveFirstAddress() {
     let bdkNetwork = BitcoinService.shared.bdkNetwork(from: network)
+    let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
     do {
-      let extDesc = try Descriptor(descriptor: externalDescriptor, network: bdkNetwork)
-      let chgDesc = try Descriptor(descriptor: internalDescriptor, network: bdkNetwork)
+      let extDesc = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
+      let chgDesc = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
       let persister = try Persister.newInMemory()
       let tempWallet = try Wallet(
         descriptor: extDesc,
@@ -422,10 +423,10 @@ final class SetupWizardViewModel {
         return
       }
       // Validate descriptors with BDK before proceeding
-      let bdkNetwork = BitcoinService.shared.bdkNetwork(from: network)
+      let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
       do {
-        _ = try Descriptor(descriptor: externalDescriptor, network: bdkNetwork)
-        _ = try Descriptor(descriptor: internalDescriptor, network: bdkNetwork)
+        _ = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
+        _ = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
       } catch {
         importDescriptorError = "Invalid descriptor: \(error.localizedDescription)"
         return
@@ -466,10 +467,10 @@ final class SetupWizardViewModel {
     }
 
     // Validate descriptors with BDK before saving — catch parse errors early
-    let bdkNetwork = BitcoinService.shared.bdkNetwork(from: network)
+    let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
     do {
-      _ = try Descriptor(descriptor: externalDescriptor, network: bdkNetwork)
-      _ = try Descriptor(descriptor: internalDescriptor, network: bdkNetwork)
+      _ = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
+      _ = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
     } catch {
       throw AppError.descriptorInvalid("\(error.localizedDescription)")
     }
