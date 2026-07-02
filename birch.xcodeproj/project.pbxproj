@@ -342,9 +342,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CC0000010000000000000004 /* Birch.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 			};
 			name = Debug;
@@ -353,9 +353,9 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CC0000010000000000000004 /* Birch.xcconfig */;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 26;
+				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 			};
 			name = Release;
