@@ -584,6 +584,10 @@ private struct LogExportSheet: View {
   @State private var selectedLevel: LogLevel?
   @State private var selectedCategory: String?
   @State private var searchText = ""
+  /// Non-nil while the pre-export privacy warning is shown; carries the pending action.
+  @State private var pendingExport: ExportAction?
+
+  private enum ExportAction { case copy, share }
 
   /// Cap on rendered rows to keep the view responsive; export still includes all.
   private let displayCap = 5000
@@ -646,12 +650,12 @@ private struct LogExportSheet: View {
         }
         ToolbarItem(placement: .primaryAction) {
           HStack(spacing: 12) {
-            ShareLink(item: exportText) {
+            Button { pendingExport = .share } label: {
               Image(systemName: "square.and.arrow.up").font(.system(size: 14))
             }
             .foregroundStyle(Color.hbBitcoinOrange)
 
-            Button(action: copyLogs) {
+            Button { pendingExport = .copy } label: {
               Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 14))
                 .foregroundStyle(copied ? Color.hbSuccess : Color.hbBitcoinOrange)
@@ -660,7 +664,18 @@ private struct LogExportSheet: View {
         }
       }
       .onAppear { loadLogs() }
+      .alert("Logs contain private wallet data", isPresented: exportWarningBinding, presenting: pendingExport) { action in
+        Button(action == .copy ? "Copy Anyway" : "Share Anyway") { performExport(action) }
+        Button("Cancel", role: .cancel) {}
+      } message: { _ in
+        Text("These logs include your wallet's transaction IDs, addresses, amounts, and descriptors. Only copy or share them with people and apps you trust.")
+      }
     }
+  }
+
+  /// Drives the export warning alert; clearing it cancels the pending action.
+  private var exportWarningBinding: Binding<Bool> {
+    Binding(get: { pendingExport != nil }, set: { if !$0 { pendingExport = nil } })
   }
 
   // MARK: Controls
@@ -805,6 +820,16 @@ private struct LogExportSheet: View {
     }
   }
 
+  private func performExport(_ action: ExportAction) {
+    switch action {
+    case .copy:
+      copyLogs()
+    case .share:
+      // Defer so the warning alert finishes dismissing before we present the share sheet.
+      DispatchQueue.main.async { shareLogs() }
+    }
+  }
+
   private func copyLogs() {
     UIPasteboard.general.string = exportText
     copied = true
@@ -812,5 +837,24 @@ private struct LogExportSheet: View {
       try? await Task.sleep(for: .seconds(2))
       await MainActor.run { copied = false }
     }
+  }
+
+  private func shareLogs() {
+    // Write to a temp .txt file so the share sheet shows a proper filename.
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("birch-logs.txt")
+    try? exportText.data(using: .utf8)?.write(to: tempURL)
+
+    let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          var topVC = windowScene.windows.first?.rootViewController else { return }
+    while let presented = topVC.presentedViewController {
+      topVC = presented
+    }
+    if let popover = activityVC.popoverPresentationController {
+      popover.sourceView = topVC.view
+      popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+      popover.permittedArrowDirections = []
+    }
+    topVC.present(activityVC, animated: true)
   }
 }
