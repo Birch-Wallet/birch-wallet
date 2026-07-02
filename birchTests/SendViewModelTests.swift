@@ -339,4 +339,19 @@ struct SendViewModelTests {
     #expect(vm.finalizedTxBytes == Data([0x01, 0x02, 0x03]))
     #expect(vm.errorMessage == nil)
   }
+
+  // MARK: - Self Recipient Detection
+
+  @Test func isSelfRecipientChecksWalletOwnership() {
+    let mock = MockBitcoinService()
+    mock.walletAddresses = ["tb1qmine"]
+    let vm = SendViewModel(bitcoinService: mock)
+
+    #expect(vm.isSelfRecipient(Recipient(address: "tb1qmine", amountSats: "1000")))
+    #expect(vm.isSelfRecipient(Recipient(address: "  tb1qmine  ", amountSats: "1000")),
+            "whitespace should be trimmed before ownership check")
+    #expect(!vm.isSelfRecipient(Recipient(address: "tb1qexternal", amountSats: "1000")))
+    #expect(!vm.isSelfRecipient(Recipient(address: "", amountSats: "1000")),
+            "empty address must never classify as self")
+  }
 }

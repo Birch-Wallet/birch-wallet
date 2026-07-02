@@ -45,7 +45,10 @@ struct SendReviewView: View {
               }
             }
 
-            ReviewItem(label: viewModel.recipients.count > 1 ? "Amount \(index + 1)" : "Amount") {
+            ReviewItem(label: viewModel.isSelfRecipient(recipient)
+              ? "Self Transfer"
+              : (viewModel.recipients.count > 1 ? "Amount \(index + 1)" : "Amount"))
+            {
               if recipient.isSendMax {
                 HStack(spacing: 6) {
                   Text("MAX (\(recipient.amountValue?.formattedSats ?? "—"))")
@@ -215,8 +218,12 @@ struct TransactionFlowDiagram: View {
 
   private var outputLabels: [(label: String, color: Color)] {
     var outputs: [(String, Color)] = []
-    for (i, _) in viewModel.recipients.enumerated() {
-      let label = viewModel.recipients.count > 1 ? "Recipient \(i + 1)" : "Recipient"
+    for (i, recipient) in viewModel.recipients.enumerated() {
+      let label: String = if viewModel.isSelfRecipient(recipient) {
+        "Self"
+      } else {
+        viewModel.recipients.count > 1 ? "Recipient \(i + 1)" : "Recipient"
+      }
       outputs.append((label, Color.hbBitcoinOrange))
     }
     if viewModel.changeAmount != nil {

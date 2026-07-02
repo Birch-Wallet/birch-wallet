@@ -359,7 +359,10 @@ private struct PSBTReviewCard: View {
           }
         }
 
-        ReviewItem(label: viewModel.recipients.count > 1 ? "Amount \(index + 1)" : "Amount") {
+        ReviewItem(label: viewModel.isSelfRecipient(recipient)
+          ? "Self Transfer"
+          : (viewModel.recipients.count > 1 ? "Amount \(index + 1)" : "Amount"))
+        {
           if recipient.isSendMax {
             HStack(spacing: 6) {
               Text("MAX (\(recipient.amountValue?.formattedSats ?? "—"))")

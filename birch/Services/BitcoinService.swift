@@ -1108,6 +1108,15 @@ final class BitcoinService {
     return (psbt, tx)
   }
 
+  /// Whether an address belongs to the loaded wallet (self-transfer detection)
+  func isWalletAddress(_ address: String) -> Bool {
+    guard let wallet else { return false }
+    let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
+    let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let addr = try? Address(address: trimmed, network: network) else { return false }
+    return wallet.isMine(script: addr.scriptPubkey())
+  }
+
   func psbtInputOutpoints(_ psbtData: Data) -> [String] {
     let base64 = psbtData.base64EncodedString()
     guard let psbt = try? Psbt(psbtBase64: base64),

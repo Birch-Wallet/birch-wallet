@@ -103,6 +103,13 @@ final class MockBitcoinService: BitcoinServiceProtocol {
     []
   }
 
+  /// Addresses treated as belonging to the wallet for self-transfer detection
+  var walletAddresses: Set<String> = []
+
+  func isWalletAddress(_ address: String) -> Bool {
+    walletAddresses.contains(address.trimmingCharacters(in: .whitespacesAndNewlines))
+  }
+
   func psbtSignerInfo(_: Data) -> BitcoinService.PSBTSignerInfo? {
     psbtSignerInfoResult
   }

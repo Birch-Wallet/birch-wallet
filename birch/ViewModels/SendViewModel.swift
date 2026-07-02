@@ -180,6 +180,11 @@ final class SendViewModel: PSBTFlowManaging {
     recipients.contains { $0.isSendMax }
   }
 
+  /// Whether a recipient's address belongs to this wallet (self-transfer)
+  func isSelfRecipient(_ recipient: Recipient) -> Bool {
+    !recipient.isAddressEmpty && bitcoinService.isWalletAddress(recipient.address)
+  }
+
   /// Build a preview TransactionItem for the send flow detail screen
   var previewTransaction: TransactionItem {
     let outputs = recipients.map { r in
