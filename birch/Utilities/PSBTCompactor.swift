@@ -9,9 +9,20 @@ import Foundation
 /// this is a display-time transform only.
 enum PSBTCompactor {
   private static let magic: [UInt8] = [0x70, 0x73, 0x62, 0x74, 0xFF] // "psbt" + 0xFF
-  private static let psbtInNonWitnessUtxo: UInt8 = 0x00
   private static let psbtGlobalUnsignedTx: UInt8 = 0x00
-  private static let psbtGlobalXpub: UInt8 = 0x01
+
+  /// A map entry to remove, identified by its exact spec-defined key shape.
+  /// Matching on both type and full key length ensures we only ever drop
+  /// entries we positively recognize; anything else passes through.
+  private struct DropKey {
+    let keyType: UInt8
+    let keyLen: Int
+
+    /// PSBT_IN_NON_WITNESS_UTXO: key is the 1-byte type alone
+    static let inNonWitnessUtxo = DropKey(keyType: 0x00, keyLen: 1)
+    /// PSBT_GLOBAL_XPUB: key is the type byte + 78-byte serialized xpub
+    static let globalXpub = DropKey(keyType: 0x01, keyLen: 79)
+  }
 
   /// Returns the PSBT with all input `non_witness_utxo` entries and global
   /// xpubs removed. On any parse failure the original data is returned unchanged.
@@ -24,7 +35,7 @@ enum PSBTCompactor {
     var output = [UInt8](bytes[0 ..< offset])
 
     // Global map: drop xpub entries, and count inputs from the unsigned tx
-    guard let unsignedTx = copyMap(bytes, &offset, into: &output, dropKeyType: psbtGlobalXpub),
+    guard let unsignedTx = copyMap(bytes, &offset, into: &output, drop: .globalXpub),
           let inputCount = inputCount(inUnsignedTx: unsignedTx)
     else {
       return psbt
@@ -33,7 +44,7 @@ enum PSBTCompactor {
     // Input maps: drop non_witness_utxo entries
     for _ in 0 ..< inputCount {
       guard offset < bytes.count,
-            copyMap(bytes, &offset, into: &output, dropKeyType: psbtInNonWitnessUtxo) != nil
+            copyMap(bytes, &offset, into: &output, drop: .inNonWitnessUtxo) != nil
       else {
         return psbt
       }
@@ -46,11 +57,11 @@ enum PSBTCompactor {
   }
 
   /// Walks one key-value map (ending at its 0x00 separator), appending kept
-  /// entries to `output`. Entries whose first key byte equals `dropKeyType`
+  /// entries to `output`. Entries matching `drop` exactly (type and key length)
   /// are skipped. Returns the value of the key-type-0x00 entry seen (used to
   /// grab the global unsigned tx), or Data() if none; nil on parse failure.
   private static func copyMap(
-    _ bytes: [UInt8], _ offset: inout Int, into output: inout [UInt8], dropKeyType: UInt8?
+    _ bytes: [UInt8], _ offset: inout Int, into output: inout [UInt8], drop: DropKey?
   ) -> Data? {
     var keyTypeZeroValue = Data()
     while true {
@@ -63,6 +74,8 @@ enum PSBTCompactor {
       let entryStart = offset
       guard let keyLen = readCompactSize(bytes, &offset),
             offset + keyLen <= bytes.count else { return nil }
+      // Note: key types are compact-size varints per BIP-174; reading one byte
+      // is correct only for types < 0xFD, which covers everything matched here
       let keyType = bytes[offset]
       offset += keyLen
       guard let valueLen = readCompactSize(bytes, &offset),
@@ -73,9 +86,7 @@ enum PSBTCompactor {
       if keyType == psbtGlobalUnsignedTx, keyLen == 1 {
         keyTypeZeroValue = Data(bytes[valueRange])
       }
-      // Match on key type alone: non_witness_utxo keys are 1 byte, global
-      // xpub keys are 1 + 78 bytes (the serialized xpub is key data)
-      if let dropKeyType, keyType == dropKeyType {
+      if let drop, keyType == drop.keyType, keyLen == drop.keyLen {
         continue // skip this entry
       }
       output.append(contentsOf: bytes[entryStart ..< valueRange.upperBound])

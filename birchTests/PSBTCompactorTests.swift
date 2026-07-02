@@ -113,6 +113,68 @@ struct PSBTCompactorTests {
     #expect(PSBTCompactor.compact(magicOnly) == magicOnly)
   }
 
+  @Test func dropsOnlyExactSpecKeyShapes() {
+    /// Synthetic PSBT containing look-alike entries that share a dropped entry's
+    /// key TYPE but not its spec-defined key LENGTH — these must pass through:
+    ///  - global: type 0x01 with a 4-byte key body (real PSBT_GLOBAL_XPUB keys are 79 bytes)
+    ///  - input: type 0x00 with 2 bytes of key data (real non_witness_utxo keys are 1 byte)
+    /// alongside a real non_witness_utxo (0xEE * 60 value) that must be stripped.
+    func entry(key: [UInt8], value: [UInt8]) -> [UInt8] {
+      [UInt8(key.count)] + key + [UInt8(value.count)] + value
+    }
+    // Minimal 1-in/1-out unsigned legacy tx
+    let unsignedTx: [UInt8] = [2, 0, 0, 0] // version
+      + [1] + [UInt8](repeating: 0xAB, count: 32) + [0, 0, 0, 0] + [0] + [0xFD, 0xFF, 0xFF, 0xFF]
+      + [1] + [0x88, 0x13, 0, 0, 0, 0, 0, 0] + [0x16, 0x00, 0x14] + [UInt8](repeating: 0x99, count: 20)
+      + [0, 0, 0, 0] // locktime
+
+    var psbt: [UInt8] = [0x70, 0x73, 0x62, 0x74, 0xFF]
+    psbt += entry(key: [0x00], value: unsignedTx) // global unsigned tx
+    psbt += entry(key: [0x01, 0xAA, 0xBB, 0xCC, 0xDD], value: [0x11, 0x22, 0x33, 0x44]) // xpub look-alike
+    psbt += [0x00] // end global map
+    psbt += entry(key: [0x00], value: [UInt8](repeating: 0xEE, count: 60)) // real non_witness_utxo
+    psbt += entry(key: [0x00, 0x51, 0x52], value: [0xCA, 0xFE]) // type-0x00 look-alike with key data
+    psbt += entry(key: [0x01], value: [0x88, 0x13, 0, 0, 0, 0, 0, 0, 0x16, 0x00, 0x14]
+      + [UInt8](repeating: 0x99, count: 20)) // witness_utxo
+    psbt += [0x00] // end input map
+    psbt += [0x00] // empty output map
+
+    let original = Data(psbt)
+    let compacted = PSBTCompactor.compact(original)
+
+    // The real non_witness_utxo is gone
+    #expect(compacted.range(of: Data(repeating: 0xEE, count: 60)) == nil)
+    // The malformed global type-0x01 entry survives (its unique key bytes remain)
+    #expect(compacted.range(of: Data([0x01, 0xAA, 0xBB, 0xCC, 0xDD])) != nil)
+    // The input type-0x00 entry with key data survives (key 0x00 0x51 0x52, value 0xCA 0xFE)
+    #expect(compacted.range(of: Data([0x03, 0x00, 0x51, 0x52, 0x02, 0xCA, 0xFE])) != nil)
+    // Exactly the non_witness_utxo entry was removed (1B keylen + 1B key + 1B valuelen + 60B value)
+    #expect(original.count - compacted.count == 63)
+  }
+
+  @Test func psbtV2PassesThroughUnchanged() {
+    /// BIP-370 (PSBT v2) removes the global unsigned tx, which the compactor
+    /// needs for the input count. Without it the walk aborts and the ENTIRE
+    /// original PSBT is returned — no partial stripping (not even the global
+    /// map), even though this v2 fixture carries a non_witness_utxo entry.
+    func entry(key: [UInt8], value: [UInt8]) -> [UInt8] {
+      [UInt8(key.count)] + key + [UInt8(value.count)] + value
+    }
+    var psbt: [UInt8] = [0x70, 0x73, 0x62, 0x74, 0xFF]
+    psbt += entry(key: [0x02], value: [2, 0, 0, 0]) // PSBT_GLOBAL_TX_VERSION
+    psbt += entry(key: [0x04], value: [1]) // PSBT_GLOBAL_INPUT_COUNT
+    psbt += entry(key: [0x05], value: [1]) // PSBT_GLOBAL_OUTPUT_COUNT
+    psbt += entry(key: [0xFB], value: [2, 0, 0, 0]) // PSBT_GLOBAL_VERSION = 2
+    psbt += [0x00] // end global map
+    psbt += entry(key: [0x00], value: [UInt8](repeating: 0xEE, count: 40)) // non_witness_utxo
+    psbt += entry(key: [0x0E], value: [UInt8](repeating: 0xAB, count: 32)) // PSBT_IN_PREVIOUS_TXID
+    psbt += [0x00] // end input map
+    psbt += [0x00] // empty output map
+
+    let v2psbt = Data(psbt)
+    #expect(PSBTCompactor.compact(v2psbt) == v2psbt)
+  }
+
   @Test func failSafeOnTruncatedPSBT() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let truncated = original.prefix(original.count / 2)
