@@ -14,20 +14,39 @@ struct TransactionRowView: View {
     transaction.timestamp ?? transaction.firstSeen
   }
 
+  private var directionIcon: String {
+    if transaction.isSelfTransfer { return "arrow.triangle.2.circlepath" }
+    return transaction.isIncoming ? "arrow.down.left" : "arrow.up.right"
+  }
+
+  private var directionText: String {
+    if transaction.isSelfTransfer { return "Self Transfer" }
+    return transaction.isIncoming ? "Received" : "Sent"
+  }
+
+  private var amountColor: Color {
+    if transaction.isSelfTransfer { return Color.hbTextPrimary }
+    return transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary
+  }
+
+  private var displayAmount: UInt64 {
+    transaction.isSelfTransfer ? transaction.selfTransferAmount : transaction.absoluteAmount
+  }
+
   var body: some View {
     HStack(spacing: 12) {
       // Direction icon
-      Image(systemName: transaction.isIncoming ? "arrow.down.left" : "arrow.up.right")
+      Image(systemName: directionIcon)
         .font(.system(size: 16, weight: .semibold))
-        .foregroundStyle(transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary)
+        .foregroundStyle(amountColor)
         .frame(width: 32, height: 32)
         .background(
-          (transaction.isIncoming ? Color.hbSuccess : Color.hbTextSecondary).opacity(0.1)
+          (transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbTextSecondary).opacity(0.1)
         )
         .clipShape(Circle())
 
       VStack(alignment: .leading, spacing: 4) {
-        Text(transaction.isIncoming ? "Received" : "Sent")
+        Text(directionText)
           .font(.hbBody(15))
           .foregroundStyle(Color.hbTextPrimary)
 
@@ -44,15 +63,15 @@ struct TransactionRowView: View {
         if isPrivate {
           Text(Constants.privacyText())
             .font(.hbMono(14))
-            .foregroundStyle(transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary)
-        } else if showFiat, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(transaction.amount) {
+            .foregroundStyle(amountColor)
+        } else if showFiat, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(displayAmount) {
           Text(fiatStr)
             .font(.hbMono(14))
-            .foregroundStyle(transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary)
+            .foregroundStyle(amountColor)
         } else {
-          Text(transaction.absoluteAmount.formattedSats)
+          Text(displayAmount.formattedSats)
             .font(.hbMono(14))
-            .foregroundStyle(transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary)
+            .foregroundStyle(amountColor)
         }
 
         // Confirmation badge

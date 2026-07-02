@@ -21,38 +21,49 @@ struct TransactionDetailView: View {
     BitcoinService.shared.currentProfile?.privacyMode ?? false
   }
 
+  private var headerAmount: UInt64 {
+    transaction.isSelfTransfer ? transaction.selfTransferAmount : transaction.absoluteAmount
+  }
+
+  private var directionText: String {
+    if transaction.isSelfTransfer { return "Self Transfer" }
+    return transaction.isIncoming ? "Received" : "Sent"
+  }
+
   var body: some View {
     ScrollView {
       VStack(spacing: 20) {
         // Direction + Amount header
         VStack(spacing: 8) {
-          Image(systemName: transaction.isIncoming ? "arrow.down.left.circle.fill" : "arrow.up.right.circle.fill")
+          Image(systemName: transaction.isSelfTransfer
+            ? "arrow.triangle.2.circlepath.circle.fill"
+            : (transaction.isIncoming ? "arrow.down.left.circle.fill" : "arrow.up.right.circle.fill"))
             .font(.system(size: 44))
-            .foregroundStyle(transaction.isIncoming ? Color.hbSuccess : Color.hbBitcoinOrange)
+            .foregroundStyle(transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbBitcoinOrange)
 
           if isPrivate {
             Text(Constants.privacyText())
               .font(.hbAmountMedium)
               .foregroundStyle(Color.hbTextPrimary)
-          } else if fiatEnabled, fiatPrimary, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(transaction.amount) {
+          } else if fiatEnabled, fiatPrimary, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(headerAmount) {
             Text(fiatStr)
               .font(.hbAmountMedium)
               .foregroundStyle(Color.hbTextPrimary)
-            Text(transaction.absoluteAmount.formattedSats)
+            Text(headerAmount.formattedSats)
               .font(.hbBody(14))
               .foregroundStyle(Color.hbTextSecondary)
           } else {
-            Text(transaction.absoluteAmount.formattedSats)
+            Text(headerAmount.formattedSats)
               .font(.hbAmountMedium)
               .foregroundStyle(Color.hbTextPrimary)
-            if fiatEnabled, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(transaction.amount) {
+            if fiatEnabled, let fiatStr = FiatPriceService.shared.formattedSatsToFiat(headerAmount) {
               Text(fiatStr)
                 .font(.hbBody(14))
                 .foregroundStyle(Color.hbTextSecondary)
             }
           }
 
-          Text(transaction.isIncoming ? "Received" : "Sent")
+          Text(directionText)
             .font(.hbBody())
             .foregroundStyle(Color.hbTextSecondary)
         }

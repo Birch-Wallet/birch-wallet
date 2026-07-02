@@ -51,6 +51,18 @@ struct TransactionItem: Identifiable, Equatable {
     UInt64(abs(amount))
   }
 
+  /// True when every input and every output belongs to this wallet,
+  /// i.e. funds were moved within the wallet and only the fee left it.
+  var isSelfTransfer: Bool {
+    !inputs.isEmpty && !outputs.isEmpty
+      && inputs.allSatisfy(\.isMine) && outputs.allSatisfy(\.isMine)
+  }
+
+  /// Amount moved within the wallet for a self-transfer (total output value).
+  var selfTransferAmount: UInt64 {
+    outputs.reduce(0) { $0 + $1.amount }
+  }
+
   var isConfirmed: Bool {
     confirmations > 0
   }
