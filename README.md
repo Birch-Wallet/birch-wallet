@@ -204,7 +204,7 @@ fastlane/screenshots/
 ## Links
 
 - **Website**: [birchwallet.app](https://birchwallet.app)
-- **TestFlight Beta**: [Join the beta](https://testflight.apple.com/join/PuHVwJDJ)
+- **App Store**: [Download on the App Store](https://apps.apple.com/us/app/birch-wallet-bitcoin-multisig/id6775676217)
 - **Author**: [newtonick](https://github.com/newtonick)
 
 ## License
