@@ -159,6 +159,38 @@ struct DescriptorTests {
     #expect(!result)
   }
 
+  @Test func rejectNonZeroAccountDescriptor() {
+    let vm = SetupWizardViewModel()
+    vm.network = .testnet4
+    vm.importedDescriptorText =
+      "wsh(sortedmulti(2,[73c5da0a/48'/1'/1'/2']tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ/0/*,[f3ab64d8/48'/1'/0'/2']tpubDFcMWLJTavzfRa3Rc5i3bTMGBW7kYBLhLMJpLGSEik5pVhN5SMNKyVXHEB3Wnz6haXBMLF5MUiGMrawKaYFoZhBFNnEv7XEiv3FtGkBLtEHj/0/*))"
+    let result = vm.parseImportedDescriptor()
+    #expect(!result)
+    #expect(vm.errorMessage?.contains("account 0") == true)
+  }
+
+  @Test func rejectCoinTypeMismatchDescriptor() {
+    let vm = SetupWizardViewModel()
+    vm.network = .mainnet
+    // Testnet coin type (1') origins imported while mainnet is selected
+    vm.importedDescriptorText =
+      "wsh(sortedmulti(2,[73c5da0a/48'/1'/0'/2']tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ/0/*,[f3ab64d8/48'/1'/0'/2']tpubDFcMWLJTavzfRa3Rc5i3bTMGBW7kYBLhLMJpLGSEik5pVhN5SMNKyVXHEB3Wnz6haXBMLF5MUiGMrawKaYFoZhBFNnEv7XEiv3FtGkBLtEHj/0/*))"
+    let result = vm.parseImportedDescriptor()
+    #expect(!result)
+    #expect(vm.errorMessage?.lowercased().contains("testnet") == true)
+  }
+
+  @Test func rejectDescriptorWithKeyMissingOrigin() {
+    let vm = SetupWizardViewModel()
+    vm.network = .testnet4
+    // Second key has no [fp/48'/...] origin info
+    vm.importedDescriptorText =
+      "wsh(sortedmulti(2,[73c5da0a/48'/1'/0'/2']tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ/0/*,tpubDFcMWLJTavzfRa3Rc5i3bTMGBW7kYBLhLMJpLGSEik5pVhN5SMNKyVXHEB3Wnz6haXBMLF5MUiGMrawKaYFoZhBFNnEv7XEiv3FtGkBLtEHj/0/*))"
+    let result = vm.parseImportedDescriptor()
+    #expect(!result)
+    #expect(vm.errorMessage?.contains("origin") == true)
+  }
+
   // MARK: - Descriptor Checksum
 
   private static let realTestnetCosigners: [(xpub: String, fingerprint: String, derivationPath: String)] = [

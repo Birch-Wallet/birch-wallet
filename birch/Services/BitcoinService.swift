@@ -1335,6 +1335,11 @@ final class BitcoinService {
 
   // MARK: - Descriptor Building
 
+  // Both builders rebuild the key origin as [fp/48'/coinType'/0'/2'] rather than
+  // using cosigner.derivationPath. This is safe because Birch only supports
+  // account-0 BIP48 keys — every entry point (setup wizard, descriptor import,
+  // cosigner editing) validates paths via SetupWizardViewModel.validateDerivationPath.
+
   static func buildDescriptor(
     requiredSignatures: Int,
     cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
