@@ -52,10 +52,17 @@ final class BitcoinService {
   private(set) var lastSyncType: SyncType = .none
   private(set) var syncLog: [String] = []
 
-  /// Updates syncState only if the given profile is still the active wallet.
-  /// Prevents a long-running sync from overwriting UI state after a wallet switch.
-  private func setSyncState(_ state: WalletSyncState, for profileId: UUID?) {
-    guard currentProfile?.id == profileId else { return }
+  /// Incremented whenever the wallet instance is replaced (load, reload, or unload).
+  /// Comparing generations lets an in-flight sync detect that its wallet was swapped
+  /// out even when the profile id is unchanged — e.g. a descriptor edit reloads the
+  /// same profile with a fresh Wallet and persister.
+  private var walletGeneration: UInt64 = 0
+
+  /// Updates syncState only if the wallet the sync started against is still loaded.
+  /// Prevents a long-running sync from overwriting UI state after a wallet switch
+  /// or same-profile reload.
+  private func setSyncState(_ state: WalletSyncState, generation: UInt64) {
+    guard walletGeneration == generation else { return }
     syncState = state
   }
 
@@ -147,6 +154,7 @@ final class BitcoinService {
   // MARK: - Wallet Lifecycle
 
   func unloadWallet() {
+    walletGeneration += 1
     syncTask?.cancel()
     syncTask = nil
     stopAutoSync()
@@ -166,7 +174,12 @@ final class BitcoinService {
   }
 
   func loadWallet(profile: WalletProfile) async throws {
-    // Cancel any in-flight sync and clear previous wallet state
+    // Always cancel any in-flight sync — it runs against a wallet instance we are
+    // about to replace, even when reloading the same profile (descriptor edits).
+    syncTask?.cancel()
+    syncTask = nil
+
+    // Clear previous wallet state when switching profiles
     if currentProfile != nil, currentProfile?.id != profile.id {
       addToLog("Switching wallets — unloading previous wallet")
       unloadWallet()
@@ -252,6 +265,7 @@ final class BitcoinService {
     syncState = .notStarted
     lastSyncType = .none
 
+    walletGeneration += 1
     wallet = w
     self.persister = persister
     currentProfile = profile
@@ -293,12 +307,15 @@ final class BitcoinService {
       return
     }
 
-    // Capture wallet identity and persister at start — if the wallet switches
-    // during sync, we must not apply results or persist to the wrong database.
-    let syncProfileId = currentProfile?.id
+    // Capture wallet identity and persister at start — if the wallet is switched
+    // or reloaded during sync, we must not apply results or persist to the wrong
+    // database. The generation (not the profile id) is the identity check, so a
+    // same-profile reload also invalidates this sync.
+    let syncGeneration = walletGeneration
+    let syncProfileId = currentProfile?.id // for per-profile UserDefaults keys only
     let syncPersister = persister
 
-    setSyncState(.syncing("Connecting…"), for: syncProfileId)
+    setSyncState(.syncing("Connecting…"), generation: syncGeneration)
     addToLog("Starting sync (needsFullScan: \(needsFullScan))")
 
     // Capture pre-sync state so completion can log deltas.
@@ -325,14 +342,14 @@ final class BitcoinService {
 
       // Verify server is reachable before starting scan — prevents showing
       // misleading "Scanning addresses" progress when offline / server is down.
-      setSyncState(.syncing("Checking server…"), for: syncProfileId)
+      setSyncState(.syncing("Checking server…"), generation: syncGeneration)
       try await Task.detached { try client.ping() }.value
       addToLog("Server ping OK")
 
       // Fetch chain tip early to confirm server returns real data
       if let header = await Task.detached(operation: { [client] in try? client.blockHeadersSubscribe() }).value {
-        guard currentProfile?.id == syncProfileId else {
-          addToLog("Sync cancelled: wallet switched during chain tip fetch")
+        guard walletGeneration == syncGeneration else {
+          addToLog("Sync cancelled: wallet replaced during chain tip fetch")
           return
         }
         chainTipHeight = UInt32(header.height)
@@ -351,7 +368,7 @@ final class BitcoinService {
         let inspector = FullScanProgressInspector { [weak self] keychain, index in
           let path = keychain == .external ? "0" : "1"
           Task { @MainActor [weak self] in
-            self?.setSyncState(.syncing("Scanning …/\(path)/\(index)"), for: syncProfileId)
+            self?.setSyncState(.syncing("Scanning …/\(path)/\(index)"), generation: syncGeneration)
           }
         }
         let fullScanRequest = try wallet.startFullScan()
@@ -359,7 +376,7 @@ final class BitcoinService {
           .build()
 
         addToLog("Full scan request built")
-        setSyncState(.syncing("Scanning addresses…"), for: syncProfileId)
+        setSyncState(.syncing("Scanning addresses…"), generation: syncGeneration)
         let update = try await Task.detached { [client] in
           try client.fullScan(
             request: fullScanRequest,
@@ -369,15 +386,15 @@ final class BitcoinService {
           )
         }.value
 
-        // Bail out if wallet was switched during the network scan
-        guard currentProfile?.id == syncProfileId else {
-          addToLog("Sync cancelled: wallet switched during full scan")
+        // Bail out if the wallet was switched or reloaded during the network scan
+        guard walletGeneration == syncGeneration else {
+          addToLog("Sync cancelled: wallet replaced during full scan")
           return
         }
         try Task.checkCancellation()
 
         addToLog("Full scan update received from server")
-        setSyncState(.syncing("Applying update…"), for: syncProfileId)
+        setSyncState(.syncing("Applying update…"), generation: syncGeneration)
         try wallet.applyUpdate(update: update)
         addToLog("Full scan update applied to wallet")
         needsFullScan = false
@@ -390,7 +407,7 @@ final class BitcoinService {
 
         let inspector = SyncProgressInspector { [weak self] _, total in
           Task { @MainActor [weak self] in
-            self?.setSyncState(.syncing("Checking \(total) scripts…"), for: syncProfileId)
+            self?.setSyncState(.syncing("Checking \(total) scripts…"), generation: syncGeneration)
           }
         }
         let syncRequest = try wallet.startSyncWithRevealedSpks()
@@ -398,7 +415,7 @@ final class BitcoinService {
           .build()
 
         addToLog("Sync request built")
-        setSyncState(.syncing("Refreshing transactions…"), for: syncProfileId)
+        setSyncState(.syncing("Refreshing transactions…"), generation: syncGeneration)
         let update = try await Task.detached { [client] in
           try client.sync(
             request: syncRequest,
@@ -407,35 +424,35 @@ final class BitcoinService {
           )
         }.value
 
-        // Bail out if wallet was switched during the network sync
-        guard currentProfile?.id == syncProfileId else {
-          addToLog("Sync cancelled: wallet switched during incremental sync")
+        // Bail out if the wallet was switched or reloaded during the network sync
+        guard walletGeneration == syncGeneration else {
+          addToLog("Sync cancelled: wallet replaced during incremental sync")
           return
         }
         try Task.checkCancellation()
 
         addToLog("Sync update received from server")
-        setSyncState(.syncing("Applying update…"), for: syncProfileId)
+        setSyncState(.syncing("Applying update…"), generation: syncGeneration)
         try wallet.applyUpdate(update: update)
         addToLog("Sync update applied to wallet")
         lastSyncType = .incremental
       }
 
       // Final identity check before persisting
-      guard currentProfile?.id == syncProfileId else {
-        addToLog("Sync cancelled: wallet switched before persist")
+      guard walletGeneration == syncGeneration else {
+        addToLog("Sync cancelled: wallet replaced before persist")
         return
       }
 
-      setSyncState(.syncing("Saving…"), for: syncProfileId)
+      setSyncState(.syncing("Saving…"), generation: syncGeneration)
       if let syncPersister {
         addToLog("Persisting wallet state")
         _ = try wallet.persist(persister: syncPersister)
       }
 
       // Verify wallet identity one more time after final await
-      guard currentProfile?.id == syncProfileId else {
-        addToLog("Sync completed but wallet switched — discarding results")
+      guard walletGeneration == syncGeneration else {
+        addToLog("Sync completed but wallet replaced — discarding results")
         return
       }
 
@@ -444,7 +461,7 @@ final class BitcoinService {
 
       let now = Date()
       lastSyncDate = now
-      setSyncState(.synced(now), for: syncProfileId)
+      setSyncState(.synced(now), generation: syncGeneration)
 
       let duration = String(format: "%.1f", now.timeIntervalSince(syncStartTime))
       let balanceDelta = Int64(balance) - Int64(balanceBefore)
@@ -456,12 +473,19 @@ final class BitcoinService {
           + "utxos \(utxoCountBefore) -> \(utxos.count), tip \(chainTipHeight)"
       )
     } catch {
+      // If the wallet was replaced mid-sync (switch or reload), this failure —
+      // typically a CancellationError — belongs to the old wallet. Don't clobber
+      // the new wallet's connection state or sync status.
+      guard walletGeneration == syncGeneration else {
+        addToLog("Sync aborted after wallet replacement: \(error)")
+        throw error
+      }
       let errorMsg = "\(error)"
       addToLog("Sync failed with error: \(errorMsg)")
       let friendly = Self.friendlyElectrumError(error)
       electrumVerified = false
       electrumConnectionError = friendly
-      setSyncState(.error(friendly), for: syncProfileId)
+      setSyncState(.error(friendly), generation: syncGeneration)
       throw error
     }
   }
