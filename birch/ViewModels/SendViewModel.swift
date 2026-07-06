@@ -357,7 +357,12 @@ final class SendViewModel: PSBTFlowManaging {
         applyPreset(selectedFeePreset)
       }
     } catch {
-      logger.error("Failed to fetch fee rates: \(error)")
+      let fallback = BitcoinService.RecommendedFees.fallback
+      logger.error("Failed to fetch fee rates: \(error) — falling back to \(fallback.medium) sat/vB")
+      await MainActor.run {
+        self.recommendedFees = fallback
+        applyPreset(selectedFeePreset)
+      }
     }
   }
 
