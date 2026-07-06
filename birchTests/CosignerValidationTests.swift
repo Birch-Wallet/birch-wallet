@@ -116,6 +116,22 @@ struct CosignerValidationTests {
     #expect(lower.contains("testnet"))
   }
 
+  @Test func rejectNonZeroAccountOnTestnet() {
+    let vm = SetupWizardViewModel()
+    vm.network = .testnet4
+    let error = vm.validateDerivationPath("m/48'/1'/1'/2'")
+    #expect(error != nil)
+    #expect(error?.contains("account 0") == true)
+  }
+
+  @Test func rejectNonZeroAccountOnMainnet() {
+    let vm = SetupWizardViewModel()
+    vm.network = .mainnet
+    let error = vm.validateDerivationPath("m/48'/0'/5'/2'")
+    #expect(error != nil)
+    #expect(error?.contains("account 0") == true)
+  }
+
   @Test func rejectInvalidBIP48Format() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4

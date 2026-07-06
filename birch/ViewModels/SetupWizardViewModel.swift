@@ -180,6 +180,10 @@ final class SetupWizardViewModel {
       let pathNetwork = coinTypeComponent == "0'" ? "mainnet" : "testnet/signet"
       return "Derivation path coin type is for \(pathNetwork) but wallet network is \(network.displayName). Expected \(Constants.derivationPath(for: network))."
     }
+    let accountComponent = String(components[3]) // e.g. "0'" or "1'"
+    if accountComponent != "0'" {
+      return "Birch only supports account 0 (\(Constants.derivationPath(for: network))). This key uses account \(accountComponent.dropLast())."
+    }
     return nil
   }
 
@@ -362,6 +366,29 @@ final class SetupWizardViewModel {
     if matches.isEmpty {
       errorMessage = "No cosigner keys found in descriptor"
       return false
+    }
+
+    // Every key must carry BIP48 origin info — otherwise keys without an origin
+    // would be silently dropped and the cosigner count would be wrong.
+    // Keys always follow "," (no origin) or "]" (after origin), which cannot
+    // occur inside a base58 key body, so this counts keys without false matches.
+    let keyPattern = #"[,\]][xt]pub"#
+    if let keyRegex = try? NSRegularExpression(pattern: keyPattern) {
+      let keyCount = keyRegex.numberOfMatches(in: text, range: NSRange(location: 0, length: nsText.length))
+      if keyCount != matches.count {
+        errorMessage = "All keys must include BIP48 origin info like [fingerprint/48'/\(network.coinType)'/0'/2']"
+        return false
+      }
+    }
+
+    // Validate each key's origin path (coin type must match the network, account must be 0)
+    for match in matches {
+      let coin = nsText.substring(with: match.range(at: 2))
+      let account = nsText.substring(with: match.range(at: 3))
+      if let error = Self.validateDerivationPath("m/48'/\(coin)'/\(account)'/2'", for: network) {
+        errorMessage = error
+        return false
+      }
     }
 
     requiredSignatures = m
