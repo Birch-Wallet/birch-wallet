@@ -1,8 +1,7 @@
 import Foundation
-import OSLog
 import SwiftData
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "LabelService")
+private let logger = AppLog(.labels)
 
 /// Handles label propagation between transactions, UTXOs, and addresses.
 enum LabelService {

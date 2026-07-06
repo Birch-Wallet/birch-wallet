@@ -4,6 +4,8 @@ import Observation
 @Observable
 @MainActor
 final class ReceiveViewModel {
+  private let logger = AppLog(.receive)
+
   var currentAddress: String = ""
   var addressIndex: UInt32 = 0
   var errorMessage: String?
@@ -38,7 +40,9 @@ final class ReceiveViewModel {
       let (address, index) = try bitcoinService.revealNextAddress()
       currentAddress = address
       addressIndex = index
+      logger.info("Revealed new receive address #\(index): \(address)")
     } catch {
+      logger.error("Failed to reveal next receive address: \(error.localizedDescription)")
       errorMessage = error.localizedDescription
     }
   }

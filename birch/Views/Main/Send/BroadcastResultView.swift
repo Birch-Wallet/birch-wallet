@@ -1,4 +1,3 @@
-import OSLog
 import SwiftData
 import SwiftUI
 
@@ -243,8 +242,7 @@ struct BroadcastResultView: View {
             walletID: walletID
           )
         } catch {
-          Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "LabelService")
-            .error("Failed to propagate change label: \(error.localizedDescription)")
+          AppLog(.labels).error("Failed to propagate change label: \(error.localizedDescription)")
         }
       }
     }

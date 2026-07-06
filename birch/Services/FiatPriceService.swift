@@ -1,8 +1,7 @@
 import Foundation
 import Observation
-import OSLog
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "FiatPriceService")
+private let logger = AppLog(.fiat)
 
 enum FiatSource: String, CaseIterable {
   case zeus

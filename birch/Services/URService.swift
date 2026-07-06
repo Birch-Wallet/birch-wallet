@@ -49,11 +49,14 @@ enum ScanExpectedType: Hashable {
 }
 
 enum URService {
+  private static let logger = AppLog(.qr)
+
   // MARK: - PSBT ↔ UR
 
   /// Encode PSBT bytes as a UR (crypto-psbt)
   static func encodePSBT(_ psbtData: Data) throws -> UR {
     let cbor = CBOR.bytes(psbtData)
+    logger.debug("Encoding \(psbtData.count)-byte PSBT as crypto-psbt UR")
     return try UR(type: "crypto-psbt", cbor: cbor)
   }
 
@@ -771,27 +774,45 @@ enum URService {
   static func processUR(_ ur: UR) -> AppURResult {
     switch ur.type {
     case "crypto-psbt":
-      if let data = try? decodePSBT(from: ur) {
+      do {
+        let data = try decodePSBT(from: ur)
+        logger.info("Decoded crypto-psbt UR: \(data.count) bytes")
         return .psbt(data)
+      } catch {
+        logger.error("Failed to decode crypto-psbt UR: \(error)")
       }
     case "crypto-hdkey":
-      if let result = try? parseHDKey(from: ur) {
+      do {
+        let result = try parseHDKey(from: ur)
+        logger.info("Decoded crypto-hdkey UR: fingerprint \(result.fingerprint), path \(result.derivationPath), xpub \(result.xpub)")
         return .hdKey(xpub: result.xpub, fingerprint: result.fingerprint, derivationPath: result.derivationPath)
+      } catch {
+        logger.error("Failed to decode crypto-hdkey UR: \(error)")
       }
     case "crypto-account":
-      if let result = try? parseCryptoAccount(from: ur) {
+      do {
+        let result = try parseCryptoAccount(from: ur)
+        logger.info("Decoded crypto-account UR: fingerprint \(result.fingerprint), path \(result.derivationPath), xpub \(result.xpub)")
         return .hdKey(xpub: result.xpub, fingerprint: result.fingerprint, derivationPath: result.derivationPath)
+      } catch {
+        logger.error("Failed to decode crypto-account UR: \(error)")
       }
     case "crypto-output":
-      if let descriptor = try? parseCryptoOutput(from: ur) {
+      do {
+        let descriptor = try parseCryptoOutput(from: ur)
+        logger.info("Decoded crypto-output UR: \(descriptor)")
         return .descriptor(descriptor)
+      } catch {
+        logger.error("Failed to decode crypto-output UR: \(error)")
       }
     case "bytes":
       if case let .bytes(data) = ur.cbor {
+        logger.info("Decoded bytes UR: \(data.count) bytes")
         return .rawBytes(data)
       }
+      logger.error("bytes UR had unexpected CBOR structure")
     default:
-      break
+      logger.warning("Unrecognized UR type: \(ur.type)")
     }
     return .unknown(ur.type)
   }

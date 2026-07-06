@@ -47,6 +47,7 @@ enum Constants {
 
   static let walletsDirName = "wallets"
   static let bdkDatabaseFilename = "bdk_wallet.sqlite"
+  static let logsDirName = "Logs"
 
   // MARK: - Limits
 
@@ -69,6 +70,13 @@ enum Constants {
 
   static func walletDatabasePath(for walletID: UUID) -> URL {
     walletDirectory(for: walletID).appendingPathComponent(bdkDatabaseFilename)
+  }
+
+  /// Directory for the rotating app log file, alongside wallet data in the
+  /// sandboxed Application Support container.
+  static func logsDirectory() -> URL {
+    let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+    return appSupport.appendingPathComponent(logsDirName)
   }
 
   // MARK: - Privacy Mode

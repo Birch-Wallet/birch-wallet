@@ -4,6 +4,8 @@ import UIKit
 import URKit
 
 enum QRVideoExporter {
+  private static let logger = AppLog(.qr)
+
   enum ExportError: Error {
     case qrGenerationFailed
     case writerSetupFailed(String)
@@ -18,6 +20,8 @@ enum QRVideoExporter {
     loopCount: Int = 3,
     qrSize: Int = 800
   ) async throws -> URL {
+    logger.info("Exporting QR MP4 '\(fileName)' from \(ur.type) UR (maxFragmentLen \(maxFragmentLen), \(fps) fps, \(loopCount) loops)")
+
     // Step 1: Generate UR part strings
     let encoder = UREncoder(ur, maxFragmentLen: maxFragmentLen)
     var partStrings: [String] = []
@@ -110,6 +114,7 @@ enum QRVideoExporter {
       throw ExportError.writingFailed(writer.error?.localizedDescription ?? "Unknown error")
     }
 
+    logger.info("QR MP4 export complete: \(partStrings.count) parts -> \(outputURL.lastPathComponent)")
     return outputURL
   }
 

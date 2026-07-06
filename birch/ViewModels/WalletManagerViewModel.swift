@@ -1,9 +1,8 @@
 import Foundation
 import Observation
-import OSLog
 import SwiftData
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "WalletManager")
+private let logger = AppLog(.wallet)
 
 @Observable
 @MainActor
@@ -11,7 +10,7 @@ final class WalletManagerViewModel {
   var errorMessage: String?
 
   func setActiveWallet(_ wallet: WalletProfile, allWallets: [WalletProfile], modelContext: ModelContext) {
-    logger.info("Switching active wallet to \(wallet.name, privacy: .private)")
+    logger.info("Switching active wallet to \(wallet.name)")
     for w in allWallets {
       w.isActive = (w.id == wallet.id)
     }
@@ -37,7 +36,7 @@ final class WalletManagerViewModel {
   }
 
   func deleteWallet(_ wallet: WalletProfile, modelContext: ModelContext) {
-    logger.info("Deleting wallet \(wallet.name, privacy: .private)")
+    logger.info("Deleting wallet \(wallet.name)")
     let wasActive = wallet.isActive
     let walletID = wallet.id
 

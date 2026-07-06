@@ -1,9 +1,8 @@
 import Bbqr
 import CoreImage.CIFilterBuiltins
-import OSLog
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "BBQRDisplayView")
+private let logger = AppLog(.qr)
 
 struct BBQRDisplayView: View {
   let data: Data

@@ -1,10 +1,9 @@
 import CryptoKit
 import Foundation
 import LocalAuthentication
-import OSLog
 import SwiftData
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "AppLock")
+private let logger = AppLog(.security)
 
 @Observable
 @MainActor
@@ -70,7 +69,7 @@ final class AppLockViewModel {
     let context = LAContext()
     var error: NSError?
     guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-      logger.warning("Biometric policy unavailable: \(error?.localizedDescription ?? "unknown", privacy: .public)")
+      logger.warning("Biometric policy unavailable: \(error?.localizedDescription ?? "unknown")")
       isLocked = false
       isAuthenticating = false
       return

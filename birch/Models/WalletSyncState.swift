@@ -27,8 +27,16 @@ enum WalletSyncState: Equatable {
   }
 }
 
-enum SyncType {
+enum SyncType: CustomStringConvertible {
   case none
   case fullScan
   case incremental
+
+  var description: String {
+    switch self {
+    case .none: "none"
+    case .fullScan: "full scan"
+    case .incremental: "incremental"
+    }
+  }
 }

@@ -1,12 +1,11 @@
 import AVFoundation
 import Bbqr
 import Combine
-import OSLog
 import SwiftUI
 import URKit
 import URUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "URScannerSheet")
+private let logger = AppLog(.qr)
 
 struct URScannerSheet: View {
   let onResult: (AppURResult) -> Void

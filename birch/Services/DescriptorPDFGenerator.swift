@@ -3,11 +3,15 @@ import UIKit
 import URKit
 
 enum DescriptorPDFGenerator {
+  private static let logger = AppLog(.export)
+
   static func generate(walletName: String, descriptor: String) -> Data? {
     guard let ur = try? URService.encodeCryptoOutput(descriptor: descriptor) else {
+      logger.error("Descriptor PDF export failed: could not UR-encode descriptor for '\(walletName)'")
       return nil
     }
     let urString = UREncoder.encode(ur)
+    logger.info("Generating descriptor PDF for '\(walletName)'")
 
     let pageWidth: CGFloat = 612
     let pageHeight: CGFloat = 792

@@ -1,8 +1,7 @@
-import OSLog
 import SwiftData
 import SwiftUI
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "birch", category: "TransactionDetailView")
+private let logger = AppLog(.transactions)
 
 struct TransactionDetailView: View {
   let transaction: TransactionItem
