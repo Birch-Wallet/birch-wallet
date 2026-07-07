@@ -344,7 +344,7 @@
 			buildSettings = {
 				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.21;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 			};
 			name = Debug;
@@ -355,7 +355,7 @@
 			buildSettings = {
 				CURRENT_PROJECT_VERSION = 27;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
-				MARKETING_VERSION = 0.2.1;
+				MARKETING_VERSION = 0.21;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 			};
 			name = Release;
