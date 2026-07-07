@@ -21,10 +21,16 @@ final class WalletManagerViewModel {
       UserDefaults.standard.set(wallet.id.uuidString, forKey: Constants.activeWalletIDKey)
       // Immediately clear stale wallet data so the UI never briefly shows old transactions/addresses
       BitcoinService.shared.unloadWallet()
-      BitcoinService.shared.syncTask = Task {
+      // Run loadWallet in a plain task — it must NOT be stored in syncTask, because
+      // loadWallet cancels syncTask to kill any in-flight sync. If this task were
+      // stored there, loadWallet would cancel itself and the following sync would
+      // immediately throw CancellationError. Only the sync itself belongs in syncTask.
+      Task {
         do {
           try await BitcoinService.shared.loadWallet(profile: wallet)
-          try await BitcoinService.shared.sync()
+          let syncTask = Task { try await BitcoinService.shared.sync() }
+          BitcoinService.shared.syncTask = syncTask
+          try await syncTask.value
         } catch {
           logger.error("Failed to load/sync wallet: \(error)")
         }
