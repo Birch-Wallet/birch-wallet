@@ -16,7 +16,11 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install SwiftFormat
-        run: brew install swiftformat@0.62.1
-
+        run: |
+          git clone --branch 0.62.1 --depth 1 https://github.com/nicklockwood/SwiftFormat.git
+          cd SwiftFormat
+          swift build -c release
+          sudo cp .build/release/swiftformat /usr/local/bin/swiftformat
+          swiftformat --version
       - name: Check Formatting
         run: swiftformat --lint .
