@@ -200,7 +200,9 @@ struct PSBTOutputInfo: Equatable {
   let amount: UInt64
   let role: Role
 
-  var isMine: Bool { role != .external }
+  var isMine: Bool {
+    role != .external
+  }
 }
 
 // MARK: - Validator
@@ -278,7 +280,9 @@ enum PSBTValidator {
   /// The script pubkey of the output an input spends, from whichever UTXO record the
   /// PSBT carries. Amount checks validate these records separately.
   private static func spentScriptPubkey(input: Input, txIn: TxIn) -> Script? {
-    if let witnessUtxo = input.witnessUtxo { return witnessUtxo.scriptPubkey }
+    if let witnessUtxo = input.witnessUtxo {
+      return witnessUtxo.scriptPubkey
+    }
     guard let previousTx = input.nonWitnessUtxo else { return nil }
     let outputs = previousTx.output()
     let vout = Int(txIn.previousOutput.vout)
