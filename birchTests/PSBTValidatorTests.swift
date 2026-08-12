@@ -341,14 +341,14 @@ struct PSBTValidatorTests {
     outputScript: UInt8 = 0xAA,
     truth: PSBTGroundTruth? = nil
   ) throws -> PSBTFinding? {
-    PSBTValidator.verifyOutputDerivation(
+    try PSBTValidator.verifyOutputDerivation(
       output: output(role),
       script: script(outputScript),
       derivations: [
-        "pubkeyA": try keySource(cosignerA, path),
-        "pubkeyB": try keySource(cosignerB, path),
+        "pubkeyA": keySource(cosignerA, path),
+        "pubkeyB": keySource(cosignerB, path),
       ],
-      against: truth ?? derivationTruth(scriptAt: { _, _ in self.script(outputScript) })
+      against: truth ?? derivationTruth(scriptAt: { _, _ in script(outputScript) })
     )
   }
 
@@ -395,14 +395,14 @@ struct PSBTValidatorTests {
 
   @Test("Cosigners claiming different indexes is critical")
   func cosignersDisagreeingIsCritical() throws {
-    let finding = PSBTValidator.verifyOutputDerivation(
+    let finding = try PSBTValidator.verifyOutputDerivation(
       output: output(.change),
       script: script(0xAA),
       derivations: [
-        "pubkeyA": try keySource(cosignerA, "m/48'/1'/0'/2'/1/0"),
-        "pubkeyB": try keySource(cosignerB, "m/48'/1'/0'/2'/1/9"),
+        "pubkeyA": keySource(cosignerA, "m/48'/1'/0'/2'/1/0"),
+        "pubkeyB": keySource(cosignerB, "m/48'/1'/0'/2'/1/9"),
       ],
-      against: derivationTruth(scriptAt: { _, _ in self.script(0xAA) })
+      against: derivationTruth(scriptAt: { _, _ in script(0xAA) })
     )
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationDisagreement)
@@ -417,7 +417,7 @@ struct PSBTValidatorTests {
       "m/48'/1'/0'/2'/1/4",
       role: .external,
       outputScript: 0xAA,
-      truth: derivationTruth(scriptAt: { _, _ in self.script(0xBB) })
+      truth: derivationTruth(scriptAt: { _, _ in script(0xBB) })
     )
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationScriptMismatch)
@@ -430,7 +430,7 @@ struct PSBTValidatorTests {
     let finding = try checkPath(
       "m/48'/1'/0'/2'/1/900000",
       role: .external,
-      truth: derivationTruth(scriptAt: { _, _ in self.script(0xAA) })
+      truth: derivationTruth(scriptAt: { _, _ in script(0xAA) })
     )
     #expect(finding?.severity == .warning)
     #expect(finding?.code == PSBTFinding.Code.outputBeyondGapLimit)
@@ -449,11 +449,11 @@ struct PSBTValidatorTests {
 
   @Test("Fingerprint comparison ignores case")
   func fingerprintCaseIsIgnored() throws {
-    let finding = PSBTValidator.verifyOutputDerivation(
+    let finding = try PSBTValidator.verifyOutputDerivation(
       output: output(.change),
       script: script(0xAA),
-      derivations: ["pubkeyA": try keySource("AABBCCDD", "m/48'/1'/0'/2'/1/0")],
-      against: derivationTruth(fingerprints: ["aabbccdd"], scriptAt: { _, _ in self.script(0xAA) })
+      derivations: ["pubkeyA": keySource("AABBCCDD", "m/48'/1'/0'/2'/1/0")],
+      against: derivationTruth(fingerprints: ["aabbccdd"], scriptAt: { _, _ in script(0xAA) })
     )
     #expect(finding == nil, "An uppercase fingerprint is the same fingerprint")
   }
