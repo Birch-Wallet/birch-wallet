@@ -10,7 +10,9 @@ func formatFeeRate(_ rate: Double) -> String {
     while s.hasSuffix("0") {
       s.removeLast()
     }
-    if s.hasSuffix(".") { s.removeLast() }
+    if s.hasSuffix(".") {
+      s.removeLast()
+    }
   }
   return s
 }

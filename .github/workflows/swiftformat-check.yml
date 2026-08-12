@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install SwiftFormat
-        run: brew install swiftformat
+        run: brew install swiftformat@0.62.1
 
       - name: Check Formatting
         run: swiftformat --lint .

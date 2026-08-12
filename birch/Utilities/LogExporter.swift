@@ -23,9 +23,15 @@ enum LogExporter {
     let entries = await LogFileStore.shared.entries(since: since)
     let trimmedSearch = search.trimmingCharacters(in: .whitespacesAndNewlines)
     return entries.filter { entry in
-      if let levels, !levels.contains(entry.l) { return false }
-      if let categories, !categories.contains(entry.c) { return false }
-      if !trimmedSearch.isEmpty, !entry.m.localizedCaseInsensitiveContains(trimmedSearch) { return false }
+      if let levels, !levels.contains(entry.l) {
+        return false
+      }
+      if let categories, !categories.contains(entry.c) {
+        return false
+      }
+      if !trimmedSearch.isEmpty, !entry.m.localizedCaseInsensitiveContains(trimmedSearch) {
+        return false
+      }
       return true
     }
   }

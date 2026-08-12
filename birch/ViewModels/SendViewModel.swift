@@ -241,7 +241,9 @@ final class SendViewModel: PSBTFlowManaging {
     if amountInFiat {
       // Switching from fiat to sats: convert fiat display amounts back to sats
       for i in recipients.indices {
-        if recipients[i].isSendMax { continue }
+        if recipients[i].isSendMax {
+          continue
+        }
         let fiatStr = fiatDisplayAmount[recipients[i].id] ?? ""
         if let fiatVal = Double(fiatStr), fiatVal > 0,
            let sats = fiatService.fiatToSats(fiatVal)

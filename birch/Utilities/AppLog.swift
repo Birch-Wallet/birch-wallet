@@ -182,12 +182,16 @@ final class LogFileStore: @unchecked Sendable {
   private func writeLocked(_ entry: LogEntry) {
     guard var data = try? encoder.encode(entry) else { return }
     data.append(0x0A) // newline delimiter
-    if handle == nil { openHandle() }
+    if handle == nil {
+      openHandle()
+    }
     guard let handle else { return }
     do {
       try handle.write(contentsOf: data)
       currentSize += UInt64(data.count)
-      if currentSize >= maxFileSize { rotate() }
+      if currentSize >= maxFileSize {
+        rotate()
+      }
     } catch {
       // Best-effort logging: drop the line rather than crash the app.
     }

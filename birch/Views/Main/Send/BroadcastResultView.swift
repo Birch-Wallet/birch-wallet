@@ -202,7 +202,9 @@ struct BroadcastResultView: View {
       if trimmed.utf8.count > WalletLabel.maxLabelLength {
         trimmed = String(trimmed.utf8.prefix(WalletLabel.maxLabelLength))!
       }
-      if firstLabel == nil { firstLabel = trimmed }
+      if firstLabel == nil {
+        firstLabel = trimmed
+      }
       let address = recipient.address.trimmingCharacters(in: .whitespacesAndNewlines)
       // Save as address label — update if one already exists
       let addrType = "addr"

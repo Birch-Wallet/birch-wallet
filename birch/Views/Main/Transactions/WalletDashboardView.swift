@@ -63,12 +63,20 @@ struct WalletDashboardView: View {
 
   private func formatAge(_ seconds: TimeInterval) -> String {
     let days = Int(seconds / 86400)
-    if days < 1 { return "< 1 day" }
-    if days < 7 { return "\(days)d" }
+    if days < 1 {
+      return "< 1 day"
+    }
+    if days < 7 {
+      return "\(days)d"
+    }
     let weeks = days / 7
-    if weeks < 5 { return "\(weeks)w" }
+    if weeks < 5 {
+      return "\(weeks)w"
+    }
     let months = days / 30
-    if months < 13 { return "\(months)mo" }
+    if months < 13 {
+      return "\(months)mo"
+    }
     let years = days / 365
     return "\(years)y \((days % 365) / 30)mo"
   }

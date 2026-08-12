@@ -229,13 +229,27 @@ final class FiatPriceService {
       let (data, _) = try await URLSession.shared.data(from: url)
       let decoded = try JSONDecoder().decode(MempoolPriceResponse.self, from: data)
       var newRates: [String: Double] = [:]
-      if let v = decoded.USD { newRates["USD"] = v }
-      if let v = decoded.EUR { newRates["EUR"] = v }
-      if let v = decoded.GBP { newRates["GBP"] = v }
-      if let v = decoded.CAD { newRates["CAD"] = v }
-      if let v = decoded.CHF { newRates["CHF"] = v }
-      if let v = decoded.AUD { newRates["AUD"] = v }
-      if let v = decoded.JPY { newRates["JPY"] = v }
+      if let v = decoded.USD {
+        newRates["USD"] = v
+      }
+      if let v = decoded.EUR {
+        newRates["EUR"] = v
+      }
+      if let v = decoded.GBP {
+        newRates["GBP"] = v
+      }
+      if let v = decoded.CAD {
+        newRates["CAD"] = v
+      }
+      if let v = decoded.CHF {
+        newRates["CHF"] = v
+      }
+      if let v = decoded.AUD {
+        newRates["AUD"] = v
+      }
+      if let v = decoded.JPY {
+        newRates["JPY"] = v
+      }
       rates = newRates
       lastFetched = Date()
       lastFetchError = nil

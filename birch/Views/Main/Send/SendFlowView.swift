@@ -77,7 +77,11 @@ struct SendFlowView: View {
       .navigationTitle("")
       .alert("Error", isPresented: .init(
         get: { viewModel.errorMessage != nil },
-        set: { if !$0 { viewModel.errorMessage = nil } }
+        set: {
+          if !$0 {
+            viewModel.errorMessage = nil
+          }
+        }
       )) {
         Button("OK") { viewModel.errorMessage = nil }
       } message: {

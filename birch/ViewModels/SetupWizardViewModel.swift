@@ -143,7 +143,9 @@ final class SetupWizardViewModel {
   // MARK: - Validation
 
   func validateCosignerXpub(_ xpub: String, at index: Int) -> String? {
-    if xpub.isEmpty { return "Xpub is required" }
+    if xpub.isEmpty {
+      return "Xpub is required"
+    }
 
     let expectedPrefixes = network == .mainnet ? ["xpub", "Zpub"] : ["tpub", "Vpub"]
     if !expectedPrefixes.contains(where: { xpub.hasPrefix($0) }) {
@@ -188,9 +190,15 @@ final class SetupWizardViewModel {
   }
 
   func validateFingerprint(_ fp: String) -> String? {
-    if fp.isEmpty { return "Fingerprint is required" }
-    if fp.count != 8 { return "Fingerprint must be 8 hex characters" }
-    if !fp.allSatisfy(\.isHexDigit) { return "Fingerprint must be hex characters only" }
+    if fp.isEmpty {
+      return "Fingerprint is required"
+    }
+    if fp.count != 8 {
+      return "Fingerprint must be 8 hex characters"
+    }
+    if !fp.allSatisfy(\.isHexDigit) {
+      return "Fingerprint must be hex characters only"
+    }
     return nil
   }
 

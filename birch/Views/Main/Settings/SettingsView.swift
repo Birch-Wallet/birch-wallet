@@ -607,19 +607,31 @@ private struct LogExportSheet: View {
   private var filteredEntries: [LogEntry] {
     let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     return allEntries.filter { entry in
-      if let selectedLevel, entry.l != selectedLevel { return false }
-      if let selectedCategory, entry.c != selectedCategory { return false }
-      if !search.isEmpty, !entry.m.localizedCaseInsensitiveContains(search) { return false }
+      if let selectedLevel, entry.l != selectedLevel {
+        return false
+      }
+      if let selectedCategory, entry.c != selectedCategory {
+        return false
+      }
+      if !search.isEmpty, !entry.m.localizedCaseInsensitiveContains(search) {
+        return false
+      }
       return true
     }
   }
 
   private var filterDescription: String {
     var parts: [String] = []
-    if let selectedLevel { parts.append("level \(selectedLevel.display)") }
-    if let selectedCategory { parts.append("category \(selectedCategory)") }
+    if let selectedLevel {
+      parts.append("level \(selectedLevel.display)")
+    }
+    if let selectedCategory {
+      parts.append("category \(selectedCategory)")
+    }
     let search = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !search.isEmpty { parts.append("search \"\(search)\"") }
+    if !search.isEmpty {
+      parts.append("search \"\(search)\"")
+    }
     return parts.joined(separator: ", ")
   }
 
@@ -675,7 +687,11 @@ private struct LogExportSheet: View {
 
   /// Drives the export warning alert; clearing it cancels the pending action.
   private var exportWarningBinding: Binding<Bool> {
-    Binding(get: { pendingExport != nil }, set: { if !$0 { pendingExport = nil } })
+    Binding(get: { pendingExport != nil }, set: {
+      if !$0 {
+        pendingExport = nil
+      }
+    })
   }
 
   // MARK: Controls

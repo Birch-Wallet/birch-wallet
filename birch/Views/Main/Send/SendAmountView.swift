@@ -117,7 +117,9 @@ private struct RecipientCard: View {
 
   private var addressHasError: Bool {
     guard viewModel.showValidationErrors, let recipient else { return false }
-    if recipient.isAddressEmpty { return true }
+    if recipient.isAddressEmpty {
+      return true
+    }
     return !recipient.isAddressFormatValid(network: viewModel.currentNetwork)
   }
 
@@ -367,7 +369,9 @@ private struct FeePresetCard: View {
       while s.hasSuffix("0") {
         s.removeLast()
       }
-      if s.hasSuffix(".") { s.removeLast() }
+      if s.hasSuffix(".") {
+        s.removeLast()
+      }
     }
     return s
   }
@@ -504,7 +508,9 @@ private struct FeePresetCard: View {
             let afterDot = filtered[filtered.index(after: dotIdx)...]
             filtered = String(filtered[...dotIdx]) + afterDot.filter { $0 != "." }
           }
-          if filtered != newValue { viewModel.feeRateSatVb = filtered }
+          if filtered != newValue {
+            viewModel.feeRateSatVb = filtered
+          }
           // Only switch to .custom when the value wasn't set by applyPreset
           if let rate = viewModel.selectedFeePreset.rate(from: viewModel.recommendedFees),
              viewModel.feeRateSatVb == rateDisplay(rate)

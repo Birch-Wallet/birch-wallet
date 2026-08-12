@@ -7,22 +7,30 @@ enum WalletSyncState: Equatable {
   case error(String)
 
   var isSyncing: Bool {
-    if case .syncing = self { return true }
+    if case .syncing = self {
+      return true
+    }
     return false
   }
 
   var syncMessage: String? {
-    if case let .syncing(msg) = self { return msg }
+    if case let .syncing(msg) = self {
+      return msg
+    }
     return nil
   }
 
   var lastSynced: Date? {
-    if case let .synced(date) = self { return date }
+    if case let .synced(date) = self {
+      return date
+    }
     return nil
   }
 
   var errorMessage: String? {
-    if case let .error(msg) = self { return msg }
+    if case let .error(msg) = self {
+      return msg
+    }
     return nil
   }
 }
