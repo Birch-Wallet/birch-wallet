@@ -21,6 +21,7 @@ enum FeeSource: String, CaseIterable {
 }
 
 private let logger = AppLog(.sync)
+private let psbtLogger = AppLog(.psbt)
 
 @Observable
 @MainActor
@@ -1043,10 +1044,6 @@ final class BitcoinService {
       builder = builder.addUtxos(outpoints: outpoints).manuallySelectedOnly()
     }
 
-    let recipientScripts = try Set(recipients.map { r in
-      try Address(address: r.address, network: network).scriptPubkey().toBytes()
-    })
-
     for recipient in recipients {
       let address = try Address(address: recipient.address, network: network)
       let script = address.scriptPubkey()
@@ -1063,22 +1060,11 @@ final class BitcoinService {
 
     let inputCount = psbt.input().count
 
-    // Identify change output via PSBT output metadata: if an output has bip32Derivation
-    // data but is NOT a recipient script, it's the change output. This avoids extractTx()
-    // which can fail on unsigned PSBTs.
-    var changeAmount: UInt64?
-    var changeAddress: String?
-    if let tx = try? psbt.extractTx() {
-      let txOutputs = tx.output()
-      let psbtOutputs = psbt.output()
-      for (i, psbtOut) in psbtOutputs.enumerated() where i < txOutputs.count {
-        let scriptBytes = txOutputs[i].scriptPubkey.toBytes()
-        if !psbtOut.bip32Derivation.isEmpty, !recipientScripts.contains(scriptBytes) {
-          changeAmount = txOutputs[i].value.toSat()
-          changeAddress = (try? Address.fromScript(script: txOutputs[i].scriptPubkey, network: network))?.description
-        }
-      }
-    }
+    // Change is whatever came back on the internal keychain, per the wallet's own
+    // script index — a self-send to one of our receive addresses stays a recipient.
+    let change = changeOutput(of: psbt, network: network)
+    let changeAmount = change?.amount
+    let changeAddress = change?.address
 
     let base64 = psbt.serialize()
     guard let bytes = Data(base64Encoded: base64) else {
@@ -1111,19 +1097,11 @@ final class BitcoinService {
 
     let inputCount = psbt.input().count
 
-    // Identify change output via PSBT output bip32Derivation (wallet-owned outputs)
-    var changeAmount: UInt64?
-    var changeAddress: String?
-    if let tx = try? psbt.extractTx() {
-      let txOutputs = tx.output()
-      let psbtOutputs = psbt.output()
-      for (i, psbtOut) in psbtOutputs.enumerated() where i < txOutputs.count {
-        if !psbtOut.bip32Derivation.isEmpty {
-          changeAmount = txOutputs[i].value.toSat()
-          changeAddress = (try? Address.fromScript(script: txOutputs[i].scriptPubkey, network: network))?.description
-        }
-      }
-    }
+    // Same rule as createPSBT: only an internal-keychain output is change. The
+    // original transaction's recipients stay recipients, including self-sends.
+    let change = changeOutput(of: psbt, network: network)
+    let changeAmount = change?.amount
+    let changeAddress = change?.address
 
     let base64 = psbt.serialize()
     guard let bytes = Data(base64Encoded: base64) else {
@@ -1155,6 +1133,13 @@ final class BitcoinService {
 
     let base64 = psbtData.base64EncodedString()
     let psbt = try Psbt(psbtBase64: base64)
+
+    // Never finalize a PSBT whose declared input amounts contradict wallet state —
+    // this is the single choke point ahead of both the Ready-to-Broadcast screen
+    // (via finalizeTx) and broadcastPSBT. Warnings are logged but do not block.
+    if let critical = verifyPSBT(psbt).criticals.first {
+      throw AppError.psbtFinalizeFailed(critical.message)
+    }
 
     // Use wallet.finalizePsbt which has full wallet context for finalizing
     // scripts (e.g. policy-based spending conditions). Falls back to psbt.finalize()
@@ -1212,6 +1197,154 @@ final class BitcoinService {
     return nil
   }
 
+  // MARK: - PSBT Inspection
+
+  /// Resolves a script to the keychain the wallet derived it from, or nil if the
+  /// wallet has no record of it. Backs every output classification.
+  private var keychainLookup: (Script) -> KeychainKind? {
+    guard let wallet else { return { _ in nil } }
+    return { wallet.derivationOfSpk(spk: $0)?.keychain }
+  }
+
+  /// Every output of a PSBT's transaction, classified against the wallet's script index.
+  func classifiedOutputs(of psbt: Psbt, network: Network) -> [PSBTOutputInfo] {
+    guard let tx = try? psbt.extractTx() else { return [] }
+    return PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup)
+  }
+
+  /// The single change output, if there is one. Deterministically the first — BDK
+  /// creates at most one, and a second internal-keychain output is reported as a
+  /// recipient rather than silently replacing this one.
+  private func changeOutput(of psbt: Psbt, network: Network) -> PSBTOutputInfo? {
+    classifiedOutputs(of: psbt, network: network).first { $0.role == .change }
+  }
+
+  /// What a PSBT pays, derived from its bytes rather than from stored metadata.
+  struct PSBTSummary {
+    let fee: UInt64
+    let feeRateSatVb: String
+    let inputCount: Int
+    let changeAmount: UInt64?
+    let changeAddress: String?
+    let recipients: [SavedRecipient]
+  }
+
+  /// Describe a PSBT using wallet knowledge alone.
+  ///
+  /// Deliberately free of the import-time policy checks in
+  /// `validateAndParseImportedPSBT`: a saved RBF bump legitimately spends outputs that
+  /// are no longer unspent, so those rules would reject a PSBT this wallet built itself.
+  func summarizePSBT(_ psbtData: Data) -> PSBTSummary? {
+    guard let psbt = try? Psbt(psbtBase64: psbtData.base64EncodedString()),
+          let tx = try? psbt.extractTx() else { return nil }
+    return summarize(psbt: psbt, tx: tx)
+  }
+
+  private func summarize(psbt: Psbt, tx: Transaction) -> PSBTSummary {
+    let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
+    let fee = (try? psbt.fee()) ?? 0
+    let vsize = tx.vsize()
+
+    var changeAmount: UInt64?
+    var changeAddress: String?
+    var recipients: [SavedRecipient] = []
+
+    for output in PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup) {
+      // Only the first internal-keychain output is change. Everything else stays
+      // visible as a recipient — including self-sends to our own receive addresses,
+      // which must not disappear into a "change" line.
+      if output.role == .change, changeAmount == nil {
+        changeAmount = output.amount
+        changeAddress = output.address
+        continue
+      }
+      if output.role == .change {
+        psbtLogger.warning("PSBT has more than one change output; listing \(output.address) as a recipient")
+      }
+      recipients.append(
+        SavedRecipient(address: output.address, amountSats: "\(output.amount)", isSendMax: false, label: "")
+      )
+    }
+
+    return PSBTSummary(
+      fee: fee,
+      feeRateSatVb: "\(vsize > 0 ? max(fee / vsize, 1) : 1)",
+      inputCount: psbt.input().count,
+      changeAmount: changeAmount,
+      changeAddress: changeAddress,
+      recipients: recipients
+    )
+  }
+
+  // MARK: - PSBT Verification
+
+  /// Everything the checks need to know that does not come from the PSBT: what the
+  /// wallet's outputs are worth, the account its keys sit under, whose fingerprints
+  /// they carry, and how to derive a script at any claimed path.
+  var psbtGroundTruth: PSBTGroundTruth {
+    .from(
+      utxos: utxos,
+      transactions: transactions,
+      network: currentProfile?.bitcoinNetwork ?? .testnet4,
+      cosignerFingerprints: Set((currentProfile?.cosigners ?? []).map(\.fingerprint)),
+      scriptAt: scriptLookup
+    )
+  }
+
+  /// Derives the script this wallet produces at a keychain and index, whether or not
+  /// that index has been revealed yet. Hardened indexes are rejected before this is
+  /// called — they cannot be derived from an xpub.
+  private var scriptLookup: (KeychainKind, UInt32) -> Script? {
+    guard let wallet else { return { _, _ in nil } }
+    return { keychain, index in
+      guard index < 0x8000_0000 else { return nil }
+      return wallet.peekAddress(keychain: keychain, index: index).address.scriptPubkey()
+    }
+  }
+
+  /// Check a serialized PSBT — input amounts and output derivation claims — against
+  /// wallet state.
+  func verifyPSBT(_ psbtData: Data) -> [PSBTFinding] {
+    guard let psbt = try? Psbt(psbtBase64: psbtData.base64EncodedString()) else {
+      return [.critical(PSBTFinding.Code.psbtUnparseable, "This PSBT could not be read")]
+    }
+    return verifyPSBT(psbt)
+  }
+
+  func verifyPSBT(_ psbt: Psbt) -> [PSBTFinding] {
+    guard let tx = try? psbt.extractTx() else {
+      return [.critical(
+        PSBTFinding.Code.psbtUnextractable,
+        "This PSBT's transaction could not be read — an input may be missing its UTXO data, or the fee it implies is impossible"
+      )]
+    }
+    return verifyPSBT(psbt, tx: tx)
+  }
+
+  /// Preferred entry point when the caller has already parsed and extracted, so the
+  /// PSBT is not decoded twice.
+  func verifyPSBT(_ psbt: Psbt, tx: Transaction) -> [PSBTFinding] {
+    let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
+    let truth = psbtGroundTruth
+    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup)
+
+    let findings = PSBTValidator.verifyInputAmounts(psbt: psbt, tx: tx, against: truth)
+      + PSBTValidator.verifyOutputDerivations(psbt: psbt, tx: tx, outputs: outputs, against: truth)
+      + PSBTValidator.verifySignatures(psbt: psbt, tx: tx)
+
+    for finding in findings {
+      switch finding.severity {
+      case .critical: psbtLogger.error("PSBT verification failed [\(finding.code)]: \(finding.message)")
+      case .warning: psbtLogger.warning("PSBT verification warning [\(finding.code)]: \(finding.message)")
+      case .info: psbtLogger.info("PSBT verification [\(finding.code)]: \(finding.message)")
+      }
+    }
+    if findings.isEmpty {
+      psbtLogger.info("PSBT verification passed: \(tx.input().count) input amount(s) match wallet state")
+    }
+    return findings
+  }
+
   func broadcastPSBT(_ psbtData: Data) async throws -> String {
     guard let client = electrumClient else {
       logger.error("Broadcast failed: not connected to Electrum server")
@@ -1243,6 +1376,8 @@ final class BitcoinService {
     let inputCount: Int
     let recipients: [SavedRecipient]
     let feeRateSatVb: String
+    /// Non-critical findings from verification; criticals throw instead.
+    let findings: [PSBTFinding]
   }
 
   enum PSBTImportError: LocalizedError {
@@ -1251,6 +1386,9 @@ final class BitcoinService {
     case inputNotOwned(outpoint: String)
     case inputSpent(outpoint: String)
     case inputFrozen(outpoint: String)
+    /// A `PSBTValidator` check contradicted wallet state. Carries the finding's
+    /// message so new checks do not each need their own case.
+    case verificationFailed(String)
 
     var errorDescription: String? {
       switch self {
@@ -1259,13 +1397,13 @@ final class BitcoinService {
       case let .inputNotOwned(op): "Input \(op) is not owned by this wallet"
       case let .inputSpent(op): "Input \(op) has already been spent"
       case let .inputFrozen(op): "Input \(op) is frozen"
+      case let .verificationFailed(message): message
       }
     }
   }
 
   func validateAndParseImportedPSBT(_ psbtData: Data, frozenOutpoints: Set<String>) throws -> PSBTImportResult {
     guard let wallet else { throw PSBTImportError.walletNotLoaded }
-    let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
 
     // Try parsing as base64 first, then as raw binary
     let psbt: Psbt
@@ -1314,35 +1452,16 @@ final class BitcoinService {
       }
     }
 
-    // Extract transaction details
-    let fee = (try? psbt.fee()) ?? 0
-    let inputCount = psbtInputs.count
-
-    // Identify change vs recipient outputs
-    let txOutputs = tx.output()
-    let psbtOutputs = psbt.output()
-    var changeAmount: UInt64?
-    var changeAddress: String?
-    var recipientList: [SavedRecipient] = []
-
-    for (i, txOut) in txOutputs.enumerated() {
-      let address = (try? Address.fromScript(script: txOut.scriptPubkey, network: network))?.description ?? "Unknown"
-      let amount = txOut.value.toSat()
-
-      // If PSBT output has bip32Derivation, it's likely a wallet-owned output (change)
-      let isChange = i < psbtOutputs.count && !psbtOutputs[i].bip32Derivation.isEmpty && wallet.isMine(script: txOut.scriptPubkey)
-
-      if isChange {
-        changeAmount = amount
-        changeAddress = address
-      } else {
-        recipientList.append(SavedRecipient(address: address, amountSats: "\(amount)", isSendMax: false, label: ""))
-      }
+    // 3. Cross-check every declared input amount against what the wallet knows those
+    // outputs hold. Without this, the fee and amounts below are simply whatever the
+    // PSBT claims they are.
+    let findings = verifyPSBT(psbt, tx: tx)
+    if let critical = findings.criticals.first {
+      throw PSBTImportError.verificationFailed(critical.message)
     }
 
-    // Estimate fee rate
-    let vsize = tx.vsize()
-    let feeRate = vsize > 0 ? max(fee / vsize, 1) : 1
+    // Everything the review screen shows is derived here, from the bytes.
+    let summary = summarize(psbt: psbt, tx: tx)
 
     let base64 = psbt.serialize()
     guard let bytes = Data(base64Encoded: base64) else {
@@ -1352,12 +1471,13 @@ final class BitcoinService {
     return PSBTImportResult(
       psbtBytes: bytes,
       psbtBase64: base64,
-      fee: fee,
-      changeAmount: changeAmount,
-      changeAddress: changeAddress,
-      inputCount: inputCount,
-      recipients: recipientList,
-      feeRateSatVb: "\(feeRate)"
+      fee: summary.fee,
+      changeAmount: summary.changeAmount,
+      changeAddress: summary.changeAddress,
+      inputCount: summary.inputCount,
+      recipients: summary.recipients,
+      feeRateSatVb: summary.feeRateSatVb,
+      findings: findings
     )
   }
 
@@ -1374,20 +1494,34 @@ final class BitcoinService {
           let psbt = try? Psbt(psbtBase64: psbtData.base64EncodedString()) else { return nil }
 
     let inputs = psbt.input()
-    guard !inputs.isEmpty else { return nil }
+    guard !inputs.isEmpty, let tx = try? psbt.extractTx() else { return nil }
+    let txInputs = tx.input()
+    guard txInputs.count == inputs.count else { return nil }
 
-    // Collect unique pubkeys that have partial_sigs across any input
+    // Only count signatures from keys that provably govern the input they sit on, and
+    // only read derivation data for those same keys. A PSBT can otherwise carry a
+    // signature for any pubkey it invents and inflate the progress shown to the user,
+    // which is enough to push the flow to the broadcast step.
+    //
+    // Each input is judged against its own witness script: cosigners derive a
+    // different key per input, so one input's key set says nothing about another's.
+    // An input whose script cannot be verified falls back to the PSBT's own word.
     var signerPubkeys: Set<String> = []
-    for input in inputs {
-      for pubkey in input.partialSigs.keys {
+    var pubkeyToFingerprint: [String: String] = [:]
+
+    for (index, input) in inputs.enumerated() {
+      let verified = PSBTValidator.verifiedPubkeys(input: input, txIn: txInputs[index])
+
+      for pubkey in input.partialSigs.keys where verified?.contains(pubkey.lowercased()) ?? true {
         signerPubkeys.insert(pubkey)
       }
-    }
 
-    // Build pubkey → master fingerprint mapping from bip32Derivation
-    var pubkeyToFingerprint: [String: String] = [:]
-    for input in inputs {
-      for (pubkey, keySource) in input.bip32Derivation {
+      // The mapping stays the PSBT's assertion: it can relabel which of your own
+      // cosigners a key belongs to, but it cannot invent a key that satisfies the
+      // script, so it cannot manufacture progress.
+      for (pubkey, keySource) in input.bip32Derivation
+        where verified?.contains(pubkey.lowercased()) ?? true
+      {
         pubkeyToFingerprint[pubkey] = keySource.fingerprint
       }
     }
@@ -1396,16 +1530,16 @@ final class BitcoinService {
     var signerFingerprints: Set<String> = []
     for pubkey in signerPubkeys {
       if let fp = pubkeyToFingerprint[pubkey] {
-        signerFingerprints.insert(fp)
+        signerFingerprints.insert(CosignerInfo.normalizedFingerprint(fp))
       }
     }
 
     // Match against wallet's cosigners
     let cosigners = profile.cosigners.sorted(by: { $0.orderIndex < $1.orderIndex })
-    let cosignerStatus = cosigners.map { cosigner in
-      (label: cosigner.label, fingerprint: cosigner.fingerprint,
-       hasSigned: signerFingerprints.contains(cosigner.fingerprint))
-    }
+    let cosignerStatus = PSBTValidator.cosignerSignStatus(
+      signerFingerprints: signerFingerprints,
+      cosigners: cosigners.map { (label: $0.label, fingerprint: $0.fingerprint) }
+    )
 
     return PSBTSignerInfo(
       totalSignatures: signerFingerprints.count,

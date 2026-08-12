@@ -105,6 +105,12 @@ struct SendReviewView: View {
                 .font(.hbMono())
                 .foregroundStyle(Color.hbTextPrimary)
             }
+
+            if let changeAddress = viewModel.changeAddress {
+              ReviewItem(label: "Change Address") {
+                changeAddress.chunkedAddressText(font: .hbMono(12))
+              }
+            }
           }
 
           ReviewItem(label: "Fee Rate") {
@@ -141,6 +147,8 @@ struct SendReviewView: View {
               .font(.hbMonoBold(16))
               .foregroundStyle(Color.hbTextPrimary)
           }
+
+          PSBTVerificationBadge(state: viewModel.psbtVerification)
         }
         .hbCard()
         .padding(.horizontal, 24)

@@ -36,6 +36,11 @@ final class MockBitcoinService: BitcoinServiceProtocol {
   var validateAndParseImportedPSBTResult: BitcoinService.PSBTImportResult?
   var validateAndParseImportedPSBTError: Error?
 
+  var verifyPSBTResult: [PSBTFinding] = []
+
+  /// nil (the default) means "could not re-derive", so callers fall back to stored metadata
+  var summarizePSBTResult: BitcoinService.PSBTSummary?
+
   var syncError: Error?
 
   // MARK: - Call Tracking
@@ -134,6 +139,14 @@ final class MockBitcoinService: BitcoinServiceProtocol {
       throw AppError.psbtCreationFailed("Mock not configured")
     }
     return result
+  }
+
+  func verifyPSBT(_: Data) -> [PSBTFinding] {
+    verifyPSBTResult
+  }
+
+  func summarizePSBT(_: Data) -> BitcoinService.PSBTSummary? {
+    summarizePSBTResult
   }
 
   func sync() async throws {

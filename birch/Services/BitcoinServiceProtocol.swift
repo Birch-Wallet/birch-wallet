@@ -35,6 +35,14 @@ protocol BitcoinServiceProtocol {
   /// Validate and parse an imported PSBT
   func validateAndParseImportedPSBT(_ psbtData: Data, frozenOutpoints: Set<String>) throws -> BitcoinService.PSBTImportResult
 
+  /// Cross-check a PSBT's declared input amounts against the wallet's own state.
+  /// Critical findings mean the PSBT contradicts what the wallet knows.
+  func verifyPSBT(_ psbtData: Data) -> [PSBTFinding]
+
+  /// Re-derive what a PSBT pays from its bytes, without import-time policy checks.
+  /// Returns nil when the PSBT cannot be parsed.
+  func summarizePSBT(_ psbtData: Data) -> BitcoinService.PSBTSummary?
+
   /// Whether an address belongs to the loaded wallet (self-transfer detection)
   func isWalletAddress(_ address: String) -> Bool
 

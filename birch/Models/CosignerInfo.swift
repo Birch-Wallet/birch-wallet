@@ -37,6 +37,16 @@ final class CosignerInfo {
     fingerprint.count == 8 && fingerprint.allSatisfy(\.isHexDigit)
   }
 
+  /// The canonical form for comparing master fingerprints.
+  ///
+  /// Fingerprints are hex, so "AABBCCDD" and "aabbccdd" are the same key — but they
+  /// are stored exactly as the user typed them, while BDK and PSBTs always emit
+  /// lowercase. Every comparison must go through this; a raw `==` silently fails for
+  /// anyone who entered theirs in uppercase.
+  static func normalizedFingerprint(_ fingerprint: String) -> String {
+    fingerprint.trimmingCharacters(in: .whitespaces).lowercased()
+  }
+
   /// Validates derivation path matches BIP48 format
   var isValidDerivationPath: Bool {
     let pattern = #"^m/48'/[01]'/\d+'/2'$"#

@@ -41,6 +41,9 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   var changeAddress: String?
   var inputCount: Int = 0
 
+  /// Result of the most recent check of `psbtBytes` against wallet state
+  var psbtVerification: PSBTVerificationState = .notChecked
+
   // Saved PSBT state
   var savedPSBTId: UUID?
   var savedPSBTName: String = ""
@@ -125,8 +128,22 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     changeAmount = savedPSBT.changeAmount
     changeAddress = savedPSBT.changeAddress
     inputCount = savedPSBT.inputCount
+
+    // Prefer what the bytes actually say over the stored metadata.
+    if let summary = service.summarizePSBT(savedPSBT.psbtBytes) {
+      totalFee = summary.fee
+      changeAmount = summary.changeAmount
+      changeAddress = summary.changeAddress
+      inputCount = summary.inputCount
+    }
     savedPSBTId = savedPSBT.id
     savedPSBTName = savedPSBT.name
+
+    // Re-check the stored bytes against current wallet state before resuming signing.
+    psbtVerification = PSBTVerificationState(
+      findings: service.verifyPSBT(savedPSBT.psbtBytes),
+      inputCount: inputCount
+    )
 
     if let signerInfo = service.psbtSignerInfo(savedPSBT.psbtBytes) {
       signaturesCollected = signerInfo.totalSignatures
@@ -171,6 +188,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
       changeAmount = result.changeAmount
       changeAddress = result.changeAddress
       inputCount = result.inputCount
+      psbtVerification = PSBTVerificationState(
+        findings: bitcoinService.verifyPSBT(result.bytes),
+        inputCount: result.inputCount
+      )
       signaturesCollected = 0
       if let signerInfo = bitcoinService.psbtSignerInfo(result.bytes) {
         signerStatus = signerInfo.cosignerSignStatus

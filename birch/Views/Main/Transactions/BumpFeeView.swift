@@ -632,6 +632,9 @@ private struct BumpFeeBroadcastView: View {
           .multilineTextAlignment(.center)
           .padding(.horizontal, 32)
 
+        PSBTVerificationBadge(state: viewModel.psbtVerification)
+          .padding(.horizontal, 24)
+
         Button(action: {
           Task { await viewModel.broadcast(modelContext: modelContext) }
         }) {
