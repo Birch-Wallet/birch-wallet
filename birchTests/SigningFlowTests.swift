@@ -23,6 +23,111 @@ struct SigningFlowTests {
     )
   }
 
+  private func criticalFinding(_ message: String = "Input lies about its amount") -> PSBTFinding {
+    .critical(PSBTFinding.Code.inputAmountMismatch, outpoint: "aa:0", message)
+  }
+
+  private func warningFinding() -> PSBTFinding {
+    .warning(PSBTFinding.Code.inputAmountUnverifiable, outpoint: "bb:1", "Could not verify")
+  }
+
+  // MARK: - Verification of merged PSBTs
+
+  @Test func handleSignedPSBTRejectsMergeThatFailsVerification() async {
+    let mock = makeMockService()
+    let vm = SendViewModel(bitcoinService: mock)
+    vm.requiredSignatures = 2
+    vm.signaturesCollected = 0
+    vm.psbtBytes = Data([0x01])
+    vm.psbtBase64 = "AQ=="
+    vm.currentStep = .psbtScan
+
+    // Combine succeeds, but the merged PSBT contradicts wallet state.
+    mock.combinePSBTsResult = ("bmV3", Data([0x02]))
+    mock.verifyPSBTResult = [criticalFinding()]
+
+    await vm.handleSignedPSBT(Data([0x03]))
+
+    #expect(vm.psbtBytes == Data([0x01]), "Merged bytes must not be kept")
+    #expect(vm.psbtBase64 == "AQ==")
+    #expect(vm.signaturesCollected == 0)
+    #expect(vm.currentStep == .psbtScan, "Should stay on the scan step")
+    #expect(vm.errorMessage == "Input lies about its amount")
+    #expect(!vm.isProcessing)
+  }
+
+  @Test func handleSignedPSBTKeepsMergeOnWarningsAlone() async {
+    let mock = makeMockService()
+    let vm = SendViewModel(bitcoinService: mock)
+    vm.requiredSignatures = 2
+    vm.signaturesCollected = 0
+    vm.inputCount = 2
+    vm.psbtBytes = Data([0x01])
+    vm.currentStep = .psbtScan
+
+    mock.combinePSBTsResult = ("bmV3", Data([0x02]))
+    mock.verifyPSBTResult = [warningFinding()]
+
+    await vm.handleSignedPSBT(Data([0x03]))
+
+    #expect(vm.psbtBytes == Data([0x02]), "Warnings must not block the merge")
+    #expect(vm.signaturesCollected == 1)
+    #expect(vm.currentStep == .psbtDisplay)
+    #expect(vm.errorMessage == nil)
+    #expect(vm.psbtVerification == .partiallyVerified(verified: 1, unverified: 1))
+  }
+
+  @Test func handleSignedPSBTRecordsVerifiedStateOnCleanMerge() async {
+    let mock = makeMockService()
+    let vm = SendViewModel(bitcoinService: mock)
+    vm.requiredSignatures = 2
+    vm.inputCount = 3
+    vm.psbtBytes = Data([0x01])
+
+    mock.combinePSBTsResult = ("bmV3", Data([0x02]))
+    mock.verifyPSBTResult = []
+
+    await vm.handleSignedPSBT(Data([0x03]))
+
+    #expect(vm.psbtVerification == .verified(inputs: 3))
+  }
+
+  @Test func bumpFeeHandleSignedPSBTRejectsFailedVerification() async {
+    let mock = makeMockService()
+    let tx = TransactionItem(
+      id: "test_tx", amount: -5000, fee: 200,
+      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100
+    )
+    let vm = BumpFeeViewModel(transaction: tx, bitcoinService: mock)
+    vm.psbtBytes = Data([0x01])
+    vm.currentStep = .psbtScan
+
+    mock.combinePSBTsResult = ("bmV3", Data([0x02]))
+    mock.verifyPSBTResult = [criticalFinding("Bump PSBT lies")]
+
+    await vm.handleSignedPSBT(Data([0x03]))
+
+    #expect(vm.psbtBytes == Data([0x01]))
+    #expect(vm.currentStep == .psbtScan)
+    #expect(vm.errorMessage == "Bump PSBT lies")
+  }
+
+  @Test func duplicateScanTellsTheUser() async {
+    let mock = makeMockService()
+    let vm = SendViewModel(bitcoinService: mock)
+    vm.psbtBytes = Data([0x01])
+    vm.currentStep = .psbtScan
+
+    // Same bytes back → nothing new in this PSBT
+    mock.combinePSBTsResult = ("AQ==", Data([0x01]))
+
+    await vm.handleSignedPSBT(Data([0x01]))
+
+    #expect(vm.errorMessage != nil, "A no-op scan must not look like success")
+    #expect(vm.signaturesCollected == 0)
+    #expect(vm.currentStep == .psbtScan)
+  }
+
   // MARK: - SendViewModel + Mock: handleSignedPSBT
 
   @Test func handleSignedPSBTAdvancesState() async {
