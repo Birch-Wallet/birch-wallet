@@ -15,17 +15,23 @@ struct TransactionRowView: View {
   }
 
   private var directionIcon: String {
-    if transaction.isSelfTransfer { return "arrow.triangle.2.circlepath" }
+    if transaction.isSelfTransfer {
+      return "arrow.triangle.2.circlepath"
+    }
     return transaction.isIncoming ? "arrow.down.left" : "arrow.up.right"
   }
 
   private var directionText: String {
-    if transaction.isSelfTransfer { return "Self Transfer" }
+    if transaction.isSelfTransfer {
+      return "Self Transfer"
+    }
     return transaction.isIncoming ? "Received" : "Sent"
   }
 
   private var amountColor: Color {
-    if transaction.isSelfTransfer { return Color.hbTextPrimary }
+    if transaction.isSelfTransfer {
+      return Color.hbTextPrimary
+    }
     return transaction.isIncoming ? Color.hbSuccess : Color.hbTextPrimary
   }
 

@@ -338,7 +338,9 @@ struct LabelServiceExportTests {
       let part = encoder.nextPart()
       decoder.receivePart(part)
       iterations += 1
-      if iterations > 1000 { break } // safety
+      if iterations > 1000 {
+        break
+      } // safety
     }
 
     // Step 3: Decode the UR
@@ -400,7 +402,9 @@ struct LabelServiceExportTests {
       let part = encoder.nextPart()
       decoder.receivePart(part)
       iterations += 1
-      if iterations > 5000 { break }
+      if iterations > 5000 {
+        break
+      }
     }
 
     let decodedResult2 = try #require(decoder.result)

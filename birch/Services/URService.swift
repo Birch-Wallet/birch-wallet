@@ -322,8 +322,12 @@ enum URService {
     var hasKeysArray = false
     for (k, v) in map {
       guard case let .unsigned(key) = k else { continue }
-      if key == 1, case .unsigned = v { hasThreshold = true }
-      if key == 2, case .array = v { hasKeysArray = true }
+      if key == 1, case .unsigned = v {
+        hasThreshold = true
+      }
+      if key == 2, case .array = v {
+        hasKeysArray = true
+      }
     }
     return hasThreshold && hasKeysArray
   }
@@ -340,8 +344,12 @@ enum URService {
     for (k, v) in map {
       guard case let .unsigned(key) = k else { continue }
       switch key {
-      case 1: if case let .unsigned(t) = v { threshold = t }
-      case 2: if case let .array(arr) = v { keys = arr }
+      case 1: if case let .unsigned(t) = v {
+          threshold = t
+        }
+      case 2: if case let .array(arr) = v {
+          keys = arr
+        }
       default: break
       }
     }
@@ -371,9 +379,13 @@ enum URService {
       guard case let .unsigned(key) = k else { continue }
       switch key {
       case 3: // key-data
-        if case let .bytes(d) = v { keyData = d }
+        if case let .bytes(d) = v {
+          keyData = d
+        }
       case 4: // chain-code
-        if case let .bytes(d) = v { chainCode = d }
+        if case let .bytes(d) = v {
+          chainCode = d
+        }
       case 6: // origin (crypto-keypath)
         let pathCBOR = unwrapSingleTag(v)
         if case let .map(pathMap) = pathCBOR {
@@ -578,8 +590,12 @@ enum URService {
     var current = ""
     var depth = 0
     for char in str {
-      if char == "[" || char == "(" || char == "<" { depth += 1 }
-      if char == "]" || char == ")" || char == ">" { depth -= 1 }
+      if char == "[" || char == "(" || char == "<" {
+        depth += 1
+      }
+      if char == "]" || char == ")" || char == ">" {
+        depth -= 1
+      }
       if char == ",", depth == 0 {
         result.append(current)
         current = ""
@@ -587,7 +603,9 @@ enum URService {
         current.append(char)
       }
     }
-    if !current.isEmpty { result.append(current) }
+    if !current.isEmpty {
+      result.append(current)
+    }
     return result
   }
 
@@ -944,7 +962,11 @@ enum URService {
 
     // Add leading zeros
     for char in string {
-      if char == "1" { bytes.append(0) } else { break }
+      if char == "1" {
+        bytes.append(0)
+      } else {
+        break
+      }
     }
 
     let decoded = Data(bytes.reversed())
@@ -981,7 +1003,11 @@ enum URService {
     var result = String(num.reversed().map { alphabet[Int($0)] })
 
     for byte in bytes {
-      if byte == 0 { result = "1" + result } else { break }
+      if byte == 0 {
+        result = "1" + result
+      } else {
+        break
+      }
     }
 
     return result

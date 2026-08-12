@@ -577,7 +577,11 @@ struct SignatureProgressView: View {
             }
             .popover(isPresented: Binding(
               get: { tappedIndex == index },
-              set: { if !$0 { tappedIndex = nil } }
+              set: {
+                if !$0 {
+                  tappedIndex = nil
+                }
+              }
             )) {
               if let signer {
                 VStack(alignment: .leading, spacing: 4) {

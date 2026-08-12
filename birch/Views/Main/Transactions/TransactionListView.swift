@@ -293,7 +293,9 @@ struct TransactionListView: View {
             togglePrivacyMode()
           }
           .onTapGesture(count: 2) {
-            if fiatEnabled { fiatPrimary.toggle() }
+            if fiatEnabled {
+              fiatPrimary.toggle()
+            }
           }
 
           // Info row
@@ -384,7 +386,11 @@ struct TransactionListView: View {
       }
       .alert("Delete Wallet?", isPresented: .init(
         get: { walletToDelete != nil },
-        set: { if !$0 { walletToDelete = nil } }
+        set: {
+          if !$0 {
+            walletToDelete = nil
+          }
+        }
       )) {
         Button("Delete", role: .destructive) {
           if let wallet = walletToDelete {

@@ -28,7 +28,11 @@ struct BumpFeeView: View {
       }
       .alert("Error", isPresented: .init(
         get: { viewModel.errorMessage != nil },
-        set: { if !$0 { viewModel.errorMessage = nil } }
+        set: {
+          if !$0 {
+            viewModel.errorMessage = nil
+          }
+        }
       )) {
         Button("OK") { viewModel.errorMessage = nil }
       } message: {
@@ -231,7 +235,9 @@ private struct BumpFeeRateCard: View {
             let afterDot = filtered[filtered.index(after: dotIdx)...]
             filtered = String(filtered[...dotIdx]) + afterDot.filter { $0 != "." }
           }
-          if filtered != newValue { viewModel.newFeeRate = filtered }
+          if filtered != newValue {
+            viewModel.newFeeRate = filtered
+          }
           // Only switch to .custom when the value wasn't set by applyPreset
           if let rate = viewModel.selectedFeePreset.rate(from: viewModel.recommendedFees),
              viewModel.newFeeRate == formatFeeRate(rate)

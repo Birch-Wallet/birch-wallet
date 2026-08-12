@@ -125,7 +125,11 @@ struct SavedPSBTListView: View {
       }
       .alert("Rename PSBT", isPresented: .init(
         get: { renamingPSBT != nil },
-        set: { if !$0 { renamingPSBT = nil } }
+        set: {
+          if !$0 {
+            renamingPSBT = nil
+          }
+        }
       )) {
         TextField("Name", text: $renameText)
         Button("Save") {
@@ -139,7 +143,11 @@ struct SavedPSBTListView: View {
       }
       .alert("Delete PSBT?", isPresented: .init(
         get: { deletingPSBT != nil },
-        set: { if !$0 { deletingPSBT = nil } }
+        set: {
+          if !$0 {
+            deletingPSBT = nil
+          }
+        }
       )) {
         Button("Delete", role: .destructive) {
           if let psbt = deletingPSBT {

@@ -116,7 +116,9 @@ struct AddressDetailView: View {
     let existing = (try? modelContext.fetch(descriptor))?.first
 
     if trimmed.isEmpty {
-      if let existing { modelContext.delete(existing) }
+      if let existing {
+        modelContext.delete(existing)
+      }
     } else if let existing {
       existing.label = trimmed
     } else {

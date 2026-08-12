@@ -71,11 +71,15 @@ extension String {
       }
       current.append(char)
     }
-    if !current.isEmpty { chunks.append(current) }
+    if !current.isEmpty {
+      chunks.append(current)
+    }
 
     var result = Text("")
     for (i, chunk) in chunks.enumerated() {
-      if i > 0 { result = result + Text(" ") }
+      if i > 0 {
+        result = result + Text(" ")
+      }
       let color: Color = i % 2 == 0 ? .hbTextPrimary : .hbTextSecondary
       result = result + Text(chunk).font(font).foregroundColor(color)
     }

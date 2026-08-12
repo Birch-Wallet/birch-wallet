@@ -964,17 +964,27 @@ final class BitcoinService {
 
       // Sanity cap: Testnet electrum servers sometimes return absurdly high values.
       let maxSaneRate = 500.0
-      if highRate > maxSaneRate { highRate = 5.0 }
-      if medRate > maxSaneRate { medRate = 2.0 }
-      if lowRate > maxSaneRate { lowRate = 1.0 }
+      if highRate > maxSaneRate {
+        highRate = 5.0
+      }
+      if medRate > maxSaneRate {
+        medRate = 2.0
+      }
+      if lowRate > maxSaneRate {
+        lowRate = 1.0
+      }
 
       let fast = highRate > 0 ? highRate : 5.0
       var medium = medRate > 0 ? medRate : 2.0
       var slow = lowRate > 0 ? lowRate : 1.0
 
       // Ensure fees are monotonically decreasing: fast >= medium >= slow
-      if medium > fast { medium = fast }
-      if slow > medium { slow = medium }
+      if medium > fast {
+        medium = fast
+      }
+      if slow > medium {
+        slow = medium
+      }
 
       return RecommendedFees(
         fast: fast,
@@ -1477,11 +1487,21 @@ final class BitcoinService {
     func polyMod(_ c: inout UInt64, _ val: Int) {
       let c0 = Int(c >> 35)
       c = ((c & 0x7_FFFF_FFFF) << 5) ^ UInt64(val)
-      if c0 & 1 != 0 { c ^= 0xF5_DEE5_1989 }
-      if c0 & 2 != 0 { c ^= 0xA9_FDCA_3312 }
-      if c0 & 4 != 0 { c ^= 0x1B_AB10_E32D }
-      if c0 & 8 != 0 { c ^= 0x37_06B1_677A }
-      if c0 & 16 != 0 { c ^= 0x64_4D62_6FFD }
+      if c0 & 1 != 0 {
+        c ^= 0xF5_DEE5_1989
+      }
+      if c0 & 2 != 0 {
+        c ^= 0xA9_FDCA_3312
+      }
+      if c0 & 4 != 0 {
+        c ^= 0x1B_AB10_E32D
+      }
+      if c0 & 8 != 0 {
+        c ^= 0x37_06B1_677A
+      }
+      if c0 & 16 != 0 {
+        c ^= 0x64_4D62_6FFD
+      }
     }
 
     for ch in descriptor {
@@ -1498,7 +1518,9 @@ final class BitcoinService {
         clsCount = 0
       }
     }
-    if clsCount > 0 { polyMod(&c, cls) }
+    if clsCount > 0 {
+      polyMod(&c, cls)
+    }
     (0 ..< 8).forEach { _ in polyMod(&c, 0) }
     c ^= 1
 

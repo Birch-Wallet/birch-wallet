@@ -25,7 +25,9 @@ struct TransactionDetailView: View {
   }
 
   private var directionText: String {
-    if transaction.isSelfTransfer { return "Self Transfer" }
+    if transaction.isSelfTransfer {
+      return "Self Transfer"
+    }
     return transaction.isIncoming ? "Received" : "Sent"
   }
 
@@ -67,7 +69,9 @@ struct TransactionDetailView: View {
             .foregroundStyle(Color.hbTextSecondary)
         }
         .onTapGesture(count: 2) {
-          if fiatEnabled { fiatPrimary.toggle() }
+          if fiatEnabled {
+            fiatPrimary.toggle()
+          }
         }
         .padding(.top, 8)
 
@@ -375,7 +379,9 @@ struct TransactionDetailView: View {
     let existing = (try? modelContext.fetch(descriptor))?.first
 
     if trimmed.isEmpty {
-      if let existing { modelContext.delete(existing) }
+      if let existing {
+        modelContext.delete(existing)
+      }
     } else if let existing {
       existing.label = trimmed
     } else {
@@ -416,7 +422,9 @@ private struct TransactionDetailFlowDiagram: View {
     let isPlaceholder: Bool
 
     var color: Color {
-      if isPlaceholder { return .hbTextSecondary }
+      if isPlaceholder {
+        return .hbTextSecondary
+      }
       return isMine ? .hbSteelBlue : .hbTextPrimary
     }
   }
