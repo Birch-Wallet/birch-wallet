@@ -1,0 +1,50 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: macos-26
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - swift
+          - ruby
+          - actions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Pin Xcode version
+        run: |
+          XCODE_VERSION=$(cat .xcode-version)
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          xcodebuild -version
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.language == 'swift' && 'none' || 'autobuild' }}
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
