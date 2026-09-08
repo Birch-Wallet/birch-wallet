@@ -30,9 +30,17 @@ final class SendViewModel: PSBTFlowManaging {
   var recommendedFees: BitcoinService.RecommendedFees?
 
   // UTXO selection
-  var manualUTXOSelection: Bool = false
   var selectedUTXOIds: Set<String> = [] // "txid:vout"
   var showUTXOPicker: Bool = false
+
+  /// Coin control is manual whenever specific UTXOs are picked. An empty
+  /// selection means automatic — the wallet chooses the inputs.
+  var manualUTXOSelection: Bool {
+    !selectedUTXOIds.isEmpty
+  }
+
+  /// Fee
+  var showFeeSheet: Bool = false
 
   /// Validation
   var showValidationErrors: Bool = false
@@ -303,6 +311,9 @@ final class SendViewModel: PSBTFlowManaging {
   func addRecipient() {
     guard canAddRecipient else { return }
     recipients.append(Recipient())
+    // The address still has to be scanned or pasted, but the amount is typed —
+    // so put the cursor there rather than making the user reach for it.
+    focusAmountIndex = recipients.count - 1
   }
 
   func removeRecipient(at index: Int) {
@@ -326,11 +337,9 @@ final class SendViewModel: PSBTFlowManaging {
     recalculateMaxIfNeeded()
   }
 
-  func setManualUTXOSelection(_ enabled: Bool) {
-    manualUTXOSelection = enabled
-    if !enabled {
-      selectedUTXOIds.removeAll()
-    }
+  /// Clear the manual selection, returning coin control to automatic
+  func useAutomaticCoinSelection() {
+    selectedUTXOIds.removeAll()
     recalculateMaxIfNeeded()
   }
 
@@ -406,15 +415,51 @@ final class SendViewModel: PSBTFlowManaging {
   }
 
   func estimatedFee(for rate: Double) -> UInt64 {
-    // Rough estimate: P2WSH multisig input ~200 vbytes, output ~43 vbytes each, overhead ~10
-    let inputCount: Int = if manualUTXOSelection {
-      max(selectedUTXOIds.count, 1)
-    } else {
-      max(bitcoinService.utxos.count, 1)
-    }
+    UInt64(Double(estimatedVsize) * max(rate, 0.001))
+  }
+
+  /// Rough estimate: P2WSH multisig input ~200 vbytes, output ~43 vbytes each, overhead ~10
+  var estimatedVsize: Int {
     let outputCount = recipients.count + 1 // +1 for change
-    let estimatedVbytes = UInt64(inputCount * 200 + outputCount * 43 + 10)
-    return UInt64(Double(estimatedVbytes) * max(rate, 0.001))
+    return estimatedInputCount * 200 + outputCount * 43 + 10
+  }
+
+  /// How many inputs the transaction is likely to spend. Automatic coin
+  /// selection does not sweep the wallet, so counting every UTXO badly
+  /// overstates the fee on a wallet with many small outputs — estimate only
+  /// what it takes to cover the amount, largest first.
+  private var estimatedInputCount: Int {
+    if manualUTXOSelection {
+      return max(selectedUTXOIds.count, 1)
+    }
+    // A send-max really does spend everything available.
+    if hasSendMax {
+      return max(spendableUTXOs.count, 1)
+    }
+    let target = totalSendAmount
+    guard target > 0 else { return 1 }
+
+    var accumulated: UInt64 = 0
+    var count = 0
+    for utxo in spendableUTXOs.sorted(by: { $0.amount > $1.amount }) {
+      accumulated += utxo.amount
+      count += 1
+      if accumulated >= target {
+        break
+      }
+    }
+    return max(count, 1)
+  }
+
+  /// Estimated fee for a preset, used to price each row of the fee sheet
+  func estimatedFee(for preset: FeePreset) -> UInt64? {
+    guard let rate = preset.rate(from: recommendedFees) else { return nil }
+    return estimatedFee(for: rate)
+  }
+
+  /// Total leaving the wallet — recipients plus the estimated fee
+  var totalWithEstimatedFee: UInt64 {
+    totalSendAmount + estimateFee()
   }
 
   /// Parse a BIP-21 URI or plain address string
@@ -640,7 +685,6 @@ final class SendViewModel: PSBTFlowManaging {
     }
     signaturesCollected = saved.signaturesCollected
     requiredSignatures = saved.requiredSignatures
-    manualUTXOSelection = saved.manualUTXOSelection
     if !saved.selectedUTXOIds.isEmpty {
       selectedUTXOIds = Set(saved.selectedUTXOIds.split(separator: ",").map(String.init))
     } else {
@@ -749,7 +793,6 @@ final class SendViewModel: PSBTFlowManaging {
     showValidationErrors = false
     showExportQR = false
     showAddressScanner = false
-    manualUTXOSelection = false
     selectedUTXOIds.removeAll()
     showUTXOPicker = false
     savedPSBTId = nil

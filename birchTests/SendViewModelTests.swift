@@ -41,8 +41,9 @@ struct SendViewModelTests {
 
   @Test func isBalanceExceededWithManualUTXOSelection() {
     let vm = SendViewModel()
-    vm.manualUTXOSelection = true
-    // No UTXOs selected, so selectedUTXOTotal = 0
+    // Selecting a UTXO the wallet doesn't hold leaves selectedUTXOTotal = 0
+    vm.selectedUTXOIds = ["missing:0"]
+    #expect(vm.manualUTXOSelection)
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "5000")]
     vm.feeRateSatVb = "1"
     #expect(vm.isBalanceExceeded)
@@ -152,7 +153,6 @@ struct SendViewModelTests {
     vm.showValidationErrors = true
     vm.showExportQR = true
     vm.showAddressScanner = true
-    vm.manualUTXOSelection = true
     vm.selectedUTXOIds = ["utxo1"]
     vm.showUTXOPicker = true
 
@@ -248,10 +248,11 @@ struct SendViewModelTests {
 
   // MARK: - Manual UTXO Selection
 
-  @Test func manualUTXOSelectionWithNoSelection() {
+  @Test func manualUTXOSelectionWithUnknownSelection() {
     let vm = SendViewModel()
-    vm.manualUTXOSelection = true
-    // No UTXOs selected → selectedUTXOTotal = 0
+    vm.selectedUTXOIds = ["missing:0"]
+    // Selection doesn't match any wallet UTXO → selectedUTXOTotal = 0
+    #expect(vm.manualUTXOSelection)
     #expect(vm.selectedUTXOTotal == 0)
     // Any positive amount should exceed balance
     vm.recipients = [Recipient(address: "tb1qtest", amountSats: "100")]
@@ -316,7 +317,7 @@ struct SendViewModelTests {
 
     // Manual UTXO mode
     vm.recipients = [Recipient()]
-    vm.manualUTXOSelection = true
+    vm.selectedUTXOIds = ["utxo1"]
     #expect(vm.hasAnyInput == true)
   }
 
