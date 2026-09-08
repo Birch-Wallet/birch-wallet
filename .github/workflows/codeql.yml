@@ -7,27 +7,25 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  # Ruby and Actions are interpreted languages: they only support build-mode "none"
-  # and do not need a macOS runner.
-  analyze-interpreted:
-    name: Analyze (${{ matrix.language }})
+  # Actions and Ruby are interpreted: they only support build-mode "none" and do
+  # not need a macOS runner. Kept as separate jobs because a job-level `if`
+  # applies to every matrix leg, and these two differ on pull requests.
+
+  # Workflow changes are exactly what pull requests here tend to touch, and this
+  # takes well under a minute, so run it on every event.
+  analyze-actions:
+    name: Analyze (actions)
     runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
       actions: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language:
-          - ruby
-          - actions
 
     steps:
       - name: Checkout
@@ -36,20 +34,51 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
+          languages: actions
           build-mode: none
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:actions"
+
+  # Ruby here is just the fastlane/Gemfile tooling, not shipped app code, so
+  # cover main on merge and the weekly schedule rather than every pull request.
+  analyze-ruby:
+    name: Analyze (ruby)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ruby
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:ruby"
 
   # Swift only supports build-mode "autobuild" or "manual". Rather than rely on the
   # autobuilder guessing a target, we drive xcodebuild ourselves, mirroring the
   # Xcode - Build and Analyze workflow.
   analyze-swift:
     name: Analyze (swift)
+    # Swift extraction traces every swift-frontend invocation, which turned a ~90s
+    # build into 46 minutes on the first green run. Too slow to gate every PR, so
+    # skip it there and cover main on merge, the weekly schedule, and on demand.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
+    timeout-minutes: 60
     permissions:
       security-events: write
       packages: read
@@ -77,12 +106,20 @@ jobs:
 
       # CodeQL only sees what the compiler actually touches, so this must be a
       # clean build. A single architecture is enough and keeps the trace fast.
+      #
+      # The package flags matter: without them xcodebuild re-resolves the package
+      # graph inside the traced build, which cost 18 of the 46 minutes on the
+      # first green run. Resolution is subprocess-heavy and CodeQL traces every
+      # process, so the same work that takes 42s in the step above is ~26x slower
+      # here. The step above has already resolved against Package.resolved.
       - name: Build
         run: |
           xcodebuild clean build \
             -project birch.xcodeproj \
             -scheme birch \
             -destination 'generic/platform=iOS' \
+            -disableAutomaticPackageResolution \
+            -skipPackageUpdates \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO
 
       - name: Perform CodeQL analysis
