@@ -37,7 +37,11 @@ struct URDisplaySheet: View {
   var body: some View {
     Group {
       if let part = displayState.part {
-        URQRCode(data: .constant(part), foregroundColor: .black, backgroundColor: .clear)
+        // Deliberately not URUI's URQRCode: it builds a fresh CIContext for every
+        // frame it draws, which costs roughly ten times what a shared one does and
+        // lands on the main thread each time the code advances — enough to visibly
+        // stutter scrolling, and worse the higher the frame rate.
+        AnimatedQRFrame(payload: part)
           .aspectRatio(1, contentMode: .fit)
       } else {
         ProgressView()

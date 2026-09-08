@@ -65,33 +65,25 @@ struct BBQRDisplayView: View {
         options: options
       )
       frames = split.parts()
-      qrImages = frames.compactMap { generateQRImage(from: $0) }
+      // Every frame is rendered once, up front, so advancing the animation later is
+      // just an array lookup. Shared CIContext — see QRImageRenderer.
+      qrImages = frames.compactMap { QRImageRenderer.image(for: $0, scale: 10) }
     } catch {
       logger.error("Failed to split BBQR data: \(error)")
     }
   }
 
-  private func generateQRImage(from string: String) -> UIImage? {
-    let context = CIContext()
-    let filter = CIFilter.qrCodeGenerator()
-    filter.message = Data(string.utf8)
-    filter.correctionLevel = "L"
-
-    guard let outputImage = filter.outputImage else { return nil }
-
-    let scale = 10.0
-    let scaled = outputImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-
-    guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
-    return UIImage(cgImage: cgImage)
-  }
-
   private func startTimer() {
     guard frames.count > 1 else { return }
     let interval = 1.0 / framesPerSecond
-    timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+    let timer = Timer(timeInterval: interval, repeats: true) { _ in
       currentIndex = (currentIndex + 1) % frames.count
     }
+    // .common mode keeps the code advancing while the user scrolls. A timer left in
+    // the default mode is suspended for the whole gesture, so the signing device
+    // would sit on a stalled frame.
+    RunLoop.main.add(timer, forMode: .common)
+    self.timer = timer
   }
 
   private func stopTimer() {
