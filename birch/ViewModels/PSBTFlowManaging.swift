@@ -30,6 +30,10 @@ protocol PSBTFlowManaging: AnyObject {
   var signerStatus: [(label: String, fingerprint: String, hasSigned: Bool)] { get set }
   var errorMessage: String? { get set }
   var isProcessing: Bool { get set }
+  var inputCount: Int { get set }
+
+  /// Result of the most recent check of `psbtBytes` against wallet state.
+  var psbtVerification: PSBTVerificationState { get set }
 
   // MARK: - Saved PSBT State
 
@@ -75,25 +79,44 @@ extension PSBTFlowManaging {
         original: psbtBytes,
         signed: signedBytes
       )
+
+      // combine() pins the unsigned transaction, but it still adopts the other PSBT's
+      // witness_utxo for any input where ours had none — clearing our non_witness_utxo
+      // when it does. That is the one route left for a signer to restate what an input
+      // is worth, so re-check before keeping the merged result.
+      let findings = psbtBitcoinService.verifyPSBT(updatedBytes)
+      if let critical = findings.criticals.first {
+        logger.error("Rejected signed PSBT, keeping previous bytes: \(critical.message)")
+        errorMessage = critical.message
+        isProcessing = false
+        return
+      }
+
+      // A PSBT that merges to exactly what we already had carries nothing new. Say so
+      // rather than silently returning the user to the QR screen.
+      if updatedBytes == previousBytes {
+        logger.warning("Signed PSBT added no new signatures (duplicate or unrelated PSBT)")
+        errorMessage = "That PSBT added no new signatures. It may already have been scanned, or it may be for a different transaction."
+        isProcessing = false
+        return
+      }
+
       psbtBase64 = updatedBase64
       psbtBytes = updatedBytes
+      psbtVerification = PSBTVerificationState(findings: findings, inputCount: inputCount)
 
       // Use PSBT introspection to determine signer status
       if let signerInfo = psbtBitcoinService.psbtSignerInfo(updatedBytes) {
         signaturesCollected = signerInfo.totalSignatures
         signerStatus = signerInfo.cosignerSignStatus
-      } else if updatedBytes != previousBytes {
+      } else {
         // Fallback: increment count based on byte change
         signaturesCollected += 1
       }
 
-      if updatedBytes == previousBytes {
-        logger.warning("Signed PSBT added no new signatures (duplicate or unrelated PSBT)")
-      } else {
-        logger.info("Merged signed PSBT: signatures \(signaturesBefore) -> \(signaturesCollected) of \(requiredSignatures)")
-      }
+      logger.info("Merged signed PSBT: signatures \(signaturesBefore) -> \(signaturesCollected) of \(requiredSignatures)")
 
-      if updatedBytes != previousBytes, let context = modelContext {
+      if let context = modelContext {
         autoSavePSBT(context: context)
       }
 

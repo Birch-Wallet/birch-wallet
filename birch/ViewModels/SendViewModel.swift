@@ -69,6 +69,12 @@ final class SendViewModel: PSBTFlowManaging {
   var changeAddress: String?
   var inputCount: Int = 0
 
+  /// Result of the most recent check of `psbtBytes` against wallet state
+  var psbtVerification: PSBTVerificationState = .notChecked
+
+  /// Where the change output comes back to, for the user to check on the review screen
+  var changeVerification: PSBTChangeVerification?
+
   /// Balance
   var availableBalance: UInt64 = 0
 
@@ -440,6 +446,11 @@ final class SendViewModel: PSBTFlowManaging {
     changeAmount = result.changeAmount
     changeAddress = result.changeAddress
     inputCount = result.inputCount
+    psbtVerification = PSBTVerificationState(
+      findings: bitcoinService.verifyPSBT(result.bytes),
+      inputCount: result.inputCount
+    )
+    changeVerification = bitcoinService.changeVerification(result.bytes)
     if let signerInfo = bitcoinService.psbtSignerInfo(result.bytes) {
       signerStatus = signerInfo.cosignerSignStatus
     }
@@ -609,6 +620,24 @@ final class SendViewModel: PSBTFlowManaging {
     inputCount = saved.inputCount
     psbtBytes = saved.psbtBytes
     psbtBase64 = saved.psbtBase64
+
+    // Prefer what the bytes actually say over what was written alongside them.
+    if let summary = bitcoinService.summarizePSBT(saved.psbtBytes) {
+      if summary.fee != saved.totalFee || summary.changeAmount != saved.changeAmount {
+        logger.warning(
+          "Saved PSBT '\(saved.name)' metadata differs from its bytes: "
+            + "fee \(saved.totalFee) -> \(summary.fee), change \(saved.changeAmount ?? 0) -> \(summary.changeAmount ?? 0)"
+        )
+      }
+      // The stored fee rate is what the user actually chose; re-deriving it from an
+      // unsigned PSBT's vsize would round it and overstate it. The absolute fee is the
+      // security-relevant number, so that one comes from the bytes.
+      totalFee = summary.fee
+      changeAmount = summary.changeAmount
+      changeAddress = summary.changeAddress
+      inputCount = summary.inputCount
+      recipients = summary.recipients.map(Recipient.init(from:))
+    }
     signaturesCollected = saved.signaturesCollected
     requiredSignatures = saved.requiredSignatures
     manualUTXOSelection = saved.manualUTXOSelection
@@ -619,6 +648,14 @@ final class SendViewModel: PSBTFlowManaging {
     }
     savedPSBTId = saved.id
     savedPSBTName = saved.name
+
+    // Re-check the stored bytes: the wallet's UTXO set may have moved on since this
+    // PSBT was saved.
+    psbtVerification = PSBTVerificationState(
+      findings: bitcoinService.verifyPSBT(saved.psbtBytes),
+      inputCount: inputCount
+    )
+    changeVerification = bitcoinService.changeVerification(saved.psbtBytes)
 
     // Populate cosigner signing status from PSBT
     if let signerInfo = bitcoinService.psbtSignerInfo(saved.psbtBytes) {
@@ -648,6 +685,11 @@ final class SendViewModel: PSBTFlowManaging {
       psbtBase64 = result.psbtBase64
       requiredSignatures = bitcoinService.requiredSignatures
       totalCosigners = bitcoinService.totalCosigners
+      psbtVerification = PSBTVerificationState(
+        findings: result.findings,
+        inputCount: result.inputCount
+      )
+      changeVerification = bitcoinService.changeVerification(result.psbtBytes)
 
       // Determine signature status
       if let signerInfo = bitcoinService.psbtSignerInfo(result.psbtBytes) {
@@ -696,6 +738,8 @@ final class SendViewModel: PSBTFlowManaging {
     changeAmount = nil
     changeAddress = nil
     inputCount = 0
+    psbtVerification = .notChecked
+    changeVerification = nil
     signaturesCollected = 0
     signerStatus = []
     broadcastTxid = ""
