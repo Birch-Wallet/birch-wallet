@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SWIFTFORMAT_VERSION: 0.62.1
+
 jobs:
   swiftformat:
     name: Check code formatting with SwiftFormat
@@ -18,12 +21,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # Clone outside the workspace: anything under the working directory would
+      # otherwise be picked up by `--lint .` below.
       - name: Install SwiftFormat
         run: |
-          git clone --branch 0.62.1 --depth 1 https://github.com/nicklockwood/SwiftFormat.git
-          cd SwiftFormat
-          swift build -c release
-          sudo cp .build/release/swiftformat /usr/local/bin/swiftformat
-          swiftformat --version
+          git clone --branch "$SWIFTFORMAT_VERSION" --depth 1 \
+            https://github.com/nicklockwood/SwiftFormat.git "$RUNNER_TEMP/SwiftFormat"
+          swift build -c release --package-path "$RUNNER_TEMP/SwiftFormat"
+          echo "SWIFTFORMAT=$RUNNER_TEMP/SwiftFormat/.build/release/swiftformat" >> "$GITHUB_ENV"
+
+      # Invoke by absolute path. The runner image preinstalls SwiftFormat in
+      # /opt/homebrew/bin, which precedes /usr/local/bin on PATH and would
+      # otherwise shadow the pinned build.
       - name: Check Formatting
-        run: swiftformat --lint .
+        run: |
+          "$SWIFTFORMAT" --version
+          "$SWIFTFORMAT" --lint .
