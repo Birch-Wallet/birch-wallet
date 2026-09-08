@@ -12,9 +12,11 @@ permissions:
   contents: read
 
 jobs:
-  analyze:
+  # Ruby and Actions are interpreted languages: they only support build-mode "none"
+  # and do not need a macOS runner.
+  analyze-interpreted:
     name: Analyze (${{ matrix.language }})
-    runs-on: macos-26
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       packages: read
@@ -24,9 +26,34 @@ jobs:
       fail-fast: false
       matrix:
         language:
-          - swift
           - ruby
           - actions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Swift only supports build-mode "autobuild" or "manual". Rather than rely on the
+  # autobuilder guessing a target, we drive xcodebuild ourselves, mirroring the
+  # Xcode - Build and Analyze workflow.
+  analyze-swift:
+    name: Analyze (swift)
+    runs-on: macos-26
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
 
     steps:
       - name: Checkout
@@ -38,13 +65,27 @@ jobs:
           sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
           xcodebuild -version
 
+      # Resolve SPM dependencies before init so the traced build is pure compilation.
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project birch.xcodeproj -scheme birch
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.language == 'swift' && 'none' || 'autobuild' }}
+          languages: swift
+          build-mode: manual
+
+      # CodeQL only sees what the compiler actually touches, so this must be a
+      # clean build. A single architecture is enough and keeps the trace fast.
+      - name: Build
+        run: |
+          xcodebuild clean build \
+            -project birch.xcodeproj \
+            -scheme birch \
+            -destination 'generic/platform=iOS' \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:swift"
