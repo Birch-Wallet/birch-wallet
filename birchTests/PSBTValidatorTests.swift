@@ -247,7 +247,7 @@ struct PSBTValidatorTests {
     let (tx, _, walletScript) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
-      script.toBytes() == walletScript ? .internal : nil
+      script.toBytes() == walletScript ? KeychainAndIndex(keychain: .internal, index: 5) : nil
     }
 
     #expect(outputs.count == 2)
@@ -263,7 +263,7 @@ struct PSBTValidatorTests {
     let (tx, externalScript, _) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
-      script.toBytes() == externalScript ? .external : nil
+      script.toBytes() == externalScript ? KeychainAndIndex(keychain: .external, index: 3) : nil
     }
 
     #expect(outputs[0].role == .selfTransfer)
@@ -288,10 +288,47 @@ struct PSBTValidatorTests {
   func multipleWalletOutputsAreAllReported() throws {
     let (tx, _, _) = try fixtureOutputs()
 
-    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { _ in .internal }
+    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { _ in KeychainAndIndex(keychain: .internal, index: 0) }
 
     #expect(outputs.filter { $0.role == .change }.count == 2)
     #expect(outputs.map(\.index) == [0, 1])
+  }
+
+  @Test("Classified outputs carry the index the wallet derived them from")
+  func classifiedOutputsCarryTheirDerivation() throws {
+    let (tx, _, walletScript) = try fixtureOutputs()
+
+    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
+      script.toBytes() == walletScript ? KeychainAndIndex(keychain: .internal, index: 5) : nil
+    }
+
+    #expect(outputs[1].derivation == KeychainAndIndex(keychain: .internal, index: 5))
+    #expect(outputs[0].derivation == nil, "An unrecognised script has no derivation")
+  }
+
+  @Test("The change path is rendered the way a signing device shows it")
+  func changeDerivationPathIsRendered() {
+    let path = PSBTValidator.derivationPathDescription(
+      accountOrigin: PSBTGroundTruth.accountOrigin(for: .mainnet),
+      keychain: .internal,
+      index: 5
+    )
+    #expect(path == "m/48'/0'/0'/2'/1/5")
+  }
+
+  @Test("A receive path renders on chain 0")
+  func receiveDerivationPathIsRendered() {
+    let path = PSBTValidator.derivationPathDescription(
+      accountOrigin: PSBTGroundTruth.accountOrigin(for: .testnet4),
+      keychain: .external,
+      index: 12
+    )
+    #expect(path == "m/48'/1'/0'/2'/0/12")
+  }
+
+  @Test("With no account origin there is no path to show")
+  func noAccountOriginMeansNoPath() {
+    #expect(PSBTValidator.derivationPathDescription(accountOrigin: [], keychain: .internal, index: 0) == nil)
   }
 
   @Test("Addresses are derived for the network in use")
@@ -331,7 +368,16 @@ struct PSBTValidatorTests {
   }
 
   private func output(_ role: PSBTOutputInfo.Role) -> PSBTOutputInfo {
-    PSBTOutputInfo(index: 1, address: "tb1qexample", amount: 29500, role: role)
+    PSBTOutputInfo(
+      index: 1,
+      address: "tb1qexample",
+      amount: 29500,
+      role: role,
+      derivation: role == .external ? nil : KeychainAndIndex(
+        keychain: role == .change ? .internal : .external,
+        index: 0
+      )
+    )
   }
 
   /// Runs the per-output check with both cosigners claiming the same path.
@@ -472,7 +518,7 @@ struct PSBTValidatorTests {
     let (tx, _, walletScript) = try fixtureOutputs()
     let psbt = try Psbt(psbtBase64: fixture().base64EncodedString())
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
-      script.toBytes() == walletScript ? .external : nil
+      script.toBytes() == walletScript ? KeychainAndIndex(keychain: .external, index: 0) : nil
     }
 
     // The fixture claims m/48'/1'/0'/2'/0/0 on output 1; hand back its own script.

@@ -43,6 +43,10 @@ protocol BitcoinServiceProtocol {
   /// Returns nil when the PSBT cannot be parsed.
   func summarizePSBT(_ psbtData: Data) -> BitcoinService.PSBTSummary?
 
+  /// Where the change output comes back to, and whether that claim holds up.
+  /// Returns nil when the PSBT has no change output.
+  func changeVerification(_ psbtData: Data) -> PSBTChangeVerification?
+
   /// Whether an address belongs to the loaded wallet (self-transfer detection)
   func isWalletAddress(_ address: String) -> Bool
 

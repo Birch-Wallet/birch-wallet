@@ -47,6 +47,65 @@ struct PSBTVerificationBadge: View {
   }
 
   var body: some View {
+    VerificationChip(icon: icon, tint: tint, title: title, detail: detail)
+  }
+}
+
+/// Whether the change output really is this wallet's own, and where it comes back to.
+///
+/// Change is the one output a user cannot check by eye: it is not an address they
+/// typed, and a PSBT that routes it somewhere unrecoverable looks exactly like one
+/// that does not.
+struct ChangeVerificationBadge: View {
+  let status: PSBTChangeVerification.Status
+
+  private var icon: String {
+    switch status {
+    case .verified: "checkmark.shield.fill"
+    case .warning: "exclamationmark.triangle.fill"
+    case .failed: "xmark.octagon.fill"
+    }
+  }
+
+  private var tint: Color {
+    switch status {
+    case .verified: .hbSuccess
+    case .warning: .hbBitcoinOrange
+    case .failed: .hbError
+    }
+  }
+
+  private var title: String {
+    switch status {
+    case .verified: "Change returns to this wallet"
+    case .warning: "Change needs a closer look"
+    case .failed: "Change address could not be confirmed"
+    }
+  }
+
+  private var detail: String {
+    switch status {
+    case .verified:
+      "This wallet derived the address above from its own change keychain, at the path shown."
+    case let .warning(message), let .failed(message):
+      message
+    }
+  }
+
+  var body: some View {
+    VerificationChip(icon: icon, tint: tint, title: title, detail: detail)
+  }
+}
+
+// MARK: - Shared presentation
+
+private struct VerificationChip: View {
+  let icon: String
+  let tint: Color
+  let title: String
+  let detail: String?
+
+  var body: some View {
     HStack(alignment: .top, spacing: 10) {
       Image(systemName: icon)
         .font(.system(size: 14))

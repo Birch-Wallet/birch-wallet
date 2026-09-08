@@ -41,6 +41,9 @@ final class MockBitcoinService: BitcoinServiceProtocol {
   /// nil (the default) means "could not re-derive", so callers fall back to stored metadata
   var summarizePSBTResult: BitcoinService.PSBTSummary?
 
+  /// nil (the default) means "no change output"
+  var changeVerificationResult: PSBTChangeVerification?
+
   var syncError: Error?
 
   // MARK: - Call Tracking
@@ -147,6 +150,10 @@ final class MockBitcoinService: BitcoinServiceProtocol {
 
   func summarizePSBT(_: Data) -> BitcoinService.PSBTSummary? {
     summarizePSBTResult
+  }
+
+  func changeVerification(_: Data) -> PSBTChangeVerification? {
+    changeVerificationResult
   }
 
   func sync() async throws {

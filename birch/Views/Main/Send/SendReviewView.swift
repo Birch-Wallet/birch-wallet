@@ -111,6 +111,21 @@ struct SendReviewView: View {
                 changeAddress.chunkedAddressText(font: .hbMono(12))
               }
             }
+
+            // The path this wallet derives the address from — not the path the PSBT
+            // claims. Compare it against what your signing device shows.
+            if let path = viewModel.changeVerification?.derivationPath {
+              ReviewItem(label: "Change Derivation Path") {
+                Text(path)
+                  .font(.hbMono(12))
+                  .foregroundStyle(Color.hbTextPrimary)
+                  .textSelection(.enabled)
+              }
+            }
+
+            if let status = viewModel.changeVerification?.status {
+              ChangeVerificationBadge(status: status)
+            }
           }
 
           ReviewItem(label: "Fee Rate") {

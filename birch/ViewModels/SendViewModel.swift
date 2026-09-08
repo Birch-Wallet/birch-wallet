@@ -72,6 +72,9 @@ final class SendViewModel: PSBTFlowManaging {
   /// Result of the most recent check of `psbtBytes` against wallet state
   var psbtVerification: PSBTVerificationState = .notChecked
 
+  /// Where the change output comes back to, for the user to check on the review screen
+  var changeVerification: PSBTChangeVerification?
+
   /// Balance
   var availableBalance: UInt64 = 0
 
@@ -447,6 +450,7 @@ final class SendViewModel: PSBTFlowManaging {
       findings: bitcoinService.verifyPSBT(result.bytes),
       inputCount: result.inputCount
     )
+    changeVerification = bitcoinService.changeVerification(result.bytes)
     if let signerInfo = bitcoinService.psbtSignerInfo(result.bytes) {
       signerStatus = signerInfo.cosignerSignStatus
     }
@@ -651,6 +655,7 @@ final class SendViewModel: PSBTFlowManaging {
       findings: bitcoinService.verifyPSBT(saved.psbtBytes),
       inputCount: inputCount
     )
+    changeVerification = bitcoinService.changeVerification(saved.psbtBytes)
 
     // Populate cosigner signing status from PSBT
     if let signerInfo = bitcoinService.psbtSignerInfo(saved.psbtBytes) {
@@ -684,6 +689,7 @@ final class SendViewModel: PSBTFlowManaging {
         findings: result.findings,
         inputCount: result.inputCount
       )
+      changeVerification = bitcoinService.changeVerification(result.psbtBytes)
 
       // Determine signature status
       if let signerInfo = bitcoinService.psbtSignerInfo(result.psbtBytes) {
@@ -733,6 +739,7 @@ final class SendViewModel: PSBTFlowManaging {
     changeAddress = nil
     inputCount = 0
     psbtVerification = .notChecked
+    changeVerification = nil
     signaturesCollected = 0
     signerStatus = []
     broadcastTxid = ""

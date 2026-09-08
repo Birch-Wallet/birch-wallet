@@ -199,10 +199,32 @@ struct PSBTOutputInfo: Equatable {
   let address: String
   let amount: UInt64
   let role: Role
+  /// Where the wallet derived this script, when it recognises it at all. This is the
+  /// wallet's own answer, not the PSBT's claim, so it is safe to show the user.
+  let derivation: KeychainAndIndex?
 
   var isMine: Bool {
     role != .external
   }
+}
+
+/// What the review screen needs to show about a change output, so the user can check
+/// where their money is coming back to.
+struct PSBTChangeVerification: Equatable {
+  enum Status: Equatable {
+    /// The wallet derived this script itself and the PSBT's claims about it agree.
+    case verified
+    /// Genuine, but with something worth reading — an index past the gap limit, say.
+    case warning(String)
+    /// A claim about this output contradicts the wallet.
+    case failed(String)
+  }
+
+  let address: String
+  let amount: UInt64
+  /// The path the wallet itself derives this script from, e.g. m/48'/0'/0'/2'/1/5.
+  let derivationPath: String?
+  let status: Status
 }
 
 // MARK: - Validator
@@ -426,15 +448,16 @@ enum PSBTValidator {
   /// fingerprint and path, so trusting it lets a hostile PSBT label a foreign output
   /// as change. A script the wallet cannot place is external, whatever the PSBT says.
   ///
-  /// - Parameter keychainOf: returns the keychain a script was derived from, or nil
-  ///   when the wallet does not recognise it.
+  /// - Parameter derivationOf: returns the keychain and index a script was derived
+  ///   from, or nil when the wallet does not recognise it.
   static func classifyOutputs(
     tx: Transaction,
     network: Network,
-    keychainOf: (Script) -> KeychainKind?
+    derivationOf: (Script) -> KeychainAndIndex?
   ) -> [PSBTOutputInfo] {
     tx.output().enumerated().map { index, txOut in
-      let role: PSBTOutputInfo.Role = switch keychainOf(txOut.scriptPubkey) {
+      let derivation = derivationOf(txOut.scriptPubkey)
+      let role: PSBTOutputInfo.Role = switch derivation?.keychain {
       case .internal: .change
       case .external: .selfTransfer
       case nil: .external
@@ -444,9 +467,21 @@ enum PSBTValidator {
         index: index,
         address: (try? Address.fromScript(script: txOut.scriptPubkey, network: network))?.description ?? "Unknown",
         amount: txOut.value.toSat(),
-        role: role
+        role: role,
+        derivation: derivation
       )
     }
+  }
+
+  /// Render the full path a script sits at, the way a signing device displays it.
+  static func derivationPathDescription(
+    accountOrigin: [UInt32],
+    keychain: KeychainKind,
+    index: UInt32
+  ) -> String? {
+    guard !accountOrigin.isEmpty else { return nil }
+    let chain: UInt32 = keychain == .internal ? 1 : 0
+    return "m/" + pathDescription(accountOrigin + [chain, index])
   }
 
   /// Check every output that claims to be derived from this wallet's keys.

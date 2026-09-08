@@ -1199,17 +1199,17 @@ final class BitcoinService {
 
   // MARK: - PSBT Inspection
 
-  /// Resolves a script to the keychain the wallet derived it from, or nil if the
-  /// wallet has no record of it. Backs every output classification.
-  private var keychainLookup: (Script) -> KeychainKind? {
+  /// Resolves a script to the keychain and index the wallet derived it from, or nil if
+  /// the wallet has no record of it. Backs every output classification.
+  private var derivationLookup: (Script) -> KeychainAndIndex? {
     guard let wallet else { return { _ in nil } }
-    return { wallet.derivationOfSpk(spk: $0)?.keychain }
+    return { wallet.derivationOfSpk(spk: $0) }
   }
 
   /// Every output of a PSBT's transaction, classified against the wallet's script index.
   func classifiedOutputs(of psbt: Psbt, network: Network) -> [PSBTOutputInfo] {
     guard let tx = try? psbt.extractTx() else { return [] }
-    return PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup)
+    return PSBTValidator.classifyOutputs(tx: tx, network: network, derivationOf: derivationLookup)
   }
 
   /// The single change output, if there is one. Deterministically the first — BDK
@@ -1217,6 +1217,52 @@ final class BitcoinService {
   /// recipient rather than silently replacing this one.
   private func changeOutput(of psbt: Psbt, network: Network) -> PSBTOutputInfo? {
     classifiedOutputs(of: psbt, network: network).first { $0.role == .change }
+  }
+
+  /// Everything the review screen needs to let a user check the change output: where
+  /// the wallet says the address comes from, and whether the PSBT's account of it
+  /// stands up.
+  ///
+  /// The path shown is the wallet's own derivation, not the PSBT's claim — a PSBT can
+  /// write any path it likes, so echoing that back would let it dictate the very thing
+  /// the user is checking.
+  func changeVerification(_ psbtData: Data) -> PSBTChangeVerification? {
+    guard let psbt = try? Psbt(psbtBase64: psbtData.base64EncodedString()),
+          let tx = try? psbt.extractTx() else { return nil }
+
+    let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
+    let truth = psbtGroundTruth
+    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: network, derivationOf: derivationLookup)
+    guard let change = outputs.first(where: { $0.role == .change }) else { return nil }
+
+    let path = change.derivation.flatMap {
+      PSBTValidator.derivationPathDescription(
+        accountOrigin: truth.accountOrigin,
+        keychain: $0.keychain,
+        index: $0.index
+      )
+    }
+
+    let psbtOutputs = psbt.output()
+    let txOutputs = tx.output()
+    var status = PSBTChangeVerification.Status.verified
+    if change.index < psbtOutputs.count, change.index < txOutputs.count,
+       let finding = PSBTValidator.verifyOutputDerivation(
+         output: change,
+         script: txOutputs[change.index].scriptPubkey,
+         derivations: psbtOutputs[change.index].bip32Derivation,
+         against: truth
+       )
+    {
+      status = finding.severity == .critical ? .failed(finding.message) : .warning(finding.message)
+    }
+
+    return PSBTChangeVerification(
+      address: change.address,
+      amount: change.amount,
+      derivationPath: path,
+      status: status
+    )
   }
 
   /// What a PSBT pays, derived from its bytes rather than from stored metadata.
@@ -1249,7 +1295,7 @@ final class BitcoinService {
     var changeAddress: String?
     var recipients: [SavedRecipient] = []
 
-    for output in PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup) {
+    for output in PSBTValidator.classifyOutputs(tx: tx, network: network, derivationOf: derivationLookup) {
       // Only the first internal-keychain output is change. Everything else stays
       // visible as a recipient — including self-sends to our own receive addresses,
       // which must not disappear into a "change" line.
@@ -1326,7 +1372,7 @@ final class BitcoinService {
   func verifyPSBT(_ psbt: Psbt, tx: Transaction) -> [PSBTFinding] {
     let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
     let truth = psbtGroundTruth
-    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: network, keychainOf: keychainLookup)
+    let outputs = PSBTValidator.classifyOutputs(tx: tx, network: network, derivationOf: derivationLookup)
 
     let findings = PSBTValidator.verifyInputAmounts(psbt: psbt, tx: tx, against: truth)
       + PSBTValidator.verifyOutputDerivations(psbt: psbt, tx: tx, outputs: outputs, against: truth)
