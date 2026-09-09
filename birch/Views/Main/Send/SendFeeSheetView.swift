@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Fee selection presented as a sheet rather than an inline accordion, so the
 /// send screen stays intact behind it and the Review button never gets pushed
-/// off screen. Each preset is priced in sats — a bare sat/vB rate doesn't tell
-/// the user what they'll pay, and two presets often resolve to the same rate.
+/// off screen. Fast, Medium and Slow always all appear, even when the fee
+/// source resolves two of them to the same rate.
 struct SendFeeSheetView: View {
   @Bindable var viewModel: SendViewModel
   @Environment(\.dismiss) private var dismiss
@@ -12,6 +12,8 @@ struct SendFeeSheetView: View {
   /// Preset selected while the sheet is open; only committed on "Use …"
   @State private var draftPreset: FeePreset
   @State private var draftRate: String
+  /// The Custom row's own value, independent of the selected preset.
+  @State private var customRate: String
   /// Latches the typing layout. Kept separate from the focus binding: the
   /// layout swap removes whichever field was focused, so driving it from
   /// @FocusState alone would immediately undo itself.
@@ -27,7 +29,15 @@ struct SendFeeSheetView: View {
     self.viewModel = viewModel
     _draftPreset = State(initialValue: viewModel.selectedFeePreset)
     _draftRate = State(initialValue: viewModel.feeRateSatVb)
+    _customRate = State(
+      initialValue: viewModel.selectedFeePreset == .custom
+        ? viewModel.feeRateSatVb
+        : Self.defaultCustomRate
+    )
   }
+
+  /// Where Custom starts when the user hasn't set one
+  private static let defaultCustomRate = "1.0"
 
   private var fiatService: FiatPriceService {
     FiatPriceService.shared
@@ -45,42 +55,10 @@ struct SendFeeSheetView: View {
     draftRateValue > 0
   }
 
-  /// One row per distinct rate. When the fee source returns the same rate for
-  /// two presets they share a row — but both names stay on it, so a preset
-  /// never looks like it went missing.
-  private struct FeeOption: Identifiable {
-    let presets: [FeePreset]
-    let rate: Double
+  private let speedPresets: [FeePreset] = [.fast, .medium, .slow]
 
-    var id: Double {
-      rate
-    }
-
-    var title: String {
-      presets.map(\.displayName).joined(separator: " · ")
-    }
-
-    var primary: FeePreset {
-      presets[0]
-    }
-  }
-
-  private var feeOptions: [FeeOption] {
-    var order: [Double] = []
-    var grouped: [Double: [FeePreset]] = [:]
-    for preset in [FeePreset.fast, .medium, .slow] {
-      guard let rate = preset.rate(from: viewModel.recommendedFees) else { continue }
-      let key = (rate * 100).rounded() / 100
-      if grouped[key] == nil {
-        order.append(key)
-        grouped[key] = []
-      }
-      grouped[key]?.append(preset)
-    }
-    return order.compactMap { key in
-      guard let presets = grouped[key] else { return nil }
-      return FeeOption(presets: presets, rate: key)
-    }
+  private func rate(for preset: FeePreset) -> Double {
+    preset.rate(from: viewModel.recommendedFees) ?? 0
   }
 
   var body: some View {
@@ -95,8 +73,8 @@ struct SendFeeSheetView: View {
         focusedCustomField
       } else {
         VStack(spacing: 10) {
-          ForEach(feeOptions) { option in
-            presetRow(option)
+          ForEach(speedPresets, id: \.self) { preset in
+            presetRow(preset)
           }
           customRow
         }
@@ -113,7 +91,7 @@ struct SendFeeSheetView: View {
       .disabled(!isValidDraft)
     }
     .padding(.horizontal, 24)
-    .padding(.top, 8)
+    .padding(.top, 24)
     .padding(.bottom, 24)
     // Measured before the expanding frame, so this is the intrinsic content
     // height rather than the sheet's.
@@ -140,17 +118,17 @@ struct SendFeeSheetView: View {
   /// rate is usually to sit somewhere relative to them.
   private var compactPresetStrip: some View {
     HStack(spacing: 8) {
-      ForEach(feeOptions) { option in
+      ForEach(speedPresets, id: \.self) { preset in
         Button(action: {
-          draftPreset = option.primary
-          draftRate = formatFeeRate(option.rate)
+          draftPreset = preset
+          draftRate = formatFeeRate(rate(for: preset))
           stopTyping()
         }) {
           VStack(spacing: 4) {
-            Text(option.title)
+            Text(preset.displayName)
               .font(.hbBody(13).weight(.bold))
               .foregroundStyle(Color.hbTextPrimary)
-            Text(formatFeeRate(option.rate))
+            Text(formatFeeRate(rate(for: preset)))
               .font(.hbMono(11))
               .foregroundStyle(Color.hbTextSecondary)
           }
@@ -230,6 +208,7 @@ struct SendFeeSheetView: View {
               draftRate = filtered
             }
             draftPreset = .custom
+            customRate = draftRate
           }
 
         Text("sat/vB")
@@ -274,7 +253,7 @@ struct SendFeeSheetView: View {
 
   private var header: some View {
     HStack(alignment: .firstTextBaseline) {
-      Text("Network fee")
+      Text("Network Fee")
         .font(.hbDisplay(22))
         .foregroundStyle(Color.hbTextPrimary)
 
@@ -288,18 +267,18 @@ struct SendFeeSheetView: View {
 
   // MARK: - Rows
 
-  private func presetRow(_ option: FeeOption) -> some View {
-    let fee = viewModel.estimatedFee(for: option.rate)
-    let isSelected = option.presets.contains(draftPreset)
+  private func presetRow(_ preset: FeePreset) -> some View {
+    let presetRate = rate(for: preset)
+    let isSelected = draftPreset == preset
 
     return Button(action: {
-      draftPreset = option.primary
-      draftRate = formatFeeRate(option.rate)
+      draftPreset = preset
+      draftRate = formatFeeRate(presetRate)
     }) {
       HStack(spacing: 12) {
         selectionIndicator(isSelected: isSelected)
 
-        Text(option.title)
+        Text(preset.displayName)
           .font(.hbHeadline)
           .foregroundStyle(Color.hbTextPrimary)
           .lineLimit(1)
@@ -307,9 +286,7 @@ struct SendFeeSheetView: View {
 
         Spacer(minLength: 8)
 
-        // A wallet with many UTXOs produces very wide sat figures — they
-        // shrink rather than wrap or push the name into two lines.
-        Text(fee.formattedSats)
+        Text("\(formatFeeRate(presetRate)) sat/vB")
           .font(.hbMonoBold(15))
           .foregroundStyle(Color.hbTextPrimary)
           .lineLimit(1)
@@ -337,7 +314,7 @@ struct SendFeeSheetView: View {
 
       Spacer(minLength: 8)
 
-      stepper
+      rateField
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 14)
@@ -347,66 +324,36 @@ struct SendFeeSheetView: View {
     .onTapGesture { selectCustom() }
   }
 
-  /// A stepper rather than a bare number field — custom is the one place a
-  /// user can silently strand a transaction, so nudging beats free typing.
-  private var stepper: some View {
+  /// Tapping the value opens the typing layout rather than editing in place —
+  /// a second bound text field here would fight the big one.
+  private var rateField: some View {
     HStack(spacing: 8) {
-      stepButton("minus", enabled: draftRateValue > 0.1) {
-        adjustRate(by: -stepSize)
-      }
-
-      // Tapping the value opens the typing layout rather than editing in
-      // place — a second bound text field here would fight the big one.
       Button(action: startTyping) {
-        Text(draftRate.isEmpty ? "0.0" : draftRate)
-          .font(.hbMono(16))
+        Text(customRate.isEmpty ? Self.defaultCustomRate : customRate)
+          .font(.hbMono(18))
           .foregroundStyle(draftRate.isEmpty ? Color.hbTextSecondary : Color.hbTextPrimary)
           .lineLimit(1)
           .minimumScaleFactor(0.7)
-          .frame(width: 58, height: 36)
+          .frame(width: 96, height: 44)
           .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 11))
+          .clipShape(RoundedRectangle(cornerRadius: 12))
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
 
-      stepButton("plus", enabled: true) {
-        adjustRate(by: stepSize)
-      }
+      Text("sat/vB")
+        .font(.hbMono(13))
+        .foregroundStyle(Color.hbTextSecondary)
     }
-  }
-
-  private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Image(systemName: symbol)
-        .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(enabled ? Color.hbTextPrimary : Color.hbTextSecondary.opacity(0.4))
-        .frame(width: 36, height: 36)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .disabled(!enabled)
-  }
-
-  /// Finer steps at low rates, whole steps once the rate is meaningful
-  private var stepSize: Double {
-    draftRateValue < 2 ? 0.1 : 1
-  }
-
-  private func adjustRate(by delta: Double) {
-    selectCustom()
-    let next = max(0.1, ((draftRateValue + delta) * 100).rounded() / 100)
-    draftRate = formatFeeRate(next)
   }
 
   private func selectCustom() {
     draftPreset = .custom
+    draftRate = customRate
   }
 
   private func startTyping() {
-    draftPreset = .custom
+    selectCustom()
     isTypingRate = true
   }
 
@@ -448,11 +395,11 @@ struct SendFeeSheetView: View {
   private var totalRow: some View {
     HStack(alignment: .bottom) {
       VStack(alignment: .leading, spacing: 5) {
-        Text("Total with fee")
+        Text("Total fee")
           .font(.hbLabel())
           .foregroundStyle(Color.hbTextSecondary)
 
-        Text((viewModel.totalSendAmount + draftFee).formattedSats)
+        Text(draftFee.formattedSats)
           .font(.hbMonoBold(17))
           .foregroundStyle(Color.hbTextPrimary)
           .lineLimit(1)
@@ -461,9 +408,7 @@ struct SendFeeSheetView: View {
 
       Spacer(minLength: 8)
 
-      if fiatEnabled,
-         let fiat = fiatService.formattedSatsToFiat(viewModel.totalSendAmount + draftFee)
-      {
+      if fiatEnabled, let fiat = fiatService.formattedSatsToFiat(draftFee) {
         Text("≈ \(fiat)")
           .font(.hbMono(12))
           .foregroundStyle(Color.hbTextSecondary)
