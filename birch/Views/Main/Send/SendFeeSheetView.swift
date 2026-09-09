@@ -235,10 +235,7 @@ struct SendFeeSheetView: View {
 
   private var commitTitle: String {
     guard isValidDraft else { return "Enter a fee rate" }
-    let name = draftPreset == .custom
-      ? "\(formatFeeRate(draftRateValue)) sat/vB"
-      : draftPreset.displayName
-    return "Use \(name) · \(draftFee.formattedSats)"
+    return "Use \(draftPreset.displayName) · \(formatFeeRate(draftRateValue)) sat/vB"
   }
 
   private func commit() {
@@ -287,7 +284,7 @@ struct SendFeeSheetView: View {
         Spacer(minLength: 8)
 
         Text("\(formatFeeRate(presetRate)) sat/vB")
-          .font(.hbMonoBold(15))
+          .font(.hbMono(15))
           .foregroundStyle(Color.hbTextPrimary)
           .lineLimit(1)
           .minimumScaleFactor(0.6)
