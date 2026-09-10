@@ -135,6 +135,11 @@ Birch uses [`fastlane snapshot`](https://docs.fastlane.tools/actions/snapshot/) 
    This is idempotent — safe to re-run. If you upgrade fastlane, the script
    aborts with a clear error so you can review the patch for the new version.
 
+   > As of fastlane **2.238.0** (the version pinned in `Gemfile.lock`), PR #29921
+   > is merged upstream: frameit ships `IPHONE_17_PRO` / `IPHONE_17_PRO_MAX` and the
+   > iPhone 17 rounded-corner mask natively. The script detects this and exits as a
+   > no-op, so this step is only needed if you downgrade fastlane below 2.238.0.
+
    On a fresh machine, also download the device frame PNGs before running
    the patch (they live at `~/.fastlane/frameit/latest/` and are not in the repo):
    ```bash

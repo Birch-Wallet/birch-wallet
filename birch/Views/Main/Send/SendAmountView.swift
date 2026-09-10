@@ -466,7 +466,7 @@ private struct RecipientCard: View {
     VStack(alignment: .leading, spacing: 12) {
       header
 
-      if hasAddress {
+      if hasAddress, !showAddressField {
         filledAddress
       } else {
         addressEntry
@@ -656,6 +656,14 @@ private struct RecipientCard: View {
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
           .focused($isAddressFocused)
+          .submitLabel(.done)
+          .onSubmit { endAddressEditing() }
+          .onChange(of: isAddressFocused) {
+            // Once the field gives up focus, show the verifiable summary
+            if !isAddressFocused {
+              endAddressEditing()
+            }
+          }
           .padding(12)
           .background(Color.hbSurfaceElevated)
           .clipShape(RoundedRectangle(cornerRadius: 10))
@@ -674,6 +682,13 @@ private struct RecipientCard: View {
         .buttonStyle(.plain)
       }
     }
+  }
+
+  /// Leave the raw field only when there is something to summarise; an empty
+  /// address falls back to the Scan / Paste buttons.
+  private func endAddressEditing() {
+    guard hasAddress else { return }
+    showAddressField = false
   }
 
   private func pasteAddress() {

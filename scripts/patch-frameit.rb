@@ -31,18 +31,29 @@ rescue Gem::MissingSpecError
   abort "ERROR: fastlane gem not found. Run `bundle install` first."
 end
 
-installed = gem_spec.version.to_s
-unless installed == EXPECTED_FASTLANE_VERSION
-  abort "ERROR: Expected fastlane #{EXPECTED_FASTLANE_VERSION}, found #{installed}.\n" \
-        "Review the patch for the new version and update EXPECTED_FASTLANE_VERSION."
-end
-
+installed         = gem_spec.version.to_s
 gem_dir           = gem_spec.gem_dir
 device_types_path = File.join(gem_dir, "frameit/lib/frameit/device_types.rb")
 editor_path       = File.join(gem_dir, "frameit/lib/frameit/editor.rb")
 
 [device_types_path, editor_path].each do |path|
   abort "ERROR: #{path} not found. Is this a full fastlane install?" unless File.exist?(path)
+end
+
+# ── Short-circuit: native support (fastlane >= 2.238.0) ──────────────────────
+# PR #29921 was merged upstream, so frameit now ships IPHONE_17_PRO /
+# IPHONE_17_PRO_MAX and an iphone-17 rounded-corner mask of its own. When the
+# installed gem already has both, this patch is unnecessary.
+if File.read(device_types_path).include?("IPHONE_17_PRO_MAX ||=") &&
+   File.read(editor_path).match?(/iphone-?17/)
+  puts "fastlane #{installed} already supports iPhone 17 Pro / Pro Max natively (PR #29921)."
+  puts "Nothing to patch — this script is a no-op on fastlane >= 2.238.0."
+  exit(0)
+end
+
+unless installed == EXPECTED_FASTLANE_VERSION
+  abort "ERROR: Expected fastlane #{EXPECTED_FASTLANE_VERSION}, found #{installed}.\n" \
+        "Review the patch for the new version and update EXPECTED_FASTLANE_VERSION."
 end
 
 # ── Patch device_types.rb ────────────────────────────────────────────────────
