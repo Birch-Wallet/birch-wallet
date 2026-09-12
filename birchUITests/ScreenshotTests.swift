@@ -33,6 +33,19 @@ final class ScreenshotTests: XCTestCase {
   /// whose items are plain top-level `buttons` not contained in any `tabBars`
   /// element. Prefer the tab bar when one exists, otherwise fall back to a
   /// top-level button match.
+  /// The amount and rate fields use numeric keypads, which have no return key,
+  /// so the Send screen carries an explicit dismiss control. Falls back to a
+  /// swipe for any screen that predates it.
+  private func dismissKeyboard(_ app: XCUIApplication) {
+    let dismiss = app.buttons["Dismiss keyboard"]
+    if dismiss.waitForExistence(timeout: 2) {
+      dismiss.tap()
+    } else {
+      app.swipeDown()
+    }
+    sleep(1)
+  }
+
   private func tabButton(_ name: String) -> XCUIElement {
     if app.tabBars.firstMatch.exists {
       return app.tabBars.buttons[name]
@@ -495,66 +508,88 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: Fill Recipient 1
 
-    // Type address directly into the address field (do not use Paste button)
+    // Scan and Paste are the primary controls now, so typing an address sits
+    // behind a link that reveals the field.
+    let typeAddressLink = app.buttons["or type an address"].firstMatch
+    XCTAssertTrue(typeAddressLink.waitForExistence(timeout: 5), "Type-an-address link should exist")
+    typeAddressLink.tap()
+
     let addressField = app.textFields.matching(NSPredicate(format: "placeholderValue CONTAINS 'tb1'")).firstMatch
     XCTAssertTrue(addressField.waitForExistence(timeout: 5), "Address text field should exist")
     addressField.tap()
     addressField.typeText("tb1qkmp8r90rcqpzdm6uqy2034j30csd902ynk35pezwg3sag6604xystkkazg")
+    dismissKeyboard(app)
 
-    // Dismiss keyboard
-    app.swipeDown()
-    sleep(1)
+    // The label is the recipient card's own title — tap it to start editing.
+    let addLabelButton = app.buttons["Add label"].firstMatch
+    XCTAssertTrue(addLabelButton.waitForExistence(timeout: 3), "Add label control should exist")
+    addLabelButton.tap()
 
-    // Type label
-    let labelField = app.textFields["Label (optional)"]
+    let labelField = app.textFields["Label"]
     XCTAssertTrue(labelField.waitForExistence(timeout: 3), "Label field should exist")
     labelField.tap()
     labelField.typeText("Test Transaction")
-
-    // Dismiss keyboard
-    app.swipeDown()
-    sleep(1)
+    dismissKeyboard(app)
 
     // Type sats amount
     let amountField = app.textFields["0"]
     XCTAssertTrue(amountField.waitForExistence(timeout: 3), "Amount field should exist")
     amountField.tap()
     amountField.typeText("71234")
+    dismissKeyboard(app)
 
-    // Dismiss keyboard
-    app.swipeDown()
+    // Fee opens a sheet now instead of expanding in place.
+    let feeRow = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Fee'")).firstMatch
+    XCTAssertTrue(feeRow.waitForExistence(timeout: 3), "Fee row should exist")
+    feeRow.tap()
     sleep(1)
 
-    // Expand Fee card by tapping the fee header area
-    let feeLabel = app.staticTexts["Fee"]
-    XCTAssertTrue(feeLabel.waitForExistence(timeout: 3), "Fee label should exist")
-    feeLabel.tap()
-    sleep(1)
+    // MARK: 25 - Network Fee sheet (Fast preset selected)
 
-    // Select Custom fee
+    let fastOption = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Fast'")).firstMatch
+    XCTAssertTrue(fastOption.waitForExistence(timeout: 3), "Fast fee option should exist")
+    fastOption.tap()
+    sleep(1)
+    snapshot("25-NetworkFee-Fast")
+
+    // Custom fee — the rate is a button that both selects Custom and opens the
+    // full-size entry layout.
     let customLabel = app.staticTexts["Custom"]
     XCTAssertTrue(customLabel.waitForExistence(timeout: 3), "Custom fee option should exist")
-    customLabel.tap()
+
+    let customRateButton = app.buttons.matching(NSPredicate(format: "label MATCHES '^[0-9.]+$'")).firstMatch
+    XCTAssertTrue(customRateButton.waitForExistence(timeout: 3), "Custom rate control should exist")
+    customRateButton.tap()
     sleep(1)
 
-    // Type custom fee rate
-    let customFeeField = app.textFields["0.0"]
-    XCTAssertTrue(customFeeField.waitForExistence(timeout: 3), "Custom fee text field should exist")
-    customFeeField.tap()
-    // Clear any existing text and type new value
-    customFeeField.typeText("2.5")
-
-    // Dismiss keyboard
-    app.swipeDown()
+    // The entry field takes focus on appear and opens pre-filled with the
+    // current rate, so clear it before typing rather than appending.
+    app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
+    app.typeText("0.51")
     sleep(1)
 
-    // Collapse fee card by tapping the fee header again
-    feeLabel.tap()
+    // Commit the sheet — there is no inline card left to collapse.
+    let useFeeButton = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use '")).firstMatch
+    XCTAssertTrue(useFeeButton.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
+    useFeeButton.tap()
     sleep(1)
 
-    // MARK: 25 - Send Recipients Filled
+    // MARK: 26 - Network Fee sheet (Custom selected)
 
-    snapshot("25-SendRecipientsFilled")
+    // Reopen so the custom rate shows in the priced list rather than mid-entry
+    // — the typing layout covers the rows with the keypad.
+    feeRow.tap()
+    sleep(1)
+    snapshot("26-NetworkFee-Custom")
+
+    let closeFeeSheet = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use '")).firstMatch
+    XCTAssertTrue(closeFeeSheet.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
+    closeFeeSheet.tap()
+    sleep(1)
+
+    // MARK: 27 - Send Recipients Filled
+
+    snapshot("27-SendRecipientsFilled")
 
     // MARK: Tap Review
 
@@ -567,17 +602,17 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(reviewTitle.waitForExistence(timeout: 15), "Review Transaction screen should appear")
     sleep(1)
 
-    // MARK: 26 - Review Transaction (top)
+    // MARK: 28 - Review Transaction (top)
 
-    snapshot("26-ReviewTransaction-Top")
+    snapshot("28-ReviewTransaction-Top")
 
     // Scroll to the bottom of the review screen
     app.swipeUp()
     sleep(1)
 
-    // MARK: 27 - Review Transaction (bottom)
+    // MARK: 29 - Review Transaction (bottom)
 
-    snapshot("27-ReviewTransaction-Bottom")
+    snapshot("29-ReviewTransaction-Bottom")
 
     // Tap "Show QR for Signing"
     let showQRBtn = app.buttons["Show QR for Signing"]
@@ -589,9 +624,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(scanSignedBtn.waitForExistence(timeout: 15), "Scan Signed PSBT button should appear on QR display")
     sleep(2)
 
-    // MARK: 28 - PSBT QR Display (animated QR showing)
+    // MARK: 30 - PSBT QR Display (animated QR showing)
 
-    snapshot("28-PSBTQRDisplay")
+    snapshot("30-PSBTQRDisplay")
 
     // Expand Advanced section
     let advancedToggle = app.staticTexts["Advanced"]
@@ -605,9 +640,9 @@ final class ScreenshotTests: XCTestCase {
     qtrStart.press(forDuration: 0.05, thenDragTo: qtrEnd)
     sleep(1)
 
-    // MARK: 29 - PSBT QR Display (Advanced expanded)
+    // MARK: 31 - PSBT QR Display (Advanced expanded)
 
-    snapshot("29-PSBTQRDisplay-Advanced")
+    snapshot("31-PSBTQRDisplay-Advanced")
 
     // Tap "Scan Signed PSBT" button to go to scan screen
     let scanBtn = app.buttons["Scan Signed PSBT"]
@@ -619,9 +654,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(scanTitle.waitForExistence(timeout: 5), "Scan Signed PSBT screen should appear")
     sleep(1)
 
-    // MARK: 30 - Scan Signed PSBT Screen
+    // MARK: 32 - Scan Signed PSBT Screen
 
-    snapshot("30-ScanSignedPSBT")
+    snapshot("32-ScanSignedPSBT")
 
     // Go back to QR Display
     let backToQR = app.buttons["Back to QR Display"]
@@ -639,8 +674,8 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(saveAlert.waitForExistence(timeout: 5), "Save PSBT alert should appear")
     sleep(1)
 
-    // MARK: 31 - Save PSBT Dialog
+    // MARK: 33 - Save PSBT Dialog
 
-    snapshot("31-SavePSBT")
+    snapshot("33-SavePSBT")
   }
 }

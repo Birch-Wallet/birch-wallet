@@ -35,7 +35,11 @@ platform :ios do
     # ── 1. Build for testing once ────────────────────────────────────────
     # Produces birch.app, birchUITests-Runner.app, and the
     # .xctestrun manifest that tells xcodebuild which apps to install.
-    sh("xcodebuild build-for-testing " \
+    # `set -o pipefail` is essential: piping to xcpretty otherwise reports
+    # xcpretty's exit status, so a failed build looks like a success and the
+    # passes below silently screenshot whatever stale .app is already in
+    # DERIVED_DATA. That produced two-month-old screenshots once.
+    sh("set -o pipefail && xcodebuild build-for-testing " \
        "-scheme birch " \
        "-project ../birch.xcodeproj " \
        "-destination 'generic/platform=iOS Simulator' " \
