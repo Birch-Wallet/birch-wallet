@@ -46,6 +46,17 @@ final class ScreenshotTests: XCTestCase {
     sleep(1)
   }
 
+  /// On iPad a numeric keypad floats as a popover, and dismissing a sheet hands
+  /// focus back to the field that had it, so the keypad reappears over the screen.
+  /// Its dismiss region covers everything, so nothing underneath is hittable until
+  /// it is tapped away. A no-op on iPhone, where the keypad has no popover.
+  private func dismissKeypadPopover(_ app: XCUIApplication) {
+    let region = app.otherElements["PopoverDismissRegion"].firstMatch
+    guard app.keyboards.firstMatch.exists, region.waitForExistence(timeout: 1) else { return }
+    region.tap()
+    sleep(1)
+  }
+
   private func tabButton(_ name: String) -> XCUIElement {
     if app.tabBars.firstMatch.exists {
       return app.tabBars.buttons[name]
@@ -573,6 +584,13 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(useFeeButton.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
     useFeeButton.tap()
     sleep(1)
+    // On iPad the decimal pad floats as a popover, and the first tap outside it
+    // only dismisses the keypad, so the sheet is still up. Tap again to commit.
+    if useFeeButton.exists, useFeeButton.isHittable {
+      useFeeButton.tap()
+      sleep(1)
+    }
+    dismissKeypadPopover(app)
 
     // MARK: 26 - Network Fee sheet (Custom selected)
 
@@ -586,6 +604,7 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(closeFeeSheet.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
     closeFeeSheet.tap()
     sleep(1)
+    dismissKeypadPopover(app)
 
     // MARK: 27 - Send Recipients Filled
 
@@ -614,6 +633,33 @@ final class ScreenshotTests: XCTestCase {
 
     snapshot("29-ReviewTransaction-Bottom")
 
+    // Open the PSBT inspector from the review screen
+    let inspectBtn = app.buttons["Inspect PSBT"]
+    XCTAssertTrue(inspectBtn.waitForExistence(timeout: 5), "Inspect PSBT button should exist")
+    inspectBtn.tap()
+
+    // The model builds off the main thread; the section headers appear once it is ready
+    let inputSection = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Input 0'")).firstMatch
+    XCTAssertTrue(inputSection.waitForExistence(timeout: 10), "Input 0 section should appear in the inspector")
+    inputSection.tap()
+    sleep(1)
+
+    // Open the witness script row so its definition shows
+    let witnessScriptRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'witness_script'")).firstMatch
+    XCTAssertTrue(witnessScriptRow.waitForExistence(timeout: 3), "witness_script row should exist in Input 0")
+    witnessScriptRow.tap()
+    sleep(1)
+
+    // MARK: 30 - PSBT Inspector (Input 0, witness_script open)
+
+    snapshot("30-PSBTInspector")
+
+    // Swipe-to-dismiss is disabled on the inspector, so close it with Done
+    let inspectorDone = app.buttons["Done"]
+    XCTAssertTrue(inspectorDone.waitForExistence(timeout: 3), "Inspector Done button should exist")
+    inspectorDone.tap()
+    sleep(1)
+
     // Tap "Show QR for Signing"
     let showQRBtn = app.buttons["Show QR for Signing"]
     XCTAssertTrue(showQRBtn.waitForExistence(timeout: 5), "Show QR for Signing button should exist")
@@ -624,9 +670,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(scanSignedBtn.waitForExistence(timeout: 15), "Scan Signed PSBT button should appear on QR display")
     sleep(2)
 
-    // MARK: 30 - PSBT QR Display (animated QR showing)
+    // MARK: 31 - PSBT QR Display (animated QR showing)
 
-    snapshot("30-PSBTQRDisplay")
+    snapshot("31-PSBTQRDisplay")
 
     // Expand Advanced section
     let advancedToggle = app.staticTexts["Advanced"]
@@ -640,9 +686,9 @@ final class ScreenshotTests: XCTestCase {
     qtrStart.press(forDuration: 0.05, thenDragTo: qtrEnd)
     sleep(1)
 
-    // MARK: 31 - PSBT QR Display (Advanced expanded)
+    // MARK: 32 - PSBT QR Display (Advanced expanded)
 
-    snapshot("31-PSBTQRDisplay-Advanced")
+    snapshot("32-PSBTQRDisplay-Advanced")
 
     // Tap "Scan Signed PSBT" button to go to scan screen
     let scanBtn = app.buttons["Scan Signed PSBT"]
@@ -654,9 +700,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(scanTitle.waitForExistence(timeout: 5), "Scan Signed PSBT screen should appear")
     sleep(1)
 
-    // MARK: 32 - Scan Signed PSBT Screen
+    // MARK: 33 - Scan Signed PSBT Screen
 
-    snapshot("32-ScanSignedPSBT")
+    snapshot("33-ScanSignedPSBT")
 
     // Go back to QR Display
     let backToQR = app.buttons["Back to QR Display"]
@@ -674,8 +720,8 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(saveAlert.waitForExistence(timeout: 5), "Save PSBT alert should appear")
     sleep(1)
 
-    // MARK: 33 - Save PSBT Dialog
+    // MARK: 34 - Save PSBT Dialog
 
-    snapshot("33-SavePSBT")
+    snapshot("34-SavePSBT")
   }
 }

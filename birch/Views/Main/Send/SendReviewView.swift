@@ -4,7 +4,9 @@ struct SendReviewView: View {
   @Bindable var viewModel: SendViewModel
   @AppStorage(Constants.denominationKey) private var denomination: String = "sats"
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
+  @AppStorage(Constants.psbtCompactKey) private var compactPSBT = true
   @State private var showExitConfirmation = false
+  @State private var showInspector = false
 
   private var fiatService: FiatPriceService {
     FiatPriceService.shared
@@ -173,6 +175,14 @@ struct SendReviewView: View {
           .hbCard()
           .padding(.horizontal, 24)
 
+        if !viewModel.psbtBytes.isEmpty {
+          Button(action: { showInspector = true }) {
+            Text("Inspect PSBT")
+              .font(.hbBody(14))
+              .foregroundStyle(Color.hbBitcoinOrange)
+          }
+        }
+
         Spacer().frame(height: 16)
 
         Button(action: {
@@ -204,6 +214,13 @@ struct SendReviewView: View {
         .padding(.bottom, 32)
       }
       .padding(.top, 16)
+    }
+    .sheet(isPresented: $showInspector) {
+      PSBTInspectorView.forCurrentWallet(
+        psbtBytes: viewModel.psbtBytes,
+        compactEnabled: compactPSBT,
+        requiredSignatures: viewModel.requiredSignatures
+      )
     }
     .alert("Exit Signing?", isPresented: $showExitConfirmation) {
       Button("Exit", role: .destructive) {

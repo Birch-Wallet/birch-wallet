@@ -1,4 +1,5 @@
 import Bbqr
+import SwiftData
 import SwiftUI
 
 struct BumpFeeView: View {

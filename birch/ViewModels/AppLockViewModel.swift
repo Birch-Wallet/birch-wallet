@@ -75,7 +75,7 @@ final class AppLockViewModel {
       return
     }
 
-    context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock \(Constants.appName)") { success, _ in
+    context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Unlock \(Constants.appName)") { [weak self] success, _ in
       DispatchQueue.main.async { [weak self] in
         guard let self else { return }
         if success {
