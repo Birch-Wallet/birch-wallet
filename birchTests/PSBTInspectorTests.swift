@@ -280,6 +280,19 @@ struct PSBTInspectorTests {
     #expect(field.parts?.contains { $0.label.hasSuffix("not in script") } == true)
   }
 
+  // MARK: - Layout
+
+  /// The regular-width layout splits sections into two reading-order columns of
+  /// near-equal expanded height, instead of a fixed Global + Input 0 left column
+  @Test func regularColumnsBalance() throws {
+    let tenInputs = try model(loadFixture("test_psbt_10in_partial"))
+    #expect(tenInputs.sections.count == 12)
+    #expect(PSBTInspectorView.columnSplit(tenInputs.sections, scale: 0.14, maxRowHeight: 360) == 6)
+
+    let twoInputs = try model(loadFixture("test_psbt_2in_unsigned"))
+    #expect(PSBTInspectorView.columnSplit(twoInputs.sections, scale: 0.14, maxRowHeight: 360) == 2)
+  }
+
   @Test func witnessUtxoCopyOnlyMentionsCompactWhenItDrops() throws {
     let data = try loadFixture("test_psbt_nonwitness")
     let claim = "compact QR drops non_witness_utxo"

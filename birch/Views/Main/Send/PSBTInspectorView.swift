@@ -149,9 +149,7 @@ struct PSBTInspectorView: View {
   }
 
   private func regularLayout(_ model: PSBTInspectorModel) -> some View {
-    let left = Array(model.sections.prefix(2))
-    let right = Array(model.sections.dropFirst(2))
-    return VStack(alignment: .leading, spacing: 0) {
+    VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .bottom, spacing: 24) {
         titleBlock(model, titleSize: 34)
         Spacer(minLength: 0)
@@ -181,19 +179,21 @@ struct PSBTInspectorView: View {
       .padding(.bottom, 14)
 
       GeometryReader { geo in
+        let maxRowHeight = geo.size.height * 0.4
+        let split = Self.columnSplit(model.sections, scale: 0.14, maxRowHeight: maxRowHeight)
         HStack(alignment: .top, spacing: 28) {
           ScrollView {
             VStack(alignment: .leading, spacing: 18) {
               if model.isFinalized {
                 finalizedBanner
               }
-              sectionList(model, sections: left, scale: 0.14, maxRowHeight: geo.size.height * 0.4)
+              sectionList(model, sections: Array(model.sections.prefix(split)), scale: 0.14, maxRowHeight: maxRowHeight)
             }
             .padding(.bottom, 22)
           }
           ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-              sectionList(model, sections: right, scale: 0.14, maxRowHeight: geo.size.height * 0.4)
+              sectionList(model, sections: Array(model.sections.dropFirst(split)), scale: 0.14, maxRowHeight: maxRowHeight)
               legend
               absentNote(model)
             }
@@ -203,6 +203,29 @@ struct PSBTInspectorView: View {
         .padding(.horizontal, 30)
       }
     }
+  }
+
+  /// Index that splits sections into two reading-order columns of near-equal fully
+  /// expanded height. Ignores expansion state so sections never jump columns on tap.
+  static func columnSplit(_ sections: [PSBTSection], scale: CGFloat, maxRowHeight: CGFloat) -> Int {
+    let heights = sections.map { section in
+      section.fields.reduce(CGFloat(44)) { // header plus section spacing
+        $0 + PSBTFieldRow.height(bytes: $1.bytes, scale: scale, maxRowHeight: maxRowHeight) + 2
+      }
+    }
+    let total = heights.reduce(0, +) + 60 // the legend and absent note sit under the right column
+    var best = 1
+    var bestGap = CGFloat.infinity
+    var left: CGFloat = 0
+    for k in 1 ..< max(sections.count, 2) {
+      left += heights[k - 1]
+      let gap = abs(total - 2 * left)
+      if gap < bestGap {
+        best = k
+        bestGap = gap
+      }
+    }
+    return best
   }
 
   // MARK: - Pieces
@@ -426,7 +449,7 @@ private struct PSBTSectionView<Rows: View>: View {
 
 // MARK: - Field row
 
-private struct PSBTFieldRow: View {
+struct PSBTFieldRow: View {
   let field: PSBTField
   let sectionLabel: String
   let isMatched: Bool
@@ -435,16 +458,22 @@ private struct PSBTFieldRow: View {
   let maxRowHeight: CGFloat
   let onTap: () -> Void
 
-  private var naturalHeight: CGFloat {
-    max(36, (CGFloat(field.bytes) * scale).rounded())
+  /// Row height proportional to serialized size, at least 36 and at most maxRowHeight.
+  /// Also used to balance the regular-width columns.
+  static func height(bytes: Int, scale: CGFloat, maxRowHeight: CGFloat) -> CGFloat {
+    min(naturalHeight(bytes: bytes, scale: scale), max(36, maxRowHeight))
+  }
+
+  private static func naturalHeight(bytes: Int, scale: CGFloat) -> CGFloat {
+    max(36, (CGFloat(bytes) * scale).rounded())
   }
 
   private var rowHeight: CGFloat {
-    min(naturalHeight, max(36, maxRowHeight))
+    Self.height(bytes: field.bytes, scale: scale, maxRowHeight: maxRowHeight)
   }
 
   private var isClamped: Bool {
-    naturalHeight > rowHeight
+    Self.naturalHeight(bytes: field.bytes, scale: scale) > rowHeight
   }
 
   var body: some View {
