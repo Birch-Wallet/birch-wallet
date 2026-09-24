@@ -198,6 +198,25 @@ extension Color {
   static var hbTextSecondary: Color {
     ThemeManager.shared.theme.textSecondary
   }
+
+  /// PSBT inspector map colours: section hues plus a signing tint, with
+  /// darker light-mode variants that stay distinguishable on the birch light ground
+  static let hbPSBTGlobal = dynamic(dark: 0xC9A227, light: 0x94740F)
+  static let hbPSBTInput = dynamic(dark: 0x8AA45F, light: 0x55722F)
+  static let hbPSBTOutput = dynamic(dark: 0x5F93AC, light: 0x33687F)
+  static let hbPSBTSigning = dynamic(dark: 0x9C8BB4, light: 0x6D5A8E)
+
+  private static func dynamic(dark: UInt32, light: UInt32) -> Color {
+    func uiColor(_ hex: UInt32) -> UIColor {
+      UIColor(
+        red: CGFloat((hex >> 16) & 0xFF) / 255,
+        green: CGFloat((hex >> 8) & 0xFF) / 255,
+        blue: CGFloat(hex & 0xFF) / 255,
+        alpha: 1
+      )
+    }
+    return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? uiColor(dark) : uiColor(light) })
+  }
 }
 
 // MARK: - Typography

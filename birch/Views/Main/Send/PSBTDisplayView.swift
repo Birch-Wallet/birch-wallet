@@ -73,6 +73,7 @@ struct PSBTDisplayView: View {
   @State private var showExitConfirmation = false
   @State private var showBackConfirmation = false
   @State private var showExportFile = false
+  @State private var showInspector = false
   @State private var qrDisplayHeight: CGFloat = 700
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
@@ -299,6 +300,14 @@ struct PSBTDisplayView: View {
           .hbCard()
           .padding(.horizontal, 24)
 
+        if !viewModel.psbtBytes.isEmpty {
+          Button(action: { showInspector = true }) {
+            Text("Inspect PSBT")
+              .font(.hbBody(14))
+              .foregroundStyle(Color.hbBitcoinOrange)
+          }
+        }
+
         Button(action: {
           if viewModel.savedPSBTId != nil {
             showExitConfirmation = true
@@ -313,6 +322,13 @@ struct PSBTDisplayView: View {
         .padding(.bottom, 32)
       }
       .padding(.top, 8)
+    }
+    .sheet(isPresented: $showInspector) {
+      PSBTInspectorView.forCurrentWallet(
+        psbtBytes: viewModel.psbtBytes,
+        compactEnabled: compactPSBT,
+        requiredSignatures: viewModel.requiredSignatures
+      )
     }
     .onChange(of: qrEncodingRaw) { showRestartAlert = true }
     .onChange(of: qrDensityRaw) { showRestartAlert = true }
