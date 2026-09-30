@@ -25,6 +25,19 @@ final class SavedPSBT {
 
   static let maxNameLength = 100
 
+  /// How long after its last save a PSBT is still offered when Send opens. Older ones
+  /// are only reachable from the Saved PSBTs list.
+  static let resumePromptWindow: TimeInterval = 48 * 60 * 60
+
+  /// The PSBT to offer on opening Send: the wallet's most recently saved one, and only
+  /// if it was saved within `resumePromptWindow`. Never falls back to an older PSBT.
+  static func resumeCandidate(in saved: [SavedPSBT], walletID: UUID, now: Date = .now) -> SavedPSBT? {
+    guard let latest = saved
+      .filter({ $0.walletID == walletID })
+      .max(by: { $0.updatedAt < $1.updatedAt }) else { return nil }
+    return now.timeIntervalSince(latest.updatedAt) < resumePromptWindow ? latest : nil
+  }
+
   init(
     walletID: UUID,
     name: String,

@@ -12,6 +12,9 @@ struct SendFlowView: View {
   @State private var resumeCandidate: SavedPSBT?
   @State private var hasCheckedResume = false
   @State private var resumeDismissed = false
+  /// Set by the resume sheet's "Resume signing"; acted on once the sheet has
+  /// gone, since an RBF resume presents its own sheet.
+  @State private var pendingResume: SavedPSBT?
   var body: some View {
     NavigationStack {
       ZStack {
@@ -56,12 +59,7 @@ struct SendFlowView: View {
           Group {
             switch viewModel.currentStep {
             case .recipients:
-              SendRecipientsView(
-                viewModel: viewModel,
-                resumeCandidate: resumeCandidate,
-                onResumeYes: { saved in resumePSBT(saved) },
-                onResumeNo: { dismissResume() }
-              )
+              SendRecipientsView(viewModel: viewModel)
             case .review:
               SendReviewView(viewModel: viewModel)
             case .psbtDisplay:
@@ -104,7 +102,11 @@ struct SendFlowView: View {
       resumeCandidate = nil
       hasCheckedResume = false
       resumeDismissed = false
+      pendingResume = nil
       checkForResumablePSBT()
+    }
+    .sheet(item: $resumeCandidate, onDismiss: handleResumeSheetDismiss) { saved in
+      ResumePSBTSheet(savedPSBT: saved) { pendingResume = $0 }
     }
     .sheet(isPresented: $viewModel.showLoadPSBT) {
       SavedPSBTListView(viewModel: viewModel) { savedPSBT in
@@ -152,23 +154,24 @@ struct SendFlowView: View {
     guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
     hasCheckedResume = true
 
-    if let saved = allSavedPSBTs.first(where: { $0.walletID == walletID }) {
-      resumeCandidate = saved
-    }
+    resumeCandidate = SavedPSBT.resumeCandidate(in: allSavedPSBTs, walletID: walletID)
+  }
+
+  /// Every way out of the resume sheet — ✕, swipe, "Start a new transaction" —
+  /// means "not now" for this session; only "Resume signing" leaves a pending PSBT.
+  private func handleResumeSheetDismiss() {
+    resumeDismissed = true
+    guard let saved = pendingResume else { return }
+    pendingResume = nil
+    resumePSBT(saved)
   }
 
   func resumePSBT(_ saved: SavedPSBT) {
-    resumeCandidate = nil
     if saved.originalTxid != nil {
       bumpFeeViewModel = BumpFeeViewModel(savedPSBT: saved)
     } else {
       viewModel.loadSavedPSBT(saved)
     }
-  }
-
-  func dismissResume() {
-    resumeCandidate = nil
-    resumeDismissed = true
   }
 }
 
