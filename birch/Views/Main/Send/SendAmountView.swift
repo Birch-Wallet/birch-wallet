@@ -4,9 +4,6 @@ import SwiftUI
 
 struct SendRecipientsView: View {
   @Bindable var viewModel: SendViewModel
-  var resumeCandidate: SavedPSBT?
-  var onResumeYes: (SavedPSBT) -> Void = { _ in }
-  var onResumeNo: () -> Void = {}
   @AppStorage(Constants.denominationKey) private var denomination: String = "sats"
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
@@ -23,14 +20,6 @@ struct SendRecipientsView: View {
       VStack(spacing: 14) {
         SendStepIndicator(currentStep: viewModel.currentStep)
           .padding(.bottom, 4)
-
-        if let saved = resumeCandidate {
-          ResumeSigningCard(
-            savedPSBT: saved,
-            onYes: { onResumeYes(saved) },
-            onNo: onResumeNo
-          )
-        }
 
         if isMultiRecipient {
           spendableHeader
@@ -1334,49 +1323,6 @@ class QRScannerUIView: UIView, AVCaptureMetadataOutputObjectsDelegate {
         session.stopRunning()
       }
     }
-  }
-}
-
-// MARK: - Resume Signing Card
-
-private struct ResumeSigningCard: View {
-  let savedPSBT: SavedPSBT
-  let onYes: () -> Void
-  let onNo: () -> Void
-
-  var body: some View {
-    VStack(spacing: 12) {
-      Text("Resume signing last PSBT?")
-        .font(.hbBody(15))
-        .foregroundStyle(Color.hbTextPrimary)
-
-      Text(savedPSBT.name)
-        .font(.hbBody(13))
-        .foregroundStyle(Color.hbTextSecondary)
-
-      HStack(spacing: 12) {
-        Button(action: onNo) {
-          Text("No")
-            .font(.hbBody(14))
-            .foregroundStyle(Color.hbTextSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-
-        Button(action: onYes) {
-          Text("Yes")
-            .font(.hbBody(14))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(Color.hbBitcoinOrange)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-      }
-    }
-    .hbCard()
   }
 }
 
