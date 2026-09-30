@@ -5,7 +5,12 @@ import SwiftUI
 /// re-tint the map to answer one question at a time.
 struct PSBTInspectorView: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+  /// Narrowest width that gets the two-column layout. Chosen by the space the sheet
+  /// actually has, not the size class: an iPad sheet reports a compact size class
+  /// even when it is wide enough for two columns. 800 keeps the iPad mini (744pt)
+  /// single-column in portrait, where two columns would truncate the byte counts.
+  private static let twoColumnMinWidth: CGFloat = 800
 
   private let psbtBytes: Data
   private let compactEnabled: Bool
@@ -56,10 +61,12 @@ struct PSBTInspectorView: View {
         case nil:
           PSBTInspectorLoadingView()
         case let .success(model):
-          if horizontalSizeClass == .regular {
-            regularLayout(model)
-          } else {
-            compactLayout(model)
+          GeometryReader { geo in
+            if geo.size.width >= Self.twoColumnMinWidth {
+              regularLayout(model)
+            } else {
+              compactLayout(model)
+            }
           }
         case let .failure(error):
           parseFailure(error)
@@ -76,6 +83,9 @@ struct PSBTInspectorView: View {
       // Pulling down at the top of the field list must not close the sheet; Done does
       .interactiveDismissDisabled()
     }
+    // On iPad the default form sheet is too narrow for two columns; a page sheet
+    // is wide enough. iPhone presents a full-width sheet either way.
+    .presentationSizing(.page)
     .task { await buildModel() }
   }
 
@@ -127,7 +137,7 @@ struct PSBTInspectorView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, 10)
       .padding(.horizontal, 12)
-      .background(Color.hbSurfaceElevated)
+      .background(Color.hbSurface)
       .clipShape(RoundedRectangle(cornerRadius: 12))
       .padding(.horizontal, 20)
       .padding(.bottom, 14)
@@ -173,7 +183,7 @@ struct PSBTInspectorView: View {
       }
       .padding(.vertical, 11)
       .padding(.horizontal, 14)
-      .background(Color.hbSurfaceElevated)
+      .background(Color.hbSurface)
       .clipShape(RoundedRectangle(cornerRadius: 12))
       .padding(.horizontal, 30)
       .padding(.bottom, 14)
@@ -252,7 +262,7 @@ struct PSBTInspectorView: View {
           .foregroundStyle(item == lens ? Color.hbBackground : Color.hbTextSecondary)
           .padding(.vertical, 7)
           .padding(.horizontal, 13)
-          .background(item == lens ? Color.hbBitcoinOrange : Color.hbSurfaceElevated)
+          .background(item == lens ? Color.hbBitcoinOrange : Color.hbSurface)
           .clipShape(Capsule())
       }
       .buttonStyle(.plain)
@@ -427,7 +437,7 @@ private struct PSBTSectionView<Rows: View>: View {
         .font(.system(size: 13, weight: .bold))
         .foregroundStyle(Color.hbTextPrimary)
       Rectangle()
-        .fill(Color.hbSurfaceElevated)
+        .fill(Color.hbBorder)
         .frame(height: 1)
       Text(meta)
         .font(.hbMono(11))
@@ -613,7 +623,7 @@ private struct PSBTPartsBreakdown: View {
         }
         .padding(.vertical, 6)
         .overlay(alignment: .bottom) {
-          Rectangle().fill(Color.hbSurfaceElevated).frame(height: 1)
+          Rectangle().fill(Color.hbBorder).frame(height: 1)
         }
         .accessibilityElement(children: .combine)
       }
