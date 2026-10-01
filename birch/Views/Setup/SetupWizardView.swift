@@ -6,45 +6,61 @@ struct SetupWizardView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @State private var viewModel = SetupWizardViewModel()
+  /// The full size of the wizard's window or sheet, measured on the background
+  /// that ignores every safe area, the keyboard included. The layout is chosen
+  /// from this so the on-screen keyboard can't flip an iPad in portrait into
+  /// two columns mid-edit, which would rebuild the field being typed in.
+  @State private var windowSize: CGSize = .zero
 
   var body: some View {
     NavigationStack {
       ZStack {
-        Color.hbBackground.ignoresSafeArea()
+        Color.hbBackground
+          .onGeometryChange(for: CGSize.self, of: \.size) { windowSize = $0 }
+          .ignoresSafeArea()
 
-        VStack(spacing: 0) {
-          // Progress bar
-          if viewModel.currentStep != .welcome {
-            ProgressBarView(progress: viewModel.progress, stepCount: viewModel.stepCount)
-              .padding(.horizontal, 24)
-              .padding(.top, 8)
-          }
-
-          // Step content
-          Group {
-            switch viewModel.currentStep {
-            case .welcome:
-              WelcomeStepView(viewModel: viewModel)
-            case .creationChoice:
-              WalletCreationChoiceView(viewModel: viewModel)
-            case .multisigConfig:
-              MultisigConfigView(viewModel: viewModel)
-            case .cosignerImport:
-              CosignerImportView(viewModel: viewModel)
-            case .descriptorImport:
-              DescriptorImportView(viewModel: viewModel)
-            case .walletName:
-              WalletNameView(
-                viewModel: viewModel,
-                onSave: viewModel.creationMode == .importDescriptor ? saveAndFinish : nil
-              )
-            case .review:
-              EmptyView() // unused in current flow
-            case .verify:
-              WalletVerifyView(viewModel: viewModel, onComplete: saveAndFinish)
+        GeometryReader { geo in
+          let stepLayout = layout(for: windowSize == .zero ? geo.size : windowSize)
+          VStack(spacing: 0) {
+            // Progress bar
+            if viewModel.currentStep != .welcome {
+              ProgressBarView(progress: viewModel.progress, stepCount: viewModel.stepCount)
+                // Two columns: span both columns. Otherwise line up with the
+                // step's content, capped to the readable column on wide layouts.
+                .padding(.leading, stepLayout == .twoColumn ? SetupLayout.leadingMargin : 24)
+                .padding(.trailing, stepLayout == .twoColumn ? SetupLayout.trailingMargin : 24)
+                .padding(.top, 8)
+                .setupReadableWidth()
             }
+
+            // Step content
+            Group {
+              switch viewModel.currentStep {
+              case .welcome:
+                WelcomeStepView(viewModel: viewModel)
+              case .creationChoice:
+                WalletCreationChoiceView(viewModel: viewModel)
+              case .multisigConfig:
+                MultisigConfigView(viewModel: viewModel)
+              case .cosignerImport:
+                CosignerImportView(viewModel: viewModel)
+              case .descriptorImport:
+                DescriptorImportView(viewModel: viewModel)
+              case .walletName:
+                WalletNameView(
+                  viewModel: viewModel,
+                  onSave: viewModel.creationMode == .importDescriptor ? saveAndFinish : nil
+                )
+              case .review:
+                EmptyView() // unused in current flow
+              case .verify:
+                WalletVerifyView(viewModel: viewModel, onComplete: saveAndFinish)
+              }
+            }
+            .frame(maxHeight: .infinity)
           }
-          .frame(maxHeight: .infinity)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .environment(\.setupLayout, stepLayout)
         }
       }
       .toolbar {
@@ -72,6 +88,18 @@ struct SetupWizardView: View {
       } message: {
         Text(viewModel.errorMessage ?? "")
       }
+    }
+  }
+
+  /// Wallet Name and Verify have no two-column design, so they keep the
+  /// readable column when the space is wider than tall.
+  private func layout(for size: CGSize) -> SetupLayout {
+    let layout = SetupLayout.resolve(size: size)
+    switch viewModel.currentStep {
+    case .walletName, .review, .verify:
+      return layout == .twoColumn ? .column : layout
+    default:
+      return layout
     }
   }
 

@@ -167,6 +167,13 @@ open class Snapshot: NSObject {
         return
       }
 
+      // XCUIScreen captures come back black for the open iPhone Duo's inner
+      // display, so the Fastfile captures that display from the host instead.
+      if ProcessInfo.processInfo.environment["SNAPSHOT_HOST_CAPTURE"] == "1" {
+        requestHostCapture(name)
+        return
+      }
+
       let screenshot = XCUIScreen.main.screenshot()
       #if os(iOS) && !targetEnvironment(macCatalyst)
         let image = XCUIDevice.shared.orientation.isLandscape ? fixLandscapeOrientation(image: screenshot.image) : screenshot.image
@@ -193,6 +200,26 @@ open class Snapshot: NSObject {
         NSLog(error.localizedDescription)
       }
     #endif
+  }
+
+  /// Drops `<device>-<name>.request` into the screenshots directory and waits
+  /// for the Fastfile to write `<device>-<name>.png` and delete the request.
+  class func requestHostCapture(_ name: String) {
+    guard let simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"], let screenshotsDir = screenshotsDirectory else { return }
+
+    let fileManager = FileManager.default
+    let request = screenshotsDir.appendingPathComponent("\(simulator)-\(name).request")
+    try? fileManager.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
+    fileManager.createFile(atPath: request.path, contents: nil)
+
+    let deadline = Date().addingTimeInterval(20)
+    while fileManager.fileExists(atPath: request.path), Date() < deadline {
+      usleep(200_000)
+    }
+    if fileManager.fileExists(atPath: request.path) {
+      NSLog("Host capture timed out for \(name)")
+      try? fileManager.removeItem(at: request)
+    }
   }
 
   class func fixLandscapeOrientation(image: UIImage) -> UIImage {

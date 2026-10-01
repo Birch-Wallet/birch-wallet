@@ -1,3 +1,5 @@
+require "json"
+
 default_platform(:ios)
 
 DERIVED_DATA   = File.expand_path("../build/DerivedData", __dir__)
@@ -11,25 +13,111 @@ def xctestrun_path
     UI.user_error!("No .xctestrun found — run the build step first")
 end
 
-# Device matrix — must match what is available in Simulator.
+# Device matrix: simulator name → the runtime it runs on. Each pass resolves
+# the UDID for that exact name and runtime (creating the simulator if it's
+# missing), because the same name exists on several runtimes and targeting by
+# name can pick the wrong one.
 DEVICES = {
-  "iPhone 17 Pro Max" => "platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.5",
-  "iPhone 17 Pro"     => "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5",
-  "iPhone 11 Pro Max" => "platform=iOS Simulator,name=iPhone 11 Pro Max,OS=26.5",
-  "iPhone 13 mini"    => "platform=iOS Simulator,name=iPhone 13 mini,OS=26.5",
-  "iPad Pro 13-inch (M5)" => "platform=iOS Simulator,name=iPad Pro 13-inch (M5),OS=26.5",
+  "iPhone 17 Pro Max"     => { runtime: "27.0" },
+  "iPhone 17 Pro"         => { runtime: "27.0" },
+  "iPhone 11 Pro Max"     => { runtime: "27.0" },
+  "iPhone 13 mini"        => { runtime: "27.0" },
+  "iPad Pro 13-inch (M5)" => { runtime: "27.0" },
+  # The foldable. The iOS 27.1 runtime supports only this device. It is
+  # captured closed (cover screen) and open (inner screen); the posture is set
+  # with the `hinge` CLI because simctl has no fold command.
+  "iPhone Duo"            => { runtime: "27.1", postures: ["closed", "open"] },
 }
+
+def runtime_identifier(runtime)
+  "com.apple.CoreSimulator.SimRuntime.iOS-#{runtime.tr('.', '-')}"
+end
+
+def resolve_udid(name, runtime)
+  runtime_id = runtime_identifier(runtime)
+  devices = JSON.parse(`xcrun simctl list devices available -j`)["devices"][runtime_id] || []
+  match = devices.find { |d| d["name"] == name }
+  return match["udid"] if match
+
+  type = JSON.parse(`xcrun simctl list devicetypes -j`)["devicetypes"].find { |t| t["name"] == name } ||
+         UI.user_error!("No simulator device type named '#{name}'")
+  UI.message("Creating '#{name}' on iOS #{runtime}")
+  udid = `xcrun simctl create '#{name}' '#{type["identifier"]}' '#{runtime_id}'`.strip
+  UI.user_error!("Could not create '#{name}' on iOS #{runtime}") if udid.empty?
+  udid
+end
+
+# Folds or unfolds the Duo and confirms the angle. `hinge get` occasionally
+# fails right after a state change, so retry a few times.
+def set_posture(udid, posture)
+  command, angle = posture == "open" ? ["open", 180.0] : ["close", 0.0]
+  3.times do
+    system("hinge", "-d", udid, command, out: File::NULL, err: File::NULL)
+    sleep(2)
+    return if `hinge -d #{udid} get 2>/dev/null`.strip.to_f == angle
+  end
+  UI.user_error!("Could not set the #{posture} posture on #{udid}")
+end
+
+# The open Duo's inner display: the largest built-in display simctl reports.
+def inner_display(udid)
+  ports = `xcrun simctl io #{udid} enumerate`.split(/^Port:/).map do |block|
+    next unless block.include?("Display class: 0")
+    uuid = block[/UUID: (\S+)/, 1]
+    width = block[/Default width: (\d+)/, 1].to_i
+    height = block[/Default height: (\d+)/, 1].to_i
+    [uuid, width * height]
+  end
+  ports.compact.max_by(&:last)&.first || UI.user_error!("No built-in display found on #{udid}")
+end
+
+# Runs the tour while answering the capture requests SnapshotHelper makes when
+# SNAPSHOT_HOST_CAPTURE is set: XCUIScreen can't see the open Duo's inner
+# display, so each shot is taken here with `simctl io --display`.
+def run_tour_with_host_capture(command, udid)
+  display = inner_display(udid)
+  pid = Process.spawn({ "TEST_RUNNER_SNAPSHOT_HOST_CAPTURE" => "1" }, command)
+  loop do
+    Dir.glob("#{SCREENSHOT_SRC}/*.request").each do |request|
+      partial = request.sub(/\.request\z/, ".partial")
+      system("xcrun", "simctl", "io", udid, "screenshot", "--type=png", "--display=#{display}", partial, out: File::NULL)
+      File.rename(partial, request.sub(/\.request\z/, ".png")) if File.exist?(partial)
+      File.delete(request)
+    end
+    break if Process.wait(pid, Process::WNOHANG)
+    sleep(0.2)
+  end
+  $?.success?
+end
 
 platform :ios do
   desc "Capture App Store + marketing screenshots (dark first, then light)"
-  lane :screenshots do
+  #   fastlane screenshots                     # every device
+  #   fastlane screenshots only:"iPhone Duo"   # rerun one device, keep the rest
+  lane :screenshots do |options|
+    devices = DEVICES
+    if options[:only]
+      devices = DEVICES.select { |name, _| name == options[:only] }
+      UI.user_error!("Unknown device '#{options[:only]}'. Choose from: #{DEVICES.keys.join(', ')}") if devices.empty?
+    end
+
     # ── 0. Clear previous output so stale files don't accumulate ────────
-    FileUtils.rm_rf(File.expand_path("screenshots/dark", __dir__))
-    FileUtils.rm_rf(File.expand_path("screenshots/light", __dir__))
+    if options[:only]
+      # Only this device's captures, bare and framed.
+      Dir.glob(File.expand_path("screenshots/{dark,light}/**/#{options[:only]}*.png", __dir__)).each { |f| FileUtils.rm_f(f) }
+    else
+      FileUtils.rm_rf(File.expand_path("screenshots/dark", __dir__))
+      FileUtils.rm_rf(File.expand_path("screenshots/light", __dir__))
+    end
+
+    # The Duo passes fold the simulator with the `hinge` CLI.
+    if devices.values.any? { |d| d[:postures] } && !system("which hinge", out: File::NULL)
+      UI.user_error!("The iPhone Duo passes need `hinge`: brew install artemnovichkov/tap/hinge")
+    end
 
     # Shut down any simulators left booted (e.g. from a manual test run) so the
     # per-device appearance/status-bar overrides in run_screenshot_pass apply to
-    # the right device. Belt-and-suspenders alongside targeting by name.
+    # the right device. Belt-and-suspenders alongside targeting by UDID.
     sh("xcrun simctl shutdown all 2>/dev/null || true")
 
     # ── 1. Build for testing once ────────────────────────────────────────
@@ -48,10 +136,10 @@ platform :ios do
        "| xcpretty")
 
     # ── 2. Dark mode ────────────────────────────────────────────────────
-    run_screenshot_pass(mode: "dark")
+    run_screenshot_pass(mode: "dark", devices: devices)
 
     # ── 3. Light mode ───────────────────────────────────────────────────
-    run_screenshot_pass(mode: "light")
+    run_screenshot_pass(mode: "light", devices: devices)
 
     # ── 4. Prep captures for frameit ────────────────────────────────────
     # frameit gem 2.232.2 hardcodes its device list. scripts/patch-frameit.rb
@@ -67,10 +155,10 @@ platform :ios do
     FileUtils.rm_rf(thirteen_mini_holding)
     FileUtils.mkdir_p(thirteen_mini_holding)
 
-    #   * iPad Pro 13": frameit has no 13" iPad frame (its bundled iPad frames
-    #     stop at 12.9"), and the App Store accepts bare iPad screenshots. Move
-    #     iPad captures out of frameit's path so it doesn't choke on an unknown
-    #     device, then restore them bare in step 8 (no framing applied).
+    #   * iPad Pro 13" and iPhone Duo: frameit has no frame for either (its
+    #     bundled iPad frames stop at 12.9"), and the App Store accepts bare
+    #     screenshots. Move these captures out of frameit's path so it doesn't
+    #     choke on an unknown device, then restore them bare in step 8.
     ipad_holding = File.expand_path("screenshots/_ipad_bare", __dir__)
     FileUtils.rm_rf(ipad_holding)
     FileUtils.mkdir_p(ipad_holding)
@@ -86,10 +174,10 @@ platform :ios do
         FileUtils.mv(src, "#{mode_holding}/#{File.basename(src)}")
       end
 
-      # Move iPad captures out of frameit's path; remember the mode.
+      # Move iPad and Duo captures out of frameit's path; remember the mode.
       ipad_mode_holding = "#{ipad_holding}/#{mode}"
       FileUtils.mkdir_p(ipad_mode_holding)
-      Dir.glob("#{dir}/iPad*.png").each do |src|
+      Dir.glob(["#{dir}/iPad*.png", "#{dir}/iPhone Duo*.png"]).each do |src|
         next if src.include?("_framed")
         FileUtils.mv(src, "#{ipad_mode_holding}/#{File.basename(src)}")
       end
@@ -132,9 +220,9 @@ platform :ios do
     end
     FileUtils.rm_rf(thirteen_mini_holding)
 
-    # ── 8. Restore iPad captures (bare — no frame available for 13") ────
-    # iPad goes to the App Store unframed; just return the bare captures to
-    # en-US/ so they land in the normal upload tree.
+    # ── 8. Restore iPad and Duo captures (bare — no frames available) ───
+    # These go out unframed; just return the bare captures to en-US/ so they
+    # land in the normal upload tree.
     ["dark", "light"].each do |mode|
       src_dir          = File.expand_path("screenshots/#{mode}/en-US", __dir__)
       ipad_mode_holding = "#{ipad_holding}/#{mode}"
@@ -148,55 +236,63 @@ platform :ios do
   # ────────────────────────────────────────────────────────────────────────
   private_lane :run_screenshot_pass do |options|
     mode    = options[:mode]  # "dark" or "light"
-    is_dark = mode == "dark"
 
-    DEVICES.each do |name, destination|
-      UI.header("#{mode} mode — #{name}")
+    options[:devices].each do |name, config|
+      udid = resolve_udid(name, config[:runtime])
 
-      # Boot
-      sh("xcrun simctl boot '#{name}' 2>/dev/null || true")
-      sleep(5) # let SpringBoard settle
+      (config[:postures] || [nil]).each do |posture|
+        label = posture ? "#{name} (#{posture.capitalize})" : name
+        UI.header("#{mode} mode — #{label}")
 
-      # Appearance. Target the device by name, NOT `booted`: if any other
-      # simulator is also up (e.g. a sim left booted from a manual test run),
-      # `booted` is ambiguous and the override silently no-ops, leaving the
-      # capture in the wrong appearance.
-      sh("xcrun simctl ui '#{name}' appearance #{mode}")
+        # Boot and wait until it's usable.
+        sh("xcrun simctl boot #{udid} 2>/dev/null || true")
+        sh("xcrun simctl bootstatus #{udid} -b > /dev/null")
+        sleep(5) # let SpringBoard settle
 
-      # Clean status bar: 9:41, full battery, full signal. Also targeted by
-      # name for the same reason as appearance above.
-      sh("xcrun simctl status_bar '#{name}' override " \
-         "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
-         "--cellularMode active --operatorName '' --cellularBars 4 " \
-         "--batteryState charged --batteryLevel 100 2>/dev/null || true")
+        set_posture(udid, posture) if posture
 
-      # Clear previous screenshots from the cache so we don't mix passes
-      FileUtils.rm_rf(SCREENSHOT_SRC)
-      FileUtils.mkdir_p(SCREENSHOT_SRC)
+        # Appearance and a clean status bar: 9:41, full battery, full signal.
+        sh("xcrun simctl ui #{udid} appearance #{mode}")
+        sh("xcrun simctl status_bar #{udid} override " \
+           "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
+           "--cellularMode active --operatorName '' --cellularBars 4 " \
+           "--batteryState charged --batteryLevel 100 2>/dev/null || true")
 
-      # Run the test with the explicit xctestrun manifest.
-      # This installs all DependentProductPaths (including birch.app)
-      # automatically — works around the Xcode 26 bug where
-      # `xcodebuild build test` / `test-without-building -scheme` fail to
-      # install the host app.
-      sh("xcodebuild test-without-building " \
-         "-xctestrun '#{xctestrun_path}' " \
-         "-destination '#{destination}' " \
-         "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
-         "-parallel-testing-enabled NO") do |status|
-        UI.error("Test failed on #{name} (#{mode} mode)") unless status.success?
+        # Clear previous screenshots from the cache so we don't mix passes
+        FileUtils.rm_rf(SCREENSHOT_SRC)
+        FileUtils.mkdir_p(SCREENSHOT_SRC)
+
+        # Run the test with the explicit xctestrun manifest.
+        # This installs all DependentProductPaths (including birch.app)
+        # automatically — works around the Xcode 26 bug where
+        # `xcodebuild build test` / `test-without-building -scheme` fail to
+        # install the host app.
+        command = "xcodebuild test-without-building " \
+                  "-xctestrun '#{xctestrun_path}' " \
+                  "-destination 'id=#{udid}' " \
+                  "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
+                  "-parallel-testing-enabled NO"
+        passed = if posture == "open"
+                   run_tour_with_host_capture(command, udid)
+                 else
+                   system(command)
+                 end
+        UI.error("Test failed on #{label} (#{mode} mode)") unless passed
+
+        # Collect screenshots into the output directory. SnapshotHelper names
+        # files after the simulator, so tag the Duo's with its posture.
+        output_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
+        FileUtils.mkdir_p(output_dir)
+        Dir.glob("#{SCREENSHOT_SRC}/*.png").each do |src|
+          dest = File.basename(src)
+          dest = dest.sub(/\A#{Regexp.escape(name)}-/, "#{label}-") if posture
+          FileUtils.cp(src, File.join(output_dir, dest))
+        end
+
+        # Reset status bar and shut down
+        sh("xcrun simctl status_bar #{udid} clear 2>/dev/null || true")
+        sh("xcrun simctl shutdown #{udid} 2>/dev/null || true")
       end
-
-      # Collect screenshots into the output directory
-      output_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
-      FileUtils.mkdir_p(output_dir)
-      Dir.glob("#{SCREENSHOT_SRC}/*.png").each do |src|
-        FileUtils.cp(src, output_dir)
-      end
-
-      # Reset status bar and shut down
-      sh("xcrun simctl status_bar '#{name}' clear 2>/dev/null || true")
-      sh("xcrun simctl shutdown '#{name}' 2>/dev/null || true")
     end
   end
 end

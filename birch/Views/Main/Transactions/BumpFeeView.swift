@@ -271,6 +271,9 @@ private struct BumpFeePSBTDisplayView: View {
   @AppStorage(Constants.qrDensityKey) private var qrDensityRaw: String = QRDensity.medium.rawValue
   @AppStorage(Constants.psbtCompactKey) private var compactPSBT = true
   @State private var qrDisplayHeight: CGFloat = 700
+  @State private var viewportHeight: CGFloat = .infinity
+  @State private var progressHeight: CGFloat = 0
+  @State private var trailingInset: CGFloat = 0
 
   private var qrEncoding: QREncoding {
     QREncoding(rawValue: qrEncodingRaw) ?? .ur
@@ -293,6 +296,12 @@ private struct BumpFeePSBTDisplayView: View {
     compactPSBT ? PSBTCompactor.compact(viewModel.psbtBytes) : viewModel.psbtBytes
   }
 
+  /// Fits the QR square in the visible height below the signature progress,
+  /// as on the send screen (see `PSBTDisplayView.maxQRSide`).
+  private var maxQRSide: CGFloat {
+    min(700, max(200, viewportHeight - progressHeight - 40))
+  }
+
   private var frameCount: Int {
     QRFrameCounter.frames(for: displayBytes, encoding: qrEncoding, density: effectiveDensity)
   }
@@ -305,6 +314,7 @@ private struct BumpFeePSBTDisplayView: View {
           required: viewModel.requiredSignatures,
           signerStatus: viewModel.signerStatus
         )
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { progressHeight = $0 }
 
         if !viewModel.psbtBytes.isEmpty {
           GeometryReader { geo in
@@ -338,7 +348,9 @@ private struct BumpFeePSBTDisplayView: View {
             .frame(maxWidth: .infinity)
           }
           .aspectRatio(1, contentMode: .fit)
-          .frame(maxHeight: 700)
+          .frame(maxHeight: maxQRSide)
+          // Clear of the iPhone Duo's side column, as on the send screen.
+          .padding(.horizontal, trailingInset > 0 ? 16 : 0)
           .background(GeometryReader { geo in
             Color.clear.onAppear { qrDisplayHeight = geo.size.height }
               .onChange(of: geo.size.height) { _, h in qrDisplayHeight = h }
@@ -477,6 +489,8 @@ private struct BumpFeePSBTDisplayView: View {
       }
       .padding(.top, 8)
     }
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { viewportHeight = $0 }
+    .onGeometryChange(for: CGFloat.self, of: \.safeAreaInsets.trailing) { trailingInset = $0 }
     .background(Color.hbBackground)
     .onChange(of: qrEncodingRaw) { showRestartAlert = true }
     .onChange(of: qrDensityRaw) { showRestartAlert = true }

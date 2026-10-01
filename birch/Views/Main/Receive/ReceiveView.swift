@@ -12,7 +12,12 @@ struct ReceiveView: View {
 
   var body: some View {
     NavigationStack {
-      VStack(spacing: 24) {
+      // Gaps are flexible rather than fixed VStack spacing: 24pt when there's
+      // room, shrinking toward 8pt on short screens (iPhone Duo open or closed,
+      // iPhone SE), where the fixed spacing overflowed and pushed the title off
+      // the top. One layout, so nothing is rebuilt (and the label field keeps
+      // focus) when the keyboard takes space.
+      VStack(spacing: 0) {
         Text("Receive")
           .font(.hbAmountLarge)
           .foregroundStyle(Color.hbTextPrimary)
@@ -21,15 +26,22 @@ struct ReceiveView: View {
           .padding(.top, 8)
           .padding(.bottom, 4)
 
+        gap
         Spacer()
+        gap
 
         if !viewModel.currentAddress.isEmpty {
-          // QR Code
+          // QR Code: takes space first, at 240pt when it fits, shrinking to a
+          // still easily scanned 160pt on short screens.
           QRCodeView(content: viewModel.currentAddress)
-            .frame(width: 240, height: 240)
+            .frame(minWidth: 160, maxWidth: 240, minHeight: 160, maxHeight: 240)
+            .aspectRatio(1, contentMode: .fit)
             .padding(16)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .layoutPriority(1)
+
+          gap
 
           // Address
           VStack(spacing: 8) {
@@ -97,7 +109,9 @@ struct ReceiveView: View {
             .tint(Color.hbBitcoinOrange)
         }
 
+        gap
         Spacer()
+        gap
 
         Button(action: { viewModel.generateNewAddress() }) {
           Text("Next Address")
@@ -105,12 +119,15 @@ struct ReceiveView: View {
         }
         .padding(.horizontal, 24)
 
+        gap
+
         NavigationLink(destination: AddressListView()) {
           Text("View All Addresses")
             .font(.hbBody(14))
             .foregroundStyle(Color.hbSteelBlue)
         }
-        .padding(.bottom, 32)
+
+        gap(max: 32)
       }
       .background(Color.hbBackground)
       .navigationTitle("")
@@ -136,6 +153,15 @@ struct ReceiveView: View {
       isEditingLabel = false
       loadLabel()
     }
+  }
+
+  private var gap: some View {
+    gap(max: 24)
+  }
+
+  private func gap(max: CGFloat) -> some View {
+    Spacer(minLength: 8)
+      .frame(maxHeight: max)
   }
 
   private func loadLabel() {

@@ -1,11 +1,15 @@
 # Devices to capture — full App Store iPhone set + iPad 13" (required by App
-# Review because the app declares iPad support, TARGETED_DEVICE_FAMILY = 1,2).
+# Review because the app declares iPad support, TARGETED_DEVICE_FAMILY = 1,2),
+# plus the iPhone Duo closed and open. The Fastfile's DEVICES drives the actual
+# runs and pins each device's runtime (27.0; the Duo needs 27.1). The Duo
+# passes need the `hinge` CLI: brew install artemnovichkov/tap/hinge
 devices([
   "iPhone 17 Pro Max",
   "iPhone 17 Pro",
   "iPhone 11 Pro Max",
   "iPhone 13 mini",
   "iPad Pro 13-inch (M5)",
+  "iPhone Duo",
 ])
 
 languages(["en-US"])

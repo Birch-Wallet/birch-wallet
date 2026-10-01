@@ -12,7 +12,7 @@ permissions:
 jobs:
   reproducibility:
     name: Verify build reproducibility
-    runs-on: macos-26
+    runs-on: xcode-27
 
     steps:
       - name: Checkout
@@ -21,8 +21,20 @@ jobs:
       - name: Pin Xcode version
         run: |
           XCODE_VERSION=$(cat .xcode-version)
-          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          # The xcode-27 image installs some releases under a _beta name
+          # (Xcode_27.1_beta.app holds the 27.1 release build), so try both.
+          for APP in "/Applications/Xcode_${XCODE_VERSION}.app" "/Applications/Xcode_${XCODE_VERSION}_beta.app"; do
+            if [ -d "$APP" ]; then
+              sudo xcode-select -s "$APP/Contents/Developer"
+              break
+            fi
+          done
           xcodebuild -version
+          # Fail rather than build with whatever Xcode the image defaults to.
+          if ! xcodebuild -version | head -1 | grep -qx "Xcode ${XCODE_VERSION}"; then
+            echo "::error::Xcode ${XCODE_VERSION} is not installed on this runner"
+            exit 1
+          fi
 
       - name: Build 1
         run: |

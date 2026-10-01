@@ -57,6 +57,30 @@ final class ScreenshotTests: XCTestCase {
     sleep(1)
   }
 
+  /// Pops the current navigation stack by tapping the system back button,
+  /// found by its `BackButton` identifier rather than inside the navigation
+  /// bar: on the iPhone Duo (iOS 27.1) it moves to the side column next to the
+  /// status bar to free vertical space. Falls back to the bar's first button,
+  /// then to the edge-swipe back gesture.
+  private func navigateBack() {
+    let backButton = app.buttons["BackButton"].firstMatch
+    let barButton = app.navigationBars.firstMatch.buttons.firstMatch
+    if backButton.waitForExistence(timeout: 2) {
+      backButton.tap()
+    } else if barButton.exists {
+      barButton.tap()
+    } else {
+      let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
+      edge.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+    }
+  }
+
+  /// A navigation-bar control by accessibility identifier, whatever its type.
+  /// iOS 27.1 can report bar buttons as Other rather than Button.
+  private func barItem(_ identifier: String) -> XCUIElement {
+    app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+  }
+
   private func tabButton(_ name: String) -> XCUIElement {
     if app.tabBars.firstMatch.exists {
       return app.tabBars.buttons[name]
@@ -165,7 +189,12 @@ final class ScreenshotTests: XCTestCase {
     // which for a full-width Toggle row hits the label, not the control. The
     // 0.95 offset puts the tap on the switch on both iPhone and the much wider
     // iPad row (where the switch sits ~960pt out in a 992pt-wide frame).
-    let toggleThumb = fiatToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+    // Prefer the switch's own element where the OS exposes one: on the open
+    // iPhone Duo the row's frame doesn't put the switch at the 0.95 offset.
+    let toggleSwitch = fiatToggle.switches.firstMatch
+    let toggleThumb = toggleSwitch.exists
+      ? toggleSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+      : fiatToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
     if fiatToggle.value as? String == "0" {
       toggleThumb.tap()
       sleep(1)
@@ -186,7 +215,7 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 05 - Wallet Picker (overlay on transactions screen)
 
-    let walletPicker = app.buttons["walletPicker"].firstMatch
+    let walletPicker = barItem("walletPicker")
     if walletPicker.waitForExistence(timeout: 3) {
       walletPicker.tap()
       let walletsTitle = app.staticTexts["Wallets"]
@@ -210,13 +239,13 @@ final class ScreenshotTests: XCTestCase {
       sleep(1)
       snapshot("06-TransactionDetail")
       // Go back to transaction list
-      app.navigationBars.buttons.element(boundBy: 0).tap()
+      navigateBack()
       sleep(1)
     }
 
     // MARK: 07 - Dashboard sheet (via "..." overflow menu)
 
-    let walletMenu = app.buttons["walletMenu"].firstMatch
+    let walletMenu = barItem("walletMenu")
     if walletMenu.waitForExistence(timeout: 3) {
       walletMenu.tap()
       let dashboardMenuItem = app.buttons["Dashboard"]
@@ -255,7 +284,7 @@ final class ScreenshotTests: XCTestCase {
       XCTAssertTrue(copyAddressButton.waitForExistence(timeout: 5), "Address detail should show Copy Address button")
       snapshot("10-AddressDetail")
       // Go back to address list
-      app.navigationBars.buttons.element(boundBy: 0).tap()
+      navigateBack()
       sleep(1)
     }
 
@@ -288,7 +317,7 @@ final class ScreenshotTests: XCTestCase {
       XCTAssertTrue(utxoDetailTitle.waitForExistence(timeout: 5), "UTXO Detail screen should appear")
       snapshot("13-UTXODetail")
       // Go back to UTXO list
-      app.navigationBars.buttons.element(boundBy: 0).tap()
+      navigateBack()
       sleep(1)
     }
 
@@ -307,7 +336,7 @@ final class ScreenshotTests: XCTestCase {
     transactionsTab.tap()
     sleep(1)
 
-    let walletPickerBtn = app.buttons["walletPicker"].firstMatch
+    let walletPickerBtn = barItem("walletPicker")
     XCTAssertTrue(walletPickerBtn.waitForExistence(timeout: 3), "Wallet picker button should exist")
     walletPickerBtn.tap()
     let walletsTitleAdd = app.staticTexts["Wallets"]
@@ -365,7 +394,9 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: Fill Cosigner 1
 
-    // Type fingerprint into TextField, press Return to dismiss its keyboard.
+    // Type fingerprint into TextField, ending with a newline to press Return
+    // and dismiss its keyboard (the closed iPhone Duo reports the keyboard's
+    // Return key off-screen, so it can't be tapped).
     // Then type xpub directly into the TextEditor (avoids the system clipboard
     // permission prompt), and dismiss via swipeDown (scrollDismissesKeyboard).
     // Do NOT press Return in the TextEditor — it inserts a newline that would
@@ -373,8 +404,7 @@ final class ScreenshotTests: XCTestCase {
     let fpField1 = app.textFields["e.g. 73c5da0a"]
     XCTAssertTrue(fpField1.waitForExistence(timeout: 3), "Fingerprint field should exist")
     fpField1.tap()
-    fpField1.typeText("07d25f0c")
-    app.keyboards.buttons["Return"].tap()
+    fpField1.typeText("07d25f0c\n")
 
     let xpubEditor1 = app.textViews.firstMatch
     XCTAssertTrue(xpubEditor1.waitForExistence(timeout: 3), "Xpub text editor should exist")
@@ -398,8 +428,7 @@ final class ScreenshotTests: XCTestCase {
     let fpField2 = app.textFields["e.g. 73c5da0a"]
     XCTAssertTrue(fpField2.waitForExistence(timeout: 3), "Fingerprint field should exist for cosigner 2")
     fpField2.tap()
-    fpField2.typeText("d73869a4")
-    app.keyboards.buttons["Return"].tap()
+    fpField2.typeText("d73869a4\n")
 
     let xpubEditor2 = app.textViews.firstMatch
     XCTAssertTrue(xpubEditor2.waitForExistence(timeout: 3), "Xpub text editor should exist for cosigner 2")
@@ -428,8 +457,7 @@ final class ScreenshotTests: XCTestCase {
     let fpField3 = app.textFields["e.g. 73c5da0a"]
     XCTAssertTrue(fpField3.waitForExistence(timeout: 3), "Fingerprint field should exist for cosigner 3")
     fpField3.tap()
-    fpField3.typeText("e3870581")
-    app.keyboards.buttons["Return"].tap()
+    fpField3.typeText("e3870581\n")
 
     let xpubEditor3 = app.textViews.firstMatch
     XCTAssertTrue(xpubEditor3.waitForExistence(timeout: 3), "Xpub text editor should exist for cosigner 3")

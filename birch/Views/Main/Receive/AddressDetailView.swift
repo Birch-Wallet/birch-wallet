@@ -83,6 +83,10 @@ struct AddressDetailView: View {
 
       Spacer()
     }
+    // Fill the screen before painting it: the stack is otherwise only as wide
+    // as its content, which left white bars beside it on wide screens (the
+    // open iPhone Duo shows the address on one line).
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color.hbBackground)
     .navigationTitle("Address #\(index)")
     .navigationBarTitleDisplayMode(.inline)

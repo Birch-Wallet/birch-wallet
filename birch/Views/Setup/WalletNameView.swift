@@ -3,6 +3,7 @@ import SwiftUI
 struct WalletNameView: View {
   @Bindable var viewModel: SetupWizardViewModel
   var onSave: (() -> Void)?
+  @Environment(\.setupLayout) private var layout
 
   var body: some View {
     VStack(spacing: 32) {
@@ -29,12 +30,14 @@ struct WalletNameView: View {
           .foregroundStyle(Color.hbTextPrimary)
       }
       .padding(.horizontal, 24)
-      // Cap the input column to a readable width so it centers under the title
-      // on wide layouts (iPad). On iPhone the screen is narrower than this cap,
-      // so the field stays full-width as before.
-      .frame(maxWidth: 480)
 
-      Spacer()
+      // Phone: the action sits at the bottom. Readable column: it stays with
+      // the content, and the group centers together.
+      if layout == .column {
+        Color.clear.frame(height: 24)
+      } else {
+        Spacer()
+      }
 
       HStack(spacing: 16) {
         if viewModel.creationMode == .createNew {
@@ -64,10 +67,12 @@ struct WalletNameView: View {
         }
       }
       .padding(.horizontal, 24)
-      // Match the input column width so the Back/Next buttons stay aligned with
-      // the centered field on wide layouts instead of floating to the corners.
-      .frame(maxWidth: 480)
       .padding(.bottom, 32)
+
+      if layout == .column {
+        Spacer()
+      }
     }
+    .setupReadableWidth()
   }
 }
