@@ -245,3 +245,23 @@ struct WalletAdvancedSetupSection: View {
     .hbCard()
   }
 }
+
+struct SetupNetworkPicker: View {
+  @Bindable var viewModel: SetupWizardViewModel
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Text("Bitcoin Network")
+        .font(.hbLabel())
+        .foregroundStyle(Color.hbTextSecondary)
+
+      Picker("Bitcoin Network", selection: $viewModel.network) {
+        ForEach(BitcoinNetwork.allCases) { network in
+          Text(network.displayName).tag(network)
+        }
+      }
+      .pickerStyle(.segmented)
+    }
+    .hbCard()
+  }
+}

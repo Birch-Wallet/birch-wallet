@@ -75,6 +75,9 @@ struct PSBTDisplayView: View {
   @State private var showExportFile = false
   @State private var showInspector = false
   @State private var qrDisplayHeight: CGFloat = 700
+  @State private var viewportHeight: CGFloat = .infinity
+  @State private var progressHeight: CGFloat = 0
+  @State private var trailingInset: CGFloat = 0
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
   private var fiatService: FiatPriceService {
@@ -102,6 +105,15 @@ struct PSBTDisplayView: View {
     compactPSBT ? PSBTCompactor.compact(viewModel.psbtBytes) : viewModel.psbtBytes
   }
 
+  /// The QR square is sized from the width, so on a short screen (the iPhone
+  /// Duo, open or closed) it ran off the bottom. Cap it to the visible height
+  /// below the signature progress (less the 8pt top padding, 16pt stack
+  /// spacing and 16pt for the glow) so the whole code is on screen. Where it
+  /// already fits, the 700pt cap still wins and nothing changes.
+  private var maxQRSide: CGFloat {
+    min(700, max(200, viewportHeight - progressHeight - 40))
+  }
+
   private var frameCount: Int {
     QRFrameCounter.frames(for: displayBytes, encoding: qrEncoding, density: effectiveDensity)
   }
@@ -115,6 +127,7 @@ struct PSBTDisplayView: View {
           required: viewModel.requiredSignatures,
           signerStatus: viewModel.signerStatus
         )
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { progressHeight = $0 }
 
         // QR Display — constrained to available height
         if !viewModel.psbtBytes.isEmpty {
@@ -151,7 +164,12 @@ struct PSBTDisplayView: View {
             .frame(maxWidth: .infinity)
           }
           .aspectRatio(1, contentMode: .fit)
-          .frame(maxHeight: 700)
+          .frame(maxHeight: maxQRSide)
+          // On the iPhone Duo the side column (clock, tab bar) sits past the
+          // trailing edge, and the system extends the content's edge under it.
+          // A QR code filling the width smeared a white band out to the side,
+          // so keep it clear of the edges there. No side column, no margin.
+          .padding(.horizontal, trailingInset > 0 ? 16 : 0)
           .background(GeometryReader { geo in
             Color.clear.onAppear { qrDisplayHeight = geo.size.height }
               .onChange(of: geo.size.height) { _, h in qrDisplayHeight = h }
@@ -323,6 +341,8 @@ struct PSBTDisplayView: View {
       }
       .padding(.top, 8)
     }
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { viewportHeight = $0 }
+    .onGeometryChange(for: CGFloat.self, of: \.safeAreaInsets.trailing) { trailingInset = $0 }
     .sheet(isPresented: $showInspector) {
       PSBTInspectorView.forCurrentWallet(
         psbtBytes: viewModel.psbtBytes,

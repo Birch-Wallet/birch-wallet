@@ -361,6 +361,9 @@ struct TransactionListView: View {
       }) {
         SetupWizardView(canDismiss: true)
           .interactiveDismissDisabled()
+          // Page-sized on iPad so the wizard gets its readable column rather
+          // than the phone layout squeezed into a form sheet.
+          .presentationSizing(.page)
       }
       .sheet(isPresented: $showWalletInfo, onDismiss: {
         walletToEdit = nil

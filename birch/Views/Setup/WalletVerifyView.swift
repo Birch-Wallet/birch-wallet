@@ -7,6 +7,7 @@ struct WalletVerifyView: View {
   @State private var showDescriptorQR = false
   @State private var showDescriptorPDF = false
   @State private var copiedDescriptor = false
+  @Environment(\.setupLayout) private var layout
 
   var body: some View {
     ScrollView {
@@ -196,6 +197,8 @@ struct WalletVerifyView: View {
         .padding(.bottom, 32)
       }
       .padding(.top, 16)
+      .padding(.top, layout == .column ? 40 : 0)
+      .setupReadableWidth()
     }
     .sheet(isPresented: $showDescriptorQR) {
       DescriptorQRSheet(descriptor: viewModel.combinedDescriptor, walletName: viewModel.walletName.isEmpty ? "My Wallet" : viewModel.walletName)
