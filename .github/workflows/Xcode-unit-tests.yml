@@ -38,4 +38,4 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          xcodebuild test -project birch.xcodeproj -scheme birch -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:birchTests -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
+          xcodebuild test -project birch.xcodeproj -scheme birch -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:birchTests -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
