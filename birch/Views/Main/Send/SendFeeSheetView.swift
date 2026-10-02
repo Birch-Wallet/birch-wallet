@@ -167,7 +167,7 @@ struct SendFeeSheetView: View {
 
         Spacer()
 
-        Text("\(draftFee.formattedSats) total")
+        Text("\(draftFee.formattedFeeSats) total")
           .font(.hbMono(12))
           .foregroundStyle(Color.hbTextSecondary)
           .lineLimit(1)
@@ -362,7 +362,7 @@ struct SendFeeSheetView: View {
           .font(.hbLabel())
           .foregroundStyle(Color.hbTextSecondary)
 
-        Text(draftFee.formattedSats)
+        Text(draftFee.formattedFeeSats)
           .font(.hbMonoBold(17))
           .foregroundStyle(Color.hbTextPrimary)
           .lineLimit(1)

@@ -32,6 +32,8 @@ struct TransactionDetailView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     ScrollView {
       VStack(spacing: 20) {
         // Direction + Amount header
@@ -213,7 +215,7 @@ struct TransactionDetailView: View {
 
           if let fee = transaction.fee {
             DetailRow(label: "Fee") {
-              Text(isPrivate ? Constants.privacyText() : fee.formattedSats)
+              Text(isPrivate ? Constants.privacyText() : fee.formattedFeeSats)
                 .font(.hbMono())
                 .foregroundStyle(Color.hbTextPrimary)
             }

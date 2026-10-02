@@ -4,7 +4,6 @@ import SwiftUI
 
 struct SendRecipientsView: View {
   @Bindable var viewModel: SendViewModel
-  @AppStorage(Constants.denominationKey) private var denomination: String = "sats"
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
   @State private var keyboardVisible = false
@@ -155,14 +154,14 @@ private struct KeyboardDismissButton: View {
 
 // MARK: - Currency Toggle Pill
 
-/// Switches the amount between sats and fiat. Falls back to a static "sats"
-/// pill when fiat is off or no rate has loaded.
+/// Switches the amount between the Bitcoin unit and fiat. Falls back to a
+/// static unit pill when fiat is off or no rate has loaded.
 private struct CurrencyTogglePill: View {
   @Bindable var viewModel: SendViewModel
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
   private var unitLabel: String {
-    viewModel.amountInFiat ? FiatPriceService.shared.currentCurrencyCode : "sats"
+    viewModel.amountInFiat ? FiatPriceService.shared.currentCurrencyCode : Denomination.current.label
   }
 
   var body: some View {
@@ -195,9 +194,9 @@ private struct CurrencyTogglePill: View {
 
 // MARK: - Amount Conversion Line
 
-/// The BTC and fiat equivalents under an amount. Shared so a recipient card
-/// reads the same whether it is the single-recipient hero or one of several
-/// numbered cards.
+/// The other Bitcoin unit and fiat equivalents under an amount. Shared so a
+/// recipient card reads the same whether it is the single-recipient hero or
+/// one of several numbered cards.
 private struct AmountConversionLine: View {
   let sats: UInt64
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
@@ -205,7 +204,7 @@ private struct AmountConversionLine: View {
   var body: some View {
     if sats > 0 {
       HStack(spacing: 10) {
-        Text("\(sats.formattedBTC) BTC")
+        Text(sats.formattedAlternateUnit)
           .font(.hbMono(13))
           .foregroundStyle(Color.hbTextSecondary)
 
@@ -223,6 +222,62 @@ private struct AmountConversionLine: View {
       .minimumScaleFactor(0.7)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+  }
+}
+
+// MARK: - BTC Amount Field
+
+/// Amount entry in BTC. The recipient still stores whole sats; the typed text
+/// is kept here so partial input like "0." survives while typing.
+private struct BTCAmountField: View {
+  @Binding var amountSats: String
+  let fontSize: CGFloat
+  let isDisabled: Bool
+  let color: Color
+  var isFocused: FocusState<Bool>.Binding
+  var onAmountChange: () -> Void
+
+  @State private var text = ""
+
+  var body: some View {
+    TextField("0.00000000", text: $text)
+      .font(.system(size: fontSize, weight: .regular, design: .monospaced))
+      .keyboardType(.decimalPad)
+      .focused(isFocused)
+      .disabled(isDisabled)
+      .foregroundStyle(color)
+      .onAppear { text = Self.displayText(for: amountSats) }
+      .onChange(of: text) { old, new in
+        guard let sats = Self.satsString(for: new) else {
+          // More than eight decimals, a second separator, or pasted junk
+          text = old
+          return
+        }
+        if sats != amountSats {
+          amountSats = sats
+        }
+      }
+      .onChange(of: amountSats) {
+        // Set from outside (MAX, a scanned BIP-21 amount, the fiat toggle)
+        if Self.satsString(for: text) != amountSats {
+          text = Self.displayText(for: amountSats)
+        }
+        onAmountChange()
+      }
+  }
+
+  /// The sats string a typed BTC value stands for; empty while nothing but a
+  /// separator has been typed, nil when the text is not a valid BTC amount.
+  private static func satsString(for text: String) -> String? {
+    if text.isEmpty || text == "." || text == "," {
+      return ""
+    }
+    return Denomination.parseBTC(text).map { "\($0)" }
+  }
+
+  private static func displayText(for amountSats: String) -> String {
+    guard let sats = UInt64(amountSats) else { return "" }
+    return Denomination.btc.format(sats, includeUnit: false)
   }
 }
 
@@ -271,9 +326,14 @@ private struct AmountHeroCard: View {
   }
 
   private var amountText: String {
-    viewModel.amountInFiat
-      ? (viewModel.fiatDisplayAmount[recipient?.id ?? UUID()] ?? "")
-      : (recipient?.amountSats ?? "")
+    if viewModel.amountInFiat {
+      return viewModel.fiatDisplayAmount[recipient?.id ?? UUID()] ?? ""
+    }
+    if Denomination.current == .btc {
+      // Always the full eight decimals, so the size holds steady while typing
+      return (recipient?.amountValue ?? 0).formattedBare
+    }
+    return recipient?.amountSats ?? ""
   }
 
   /// Sized to hold eight digits; longer values step down rather than wrap.
@@ -367,19 +427,34 @@ private struct AmountHeroCard: View {
           .disabled(isMaxActive)
           .foregroundStyle(isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary)
       } else {
-        TextField("0", text: $viewModel.recipients[index].amountSats)
-          .font(.system(size: amountFontSize, weight: .regular, design: .monospaced))
-          .keyboardType(.numberPad)
-          .focused($isAmountFocused)
-          .disabled(isMaxActive)
-          .foregroundStyle(isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary)
-          .onChange(of: viewModel.recipients[index].amountSats) {
-            if !isMaxActive {
-              viewModel.recalculateMaxIfNeeded()
+        if Denomination.current == .btc {
+          BTCAmountField(
+            amountSats: $viewModel.recipients[index].amountSats,
+            fontSize: amountFontSize,
+            isDisabled: isMaxActive,
+            color: isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary,
+            isFocused: $isAmountFocused,
+            onAmountChange: {
+              if !isMaxActive {
+                viewModel.recalculateMaxIfNeeded()
+              }
             }
-          }
+          )
+        } else {
+          TextField("0", text: $viewModel.recipients[index].amountSats)
+            .font(.system(size: amountFontSize, weight: .regular, design: .monospaced))
+            .keyboardType(.numberPad)
+            .focused($isAmountFocused)
+            .disabled(isMaxActive)
+            .foregroundStyle(isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary)
+            .onChange(of: viewModel.recipients[index].amountSats) {
+              if !isMaxActive {
+                viewModel.recalculateMaxIfNeeded()
+              }
+            }
+        }
 
-        Text("sats")
+        Text(Denomination.current.label)
           .font(.hbMono(18))
           .foregroundStyle(Color.hbTextSecondary)
       }
@@ -765,19 +840,34 @@ private struct RecipientCard: View {
               .disabled(viewModel.recipients[index].isSendMax)
               .foregroundStyle(amountColor)
           } else {
-            TextField("0", text: $viewModel.recipients[index].amountSats)
-              .font(.system(size: 28, weight: .regular, design: .monospaced))
-              .keyboardType(.numberPad)
-              .focused($isAmountFocused)
-              .disabled(viewModel.recipients[index].isSendMax)
-              .foregroundStyle(amountColor)
-              .onChange(of: viewModel.recipients[index].amountSats) {
-                if !viewModel.recipients[index].isSendMax {
-                  viewModel.recalculateMaxIfNeeded()
+            if Denomination.current == .btc {
+              BTCAmountField(
+                amountSats: $viewModel.recipients[index].amountSats,
+                fontSize: 24,
+                isDisabled: viewModel.recipients[index].isSendMax,
+                color: amountColor,
+                isFocused: $isAmountFocused,
+                onAmountChange: {
+                  if index < viewModel.recipients.count, !viewModel.recipients[index].isSendMax {
+                    viewModel.recalculateMaxIfNeeded()
+                  }
                 }
-              }
+              )
+            } else {
+              TextField("0", text: $viewModel.recipients[index].amountSats)
+                .font(.system(size: 28, weight: .regular, design: .monospaced))
+                .keyboardType(.numberPad)
+                .focused($isAmountFocused)
+                .disabled(viewModel.recipients[index].isSendMax)
+                .foregroundStyle(amountColor)
+                .onChange(of: viewModel.recipients[index].amountSats) {
+                  if !viewModel.recipients[index].isSendMax {
+                    viewModel.recalculateMaxIfNeeded()
+                  }
+                }
+            }
 
-            Text("sats")
+            Text(Denomination.current.label)
               .font(.hbMono(14))
               .foregroundStyle(Color.hbTextSecondary)
           }
@@ -841,7 +931,7 @@ private struct DecisionStack: View {
     guard viewModel.feeRateValue > 0 else { return "Tap to choose a rate" }
     let rate = "\(formatFeeRate(viewModel.feeRateValue)) sat/vB"
     guard viewModel.totalSendAmount > 0 else { return rate }
-    return "\(rate) · \(viewModel.estimateFee().formattedSats)"
+    return "\(rate) · \(viewModel.estimateFee().formattedFeeSats)"
   }
 
   private var coinsSubtitle: String {

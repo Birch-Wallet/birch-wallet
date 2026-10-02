@@ -196,6 +196,8 @@ struct TransactionListView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     NavigationStack {
       VStack(spacing: 0) {
         // Wallet hero header

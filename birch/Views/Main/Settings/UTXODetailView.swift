@@ -39,6 +39,8 @@ struct UTXODetailView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     ScrollView {
       VStack(spacing: 16) {
         // Amount header

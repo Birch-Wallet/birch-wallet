@@ -7,48 +7,102 @@ enum Denomination: String, CaseIterable {
   case sats
   case btc = "BTC"
 
+  static let satsPerBTC: UInt64 = 100_000_000
+  static let maxSats: UInt64 = 21_000_000 * satsPerBTC
+
   static var current: Denomination {
     let raw = UserDefaults.standard.string(forKey: Constants.denominationKey) ?? "sats"
     return Denomination(rawValue: raw) ?? .sats
+  }
+
+  /// Unit label shown next to amounts
+  var label: String {
+    rawValue
+  }
+
+  /// The unit that is not this one — shown as the secondary conversion.
+  var alternate: Denomination {
+    self == .sats ? .btc : .sats
+  }
+
+  /// Format a satoshi amount in this unit: grouped whole sats, or BTC with
+  /// eight fixed decimals.
+  func format(_ sats: UInt64, includeUnit: Bool = true) -> String {
+    let number: String
+    switch self {
+    case .btc:
+      // Integer math — eight decimals exactly, with no floating-point rounding.
+      let whole = sats / Self.satsPerBTC
+      let fraction = sats % Self.satsPerBTC
+      let padded = String(repeating: "0", count: 8 - "\(fraction)".count) + "\(fraction)"
+      number = "\(whole).\(padded)"
+    case .sats:
+      let formatter = NumberFormatter()
+      formatter.numberStyle = .decimal
+      formatter.groupingSeparator = ","
+      number = formatter.string(from: NSNumber(value: sats)) ?? "\(sats)"
+    }
+    return includeUnit ? "\(number) \(label)" : number
+  }
+
+  /// Parse a typed BTC amount into sats. Accepts "." or "," as the decimal
+  /// separator; rejects more than eight decimals and anything above 21M BTC.
+  static func parseBTC(_ text: String) -> UInt64? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+    guard !trimmed.isEmpty else { return nil }
+    let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+    guard parts.count <= 2 else { return nil }
+    let wholePart = String(parts[0])
+    let fractionPart = parts.count == 2 ? String(parts[1]) : ""
+    guard !(wholePart.isEmpty && fractionPart.isEmpty) else { return nil }
+    guard wholePart.allSatisfy(\.isASCIIDigit), fractionPart.allSatisfy(\.isASCIIDigit) else { return nil }
+    guard wholePart.count <= 8, fractionPart.count <= 8 else { return nil }
+    let whole = wholePart.isEmpty ? 0 : (UInt64(wholePart) ?? 0)
+    let fraction = UInt64(fractionPart + String(repeating: "0", count: 8 - fractionPart.count)) ?? 0
+    let sats = whole * satsPerBTC + fraction
+    return sats <= maxSats ? sats : nil
+  }
+}
+
+private extension Character {
+  var isASCIIDigit: Bool {
+    isASCII && isNumber
   }
 }
 
 // MARK: - Formatting Helpers
 
 extension Int64 {
-  /// Format satoshi amount for display
+  /// Format satoshi amount for display in the selected Bitcoin unit
   var formattedSats: String {
-    let absAmount = abs(self)
-    switch Denomination.current {
-    case .btc:
-      let btc = Double(absAmount) / 100_000_000.0
-      return String(format: "%.8f BTC", btc)
-    case .sats:
-      let formatter = NumberFormatter()
-      formatter.numberStyle = .decimal
-      formatter.groupingSeparator = ","
-      return "\(formatter.string(from: NSNumber(value: absAmount)) ?? "\(absAmount)") sats"
-    }
+    Denomination.current.format(magnitude)
+  }
+
+  /// Network fees always read in sats, whatever unit is selected.
+  var formattedFeeSats: String {
+    Denomination.sats.format(magnitude)
   }
 }
 
 extension UInt64 {
+  /// Format satoshi amount for display in the selected Bitcoin unit
   var formattedSats: String {
-    switch Denomination.current {
-    case .btc:
-      let btc = Double(self) / 100_000_000.0
-      return String(format: "%.8f BTC", btc)
-    case .sats:
-      let formatter = NumberFormatter()
-      formatter.numberStyle = .decimal
-      formatter.groupingSeparator = ","
-      return "\(formatter.string(from: NSNumber(value: self)) ?? "\(self)") sats"
-    }
+    Denomination.current.format(self)
   }
 
-  var formattedBTC: String {
-    let btc = Double(self) / 100_000_000.0
-    return String(format: "%.8f", btc)
+  /// Network fees always read in sats, whatever unit is selected.
+  var formattedFeeSats: String {
+    Denomination.sats.format(self)
+  }
+
+  /// The amount in the selected unit without its unit label.
+  var formattedBare: String {
+    Denomination.current.format(self, includeUnit: false)
+  }
+
+  /// The amount in the unit that is not selected — the secondary conversion.
+  var formattedAlternateUnit: String {
+    Denomination.current.alternate.format(self)
   }
 }
 

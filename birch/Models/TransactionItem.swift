@@ -80,13 +80,4 @@ struct TransactionItem: Identifiable, Equatable {
     guard let fee, let vsize, vsize > 0 else { return nil }
     return Float(fee) / Float(vsize)
   }
-
-  var formattedAmount: String {
-    let sats = absoluteAmount
-    if sats >= 100_000_000 {
-      let btc = Double(sats) / 100_000_000.0
-      return String(format: "%.8f BTC", btc)
-    }
-    return "\(sats) sats"
-  }
 }

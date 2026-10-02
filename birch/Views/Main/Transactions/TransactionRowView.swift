@@ -40,6 +40,8 @@ struct TransactionRowView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     HStack(spacing: 12) {
       // Direction icon
       Image(systemName: directionIcon)

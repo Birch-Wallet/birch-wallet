@@ -15,6 +15,8 @@ struct UTXOListView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     VStack(spacing: 0) {
       // Title
       Text("UTXOs")

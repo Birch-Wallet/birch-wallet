@@ -28,8 +28,9 @@ struct SettingsView: View {
             FeeSettingsRow()
           }
 
-          // Fiat Display
-          Section("Fiat Display") {
+          // Currency Display
+          Section("Currency Display") {
+            DenominationSettingsRow()
             FiatSettingsRow()
           }
 
@@ -207,18 +208,18 @@ private struct DenominationSettingsRow: View {
   @AppStorage(Constants.denominationKey) private var denomination: String = Denomination.sats.rawValue
 
   var body: some View {
-    HStack {
-      Text("Denomination")
-        .foregroundStyle(Color.hbTextPrimary)
-      Spacer()
-      Picker("", selection: $denomination) {
-        ForEach(Denomination.allCases, id: \.rawValue) { denom in
-          Text(denom.rawValue).tag(denom.rawValue)
-        }
+    Picker("Bitcoin Unit", selection: $denomination) {
+      ForEach(Denomination.allCases, id: \.rawValue) { denom in
+        Text(denom.label).tag(denom.rawValue)
       }
-      .tint(Color.hbBitcoinOrange)
     }
+    .tint(Color.hbBitcoinOrange)
+    .foregroundStyle(Color.hbTextPrimary)
+    .accessibilityIdentifier("bitcoinUnitPicker")
     .listRowBackground(Color.hbSurface)
+    .onChange(of: denomination) { _, new in
+      logger.info("Bitcoin unit changed to \(new)")
+    }
   }
 }
 
@@ -262,7 +263,7 @@ private struct FiatSettingsRow: View {
         VStack(alignment: .leading, spacing: 2) {
           Text("Show Fiat Price")
             .foregroundStyle(Color.hbTextPrimary)
-          Text("Display estimated fiat value alongside sats")
+          Text("Display estimated fiat value alongside bitcoin amounts")
             .font(.hbBody(12))
             .foregroundStyle(Color.hbTextSecondary)
         }

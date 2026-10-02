@@ -95,8 +95,7 @@ struct Recipient: Identifiable {
         switch item.name.lowercased() {
         case "amount":
           // BIP-21 amount is in BTC, convert to sats
-          if let btcString = item.value, let btc = Double(btcString) {
-            let sats = UInt64(btc * 100_000_000)
+          if let btcString = item.value, let sats = Denomination.parseBTC(btcString) {
             amountSats = "\(sats)"
             isSendMax = false
           }
