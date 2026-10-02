@@ -76,7 +76,15 @@ jobs:
     # Swift extraction traces every swift-frontend invocation, which turned a ~90s
     # build into 46 minutes on the first green run. Too slow to gate every PR, so
     # skip it there and cover main on merge, the weekly schedule, and on demand.
-    if: github.event_name != 'pull_request'
+    #
+    # PAUSED: CodeQL's build tracer does not work on macOS 27 / Xcode 27 (Swift
+    # 6.4). Apple removed the Intel-compatible binaries the tracer relies on, so
+    # the traced build dies with "Bad CPU type in executable" as soon as it spawns
+    # sandbox-exec to resolve packages. GitHub's only workaround is a macOS 26 /
+    # Xcode 26 runner, which cannot build this app (it needs the iOS 27.1 SDK).
+    # See https://github.com/github/codeql/issues/22742. Once the new Swift
+    # scanner ships, restore: if: github.event_name != 'pull_request'
+    if: false
     runs-on: xcode-27
     timeout-minutes: 60
     permissions:
