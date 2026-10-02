@@ -15,6 +15,10 @@ struct birchApp: App {
         // Clear Keychain (PIN, lockout state)
         KeychainHelper.deleteAll()
       }
+      // The screenshot tour turns animations off so each step settles at once.
+      if CommandLine.arguments.contains("-DisableAnimations") {
+        UIView.setAnimationsEnabled(false)
+      }
     #endif
 
     do {
@@ -77,5 +81,17 @@ struct RootView: View {
           themeManager.applySystemColorScheme(systemColorScheme)
         }
       }
+    #if DEBUG
+      .transaction { transaction in
+        if Self.disablesAnimations {
+          transaction.animation = nil
+          transaction.disablesAnimations = true
+        }
+      }
+    #endif
   }
+
+  #if DEBUG
+    private static let disablesAnimations = CommandLine.arguments.contains("-DisableAnimations")
+  #endif
 }

@@ -64,9 +64,17 @@ open class Snapshot: NSObject {
   static var deviceLanguage = ""
   static var currentLocale = ""
 
+  /// Each snapshot is captured once per appearance, dark first, into a
+  /// `screenshots/<appearance>/` subfolder, so one tour covers both modes.
+  static let appearances: [(name: String, value: XCUIDevice.Appearance)] = [("dark", .dark), ("light", .light)]
+
+  /// Time for the app to redraw after the appearance changes.
+  static let appearanceSettle: useconds_t = 500_000
+
   open class func setupSnapshot(_ app: XCUIApplication, waitForAnimations: Bool = true) {
     Snapshot.app = app
     Snapshot.waitForAnimations = waitForAnimations
+    XCUIDevice.shared.appearance = .dark
 
     do {
       let cacheDir = try getCacheDirectory()
@@ -167,10 +175,26 @@ open class Snapshot: NSObject {
         return
       }
 
+      for (index, appearance) in appearances.enumerated() {
+        if XCUIDevice.shared.appearance != appearance.value {
+          XCUIDevice.shared.appearance = appearance.value
+          usleep(appearanceSettle)
+        }
+        capture(name, appearance: appearance.name)
+        if index == appearances.count - 1 {
+          XCUIDevice.shared.appearance = appearances[0].value
+          usleep(appearanceSettle)
+        }
+      }
+    #endif
+  }
+
+  #if !os(OSX)
+    class func capture(_ name: String, appearance: String) {
       // XCUIScreen captures come back black for the open iPhone Duo's inner
       // display, so the Fastfile captures that display from the host instead.
       if ProcessInfo.processInfo.environment["SNAPSHOT_HOST_CAPTURE"] == "1" {
-        requestHostCapture(name)
+        requestHostCapture(name, appearance: appearance)
         return
       }
 
@@ -182,6 +206,7 @@ open class Snapshot: NSObject {
       #endif
 
       guard var simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"], let screenshotsDir = screenshotsDirectory else { return }
+      let appearanceDir = screenshotsDir.appendingPathComponent(appearance, isDirectory: true)
 
       do {
         // The simulator name contains "Clone X of " inside the screenshot file when running parallelized UI Tests on concurrent devices
@@ -189,27 +214,30 @@ open class Snapshot: NSObject {
         let range = NSRange(location: 0, length: simulator.count)
         simulator = regex.stringByReplacingMatches(in: simulator, range: range, withTemplate: "")
 
-        let path = screenshotsDir.appendingPathComponent("\(simulator)-\(name).png")
+        try FileManager.default.createDirectory(at: appearanceDir, withIntermediateDirectories: true)
+        let path = appearanceDir.appendingPathComponent("\(simulator)-\(name).png")
         #if swift(<5.0)
           try UIImagePNGRepresentation(image)?.write(to: path, options: .atomic)
         #else
           try image.pngData()?.write(to: path, options: .atomic)
         #endif
       } catch {
-        NSLog("Problem writing screenshot: \(name) to \(screenshotsDir)/\(simulator)-\(name).png")
+        NSLog("Problem writing screenshot: \(name) to \(appearanceDir)/\(simulator)-\(name).png")
         NSLog(error.localizedDescription)
       }
-    #endif
-  }
+    }
+  #endif
 
-  /// Drops `<device>-<name>.request` into the screenshots directory and waits
-  /// for the Fastfile to write `<device>-<name>.png` and delete the request.
-  class func requestHostCapture(_ name: String) {
+  /// Drops `<appearance>/<device>-<name>.request` into the screenshots
+  /// directory and waits for the Fastfile to write the matching `.png` and
+  /// delete the request.
+  class func requestHostCapture(_ name: String, appearance: String) {
     guard let simulator = ProcessInfo().environment["SIMULATOR_DEVICE_NAME"], let screenshotsDir = screenshotsDirectory else { return }
 
     let fileManager = FileManager.default
-    let request = screenshotsDir.appendingPathComponent("\(simulator)-\(name).request")
-    try? fileManager.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
+    let appearanceDir = screenshotsDir.appendingPathComponent(appearance, isDirectory: true)
+    let request = appearanceDir.appendingPathComponent("\(simulator)-\(name).request")
+    try? fileManager.createDirectory(at: appearanceDir, withIntermediateDirectories: true)
     fileManager.createFile(atPath: request.path, contents: nil)
 
     let deadline = Date().addingTimeInterval(20)
@@ -342,3 +370,5 @@ private extension CGFloat {
 // Please don't remove the lines below
 // They are used to detect outdated configuration files
 // SnapshotHelperVersion [1.30]
+// Local changes: dual-appearance capture into screenshots/<appearance>/ and
+// host capture for the open iPhone Duo (see fastlane/Fastfile).
