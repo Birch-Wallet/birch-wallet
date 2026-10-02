@@ -25,7 +25,9 @@ struct BumpFeeView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
       .alert("Error", isPresented: .init(
         get: { viewModel.errorMessage != nil },
@@ -145,8 +147,7 @@ private struct BumpFeeRateCard: View {
       }
 
       if showFeeMenu {
-        Divider()
-          .background(Color.hbBorder)
+        HBDivider()
 
         VStack(spacing: 10) {
           ForEach(FeePreset.allCases, id: \.self) { preset in
@@ -220,10 +221,9 @@ private struct BumpFeeRateCard: View {
         .frame(width: 60)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .birchCard(.nested)
         .overlay(
-          RoundedRectangle(cornerRadius: 6)
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
             .strokeBorder(
               viewModel.selectedFeePreset == .custom && !viewModel.isValidFeeRate && !viewModel.newFeeRate.isEmpty
                 ? Color.hbError.opacity(0.8) : .clear,
@@ -523,7 +523,7 @@ private struct BumpFeePSBTDisplayView: View {
         }
         .padding(24)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .transition(.opacity)
         .onAppear {
           DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -569,7 +569,7 @@ private struct BumpFeePSBTScanView: View {
       }
       .aspectRatio(1, contentMode: .fit)
       .frame(maxHeight: 500)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
       .padding(.horizontal, 24)
 
       Button(action: { showImportFile = true }) {

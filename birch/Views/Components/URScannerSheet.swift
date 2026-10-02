@@ -48,7 +48,7 @@ struct URScannerSheet: View {
 
       VStack(spacing: 16) {
         URVideo(videoSession: videoSession)
-          .clipShape(RoundedRectangle(cornerRadius: 12))
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           .overlay(ScannerOverlay())
           .gesture(
             MagnifyGesture()
@@ -107,7 +107,7 @@ struct URScannerSheet: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Color.hbError.opacity(0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
             .transition(.move(edge: .bottom).combined(with: .opacity))

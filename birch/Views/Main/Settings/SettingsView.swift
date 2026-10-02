@@ -68,6 +68,7 @@ struct SettingsView: View {
       .navigationTitle("")
       .sheet(isPresented: $showLogExport) {
         LogExportSheet()
+          .birchSheet()
       }
     }
   }
@@ -175,10 +176,12 @@ private struct AppIconTile: View {
           .aspectRatio(contentMode: .fit)
           .frame(width: 72, height: 72)
           .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-          .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-              .stroke(isSelected ? Color.hbBitcoinOrange : Color.hbBorder, lineWidth: isSelected ? 3 : 1)
-          )
+          .overlay {
+            if isSelected {
+              RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+            }
+          }
 
         HStack(spacing: 4) {
           if isSelected {
@@ -357,9 +360,11 @@ private struct AppLockSettingsSection: View {
       }
       .sheet(isPresented: $showSetPIN) {
         SetPINSheet(lockVM: lockVM)
+          .birchSheet()
       }
       .sheet(isPresented: $showRemovePIN) {
         RemovePINSheet(lockVM: lockVM)
+          .birchSheet()
       }
 
       if appLockEnabled {
@@ -491,8 +496,9 @@ private struct SetPINSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
     }
   }
@@ -543,8 +549,9 @@ private struct RemovePINSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
       .onAppear { startLockoutTimerIfNeeded() }
       .onDisappear { lockoutTimer?.invalidate() }
@@ -658,8 +665,9 @@ private struct LogExportSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
         ToolbarItem(placement: .primaryAction) {
           HStack(spacing: 12) {
             Button { pendingExport = .share } label: {
@@ -752,7 +760,7 @@ private struct LogExportSheet: View {
         }
       }
       .padding(8)
-      .background(Color.hbSurface, in: RoundedRectangle(cornerRadius: 8))
+      .background(Color.hbSurface, in: .rect(cornerRadius: 8, style: .continuous))
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
@@ -809,7 +817,7 @@ private struct LogExportSheet: View {
           }
           .padding(12)
         }
-        .background(Color.hbSurfaceElevated)
+        .background(Color.hbSurface)
       }
     }
   }

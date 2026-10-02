@@ -88,9 +88,11 @@ struct SendRecipientsView: View {
         viewModel.showAddressScanner = false
         viewModel.focusAmountIndex = targetIndex
       }
+      .birchSheet()
     }
     .sheet(isPresented: $viewModel.showUTXOPicker) {
       UTXOPickerSheet(viewModel: viewModel)
+        .birchSheet()
     }
     .sheet(isPresented: $viewModel.showFeeSheet) {
       SendFeeSheetView(viewModel: viewModel)
@@ -321,7 +323,7 @@ private struct AmountHeroCard: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       }
 
-      Divider().overlay(Color.hbBorder)
+      HBDivider()
 
       HStack {
         Text(viewModel.manualUTXOSelection ? "Selected" : "Spendable")
@@ -336,12 +338,13 @@ private struct AmountHeroCard: View {
       }
     }
     .padding(20)
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 22))
-    .overlay(
-      RoundedRectangle(cornerRadius: 22)
-        .strokeBorder(hasError ? Color.hbError.opacity(0.8) : Color.hbBorder, lineWidth: hasError ? 1.5 : 0.5)
-    )
+    .birchCard()
+    .overlay {
+      if hasError {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .strokeBorder(Color.hbError.opacity(0.8), lineWidth: 1.5)
+      }
+    }
     .onChange(of: viewModel.focusAmountIndex) {
       if viewModel.focusAmountIndex == index {
         isAmountFocused = true
@@ -473,20 +476,18 @@ private struct RecipientCard: View {
       }
 
       if showsAmount {
-        Divider().overlay(Color.hbBorder)
+        HBDivider()
         amountRow
       }
     }
     .padding(16)
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 20))
-    .overlay(
-      RoundedRectangle(cornerRadius: 20)
-        .strokeBorder(
-          (addressFormatError || addressMissing) ? Color.hbError.opacity(0.8) : Color.hbBorder,
-          lineWidth: (addressFormatError || addressMissing) ? 1.5 : 0.5
-        )
-    )
+    .birchCard()
+    .overlay {
+      if addressFormatError || addressMissing {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .strokeBorder(Color.hbError.opacity(0.8), lineWidth: 1.5)
+      }
+    }
     .onAppear { focusAmountIfRequested() }
     .onChange(of: viewModel.focusAmountIndex) { focusAmountIfRequested() }
   }
@@ -615,8 +616,7 @@ private struct RecipientCard: View {
           }
           .foregroundStyle(.white)
           .frame(maxWidth: .infinity, minHeight: 56)
-          .background(Color.hbBitcoinOrange)
-          .clipShape(RoundedRectangle(cornerRadius: 16))
+          .background(Color.hbBitcoinOrange, in: .rect(cornerRadius: 8, style: .continuous))
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -626,12 +626,7 @@ private struct RecipientCard: View {
             .font(.hbBody(16).weight(.bold))
             .foregroundStyle(Color.hbSteelBlue)
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-              RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-            )
+            .birchCard(.nested)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -654,8 +649,7 @@ private struct RecipientCard: View {
             }
           }
           .padding(12)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .birchCard(.nested)
           .foregroundStyle(Color.hbTextPrimary)
       } else {
         Button(action: {
@@ -718,8 +712,7 @@ private struct RecipientCard: View {
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(Color.hbTextSecondary)
             .frame(width: 40, height: 40)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .birchCard(.nested)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -732,8 +725,7 @@ private struct RecipientCard: View {
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(Color.hbBitcoinOrange)
             .frame(width: 40, height: 40)
-            .background(Color.hbBitcoinOrange.opacity(0.15))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .background(Color.hbBitcoinOrange.opacity(0.15), in: .rect(cornerRadius: 8, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -869,7 +861,7 @@ private struct DecisionStack: View {
         action: { viewModel.showFeeSheet = true }
       )
 
-      Divider().overlay(Color.hbBorder)
+      HBDivider()
 
       row(
         title: "Coins",
@@ -888,12 +880,7 @@ private struct DecisionStack: View {
           .padding(.bottom, 12)
       }
     }
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 20))
-    .overlay(
-      RoundedRectangle(cornerRadius: 20)
-        .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-    )
+    .birchCard()
   }
 
   private func row(
@@ -1058,8 +1045,9 @@ struct UTXOPickerSheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
         ToolbarItem(placement: .cancellationAction) {
           Button(viewModel.selectedUTXOIds.isEmpty ? "Select All" : "Deselect All") {
             if viewModel.selectedUTXOIds.isEmpty {
@@ -1068,9 +1056,9 @@ struct UTXOPickerSheet: View {
               viewModel.useAutomaticCoinSelection()
             }
           }
-          .foregroundStyle(Color.hbSteelBlue)
-          .font(.hbBody(14))
+          .buttonStyle(HBBarButtonStyle())
         }
+        .hbHidesGlassBackground()
       }
       .safeAreaInset(edge: .bottom) {
         HStack {
@@ -1141,8 +1129,7 @@ private struct UTXOPickerRow: View {
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
-      .background(isSelected ? Color.hbBitcoinOrange.opacity(0.08) : Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 10))
+      .birchSelected(isSelected, ring: false)
     }
   }
 }
@@ -1194,8 +1181,7 @@ private struct FrozenUTXOPickerRow: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .birchCard()
     .opacity(0.5)
   }
 }
@@ -1222,7 +1208,7 @@ struct AddressScannerSheet: View {
             scannedCode = code
             onResult(code)
           }
-          .clipShape(RoundedRectangle(cornerRadius: 12))
+          .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           .overlay(ScannerOverlay())
           .padding(.horizontal, 24)
 
@@ -1234,8 +1220,9 @@ struct AddressScannerSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-            .foregroundStyle(Color.hbTextSecondary)
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
     }
   }
@@ -1342,7 +1329,7 @@ struct SendStepIndicator: View {
     HStack(spacing: 4) {
       ForEach(steps, id: \.0) { step, label in
         VStack(spacing: 4) {
-          RoundedRectangle(cornerRadius: 2)
+          RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(step.rawValue <= currentStep.rawValue
               ? Color.hbBitcoinOrange
               : Color.hbBorder)

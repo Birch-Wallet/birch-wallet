@@ -349,6 +349,7 @@ struct PSBTDisplayView: View {
         compactEnabled: compactPSBT,
         requiredSignatures: viewModel.requiredSignatures
       )
+      .birchSheet()
     }
     .onChange(of: qrEncodingRaw) { showRestartAlert = true }
     .onChange(of: qrDensityRaw) { showRestartAlert = true }
@@ -405,7 +406,7 @@ struct PSBTDisplayView: View {
         }
         .padding(24)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .transition(.opacity)
         .onAppear {
           DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -491,8 +492,7 @@ private struct PSBTReviewCard: View {
         }
 
         if index < viewModel.recipients.count - 1 {
-          Divider()
-            .overlay(Color.hbBorder)
+          HBDivider()
         }
       }
 
@@ -584,11 +584,11 @@ struct SignatureProgressView: View {
           let signer = index < signedCosigners.count ? signedCosigners[index] : nil
           let isSigned = signer != nil
 
-          RoundedRectangle(cornerRadius: 6)
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(isSigned ? Color.hbBitcoinOrange : Color.hbSurface)
             .frame(width: 48, height: 48)
             .overlay(
-              RoundedRectangle(cornerRadius: 6)
+              RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(
                   isSigned ? Color.hbBitcoinOrange : Color.hbBorder,
                   lineWidth: isSigned ? 2 : 1

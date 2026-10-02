@@ -155,12 +155,7 @@ private struct ChoiceCard: View {
           .foregroundStyle(Color.hbTextSecondary)
       }
       .padding(20)
-      .background(Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-      )
+      .birchCard()
     }
   }
 }

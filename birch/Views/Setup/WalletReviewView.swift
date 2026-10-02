@@ -51,8 +51,7 @@ struct WalletReviewView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .birchCard(.nested)
           }
         }
         .hbCard()
@@ -69,7 +68,7 @@ struct WalletReviewView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background(Color.purple.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .padding(.horizontal, 24)
 
@@ -94,6 +93,7 @@ struct WalletReviewView: View {
         walletName: viewModel.walletName.isEmpty ? "My Wallet" : viewModel.walletName,
         descriptor: viewModel.externalDescriptor
       )
+      .birchSheet()
     }
   }
 }

@@ -57,8 +57,7 @@ struct WalletVerifyView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .birchCard(.nested)
           }
         }
         .hbCard()
@@ -96,7 +95,7 @@ struct WalletVerifyView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Color.purple.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
 
           Button(action: { showDescriptorQR = true }) {
@@ -109,7 +108,7 @@ struct WalletVerifyView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Color.hbBitcoinOrange.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
 
           Button(action: {
@@ -128,7 +127,7 @@ struct WalletVerifyView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Color.hbSteelBlue.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
         }
         .hbCard()
@@ -160,7 +159,7 @@ struct WalletVerifyView: View {
               .frame(width: 200, height: 200)
               .padding(12)
               .background(Color.white)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
               .frame(maxWidth: .infinity)
 
             viewModel.firstReceiveAddress.chunkedAddressText(font: .hbMono(12))
@@ -202,12 +201,14 @@ struct WalletVerifyView: View {
     }
     .sheet(isPresented: $showDescriptorQR) {
       DescriptorQRSheet(descriptor: viewModel.combinedDescriptor, walletName: viewModel.walletName.isEmpty ? "My Wallet" : viewModel.walletName)
+        .birchSheet()
     }
     .sheet(isPresented: $showDescriptorPDF) {
       DescriptorPDFView(
         walletName: viewModel.walletName.isEmpty ? "My Wallet" : viewModel.walletName,
         descriptor: viewModel.externalDescriptor
       )
+      .birchSheet()
     }
   }
 }
@@ -291,8 +292,9 @@ private struct DescriptorQRSheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
   }

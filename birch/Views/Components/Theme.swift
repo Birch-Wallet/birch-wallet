@@ -91,6 +91,49 @@ struct HBTheme {
     secondaryAccent: Color(red: 0.278, green: 0.373, blue: 0.224),
     colorScheme: .light
   )
+
+  // MARK: Lifted surface roles
+
+  // Derived from each theme's own palette. Light themes swap ground and card so
+  // cards sit lighter than the screen and read as lifted by their soft shadow.
+  // The system theme uses the grouped backgrounds, which already step that way.
+
+  /// Screen background
+  var ground: Color {
+    switch colorScheme {
+    case .light: surface
+    case .dark: background
+    default: Color(.systemGroupedBackground)
+    }
+  }
+
+  /// Card fill
+  var card: Color {
+    switch colorScheme {
+    case .light: background
+    case .dark: surface
+    default: Color(.secondarySystemGroupedBackground)
+    }
+  }
+
+  /// Fill for elements nested inside a card: fields, rows, segmented track
+  var nested: Color {
+    switch colorScheme {
+    case .light: surface
+    case .dark: surfaceElevated
+    default: Color(.tertiarySystemGroupedBackground)
+    }
+  }
+
+  /// Floating surfaces over other content (popovers): one step above a card in
+  /// dark, card-light in light where the shadow carries the lift
+  var floating: Color {
+    switch colorScheme {
+    case .light: background
+    case .dark: surfaceElevated
+    default: Color(.tertiarySystemBackground)
+    }
+  }
 }
 
 // MARK: - App Theme Enum
@@ -133,17 +176,25 @@ final class ThemeManager {
   private init() {
     let saved = UserDefaults.standard.string(forKey: Constants.themeKey) ?? AppTheme.system.rawValue
     theme = (AppTheme(rawValue: saved) ?? .system).theme
+    applyControlAppearance()
   }
 
   func apply(_ appTheme: AppTheme) {
     theme = appTheme.theme
     UserDefaults.standard.set(appTheme.rawValue, forKey: Constants.themeKey)
+    applyControlAppearance()
   }
 
   /// Sets the displayed theme to the appropriate custom palette for the given OS color scheme.
   /// Only used when the System theme is selected — does not save to UserDefaults.
   func applySystemColorScheme(_ colorScheme: ColorScheme) {
     theme = colorScheme == .dark ? .birchDark : .birchLight
+    applyControlAppearance()
+  }
+
+  /// Segmented pickers are UIKit-backed, so their track takes the nested fill via appearance
+  private func applyControlAppearance() {
+    UISegmentedControl.appearance().backgroundColor = UIColor(theme.nested)
   }
 }
 
@@ -152,15 +203,30 @@ final class ThemeManager {
 extension Color {
   /// Backgrounds
   static var hbBackground: Color {
-    ThemeManager.shared.theme.background
+    ThemeManager.shared.theme.ground
   }
 
+  /// Card fill
   static var hbSurface: Color {
-    ThemeManager.shared.theme.surface
+    ThemeManager.shared.theme.card
   }
 
+  /// Fill for elements nested inside a card
   static var hbSurfaceElevated: Color {
-    ThemeManager.shared.theme.surfaceElevated
+    ThemeManager.shared.theme.nested
+  }
+
+  static var hbFloating: Color {
+    ThemeManager.shared.theme.floating
+  }
+
+  static var hbSheet: Color {
+    ThemeManager.shared.theme.ground
+  }
+
+  /// 1pt line between rows inside a card
+  static var hbDivider: Color {
+    ThemeManager.shared.theme.nested
   }
 
   static var hbBorder: Color {
@@ -250,16 +316,113 @@ extension Font {
 
 // MARK: - View Modifiers
 
+enum CardLevel {
+  case card
+  case nested
+}
+
+/// Lifted card: edges come from the fill step against the ground, plus a soft
+/// shadow in light mode. No stroke.
+struct BirchCard: ViewModifier {
+  @Environment(\.colorScheme) private var scheme
+  var level: CardLevel = .card
+
+  func body(content: Content) -> some View {
+    let radius: CGFloat = level == .card ? 12 : 8
+    content
+      .background(
+        level == .card ? Color.hbSurface : Color.hbSurfaceElevated,
+        in: .rect(cornerRadius: radius, style: .continuous)
+      )
+      .shadow(
+        color: .black.opacity(scheme == .dark || level == .nested ? 0 : 0.06),
+        radius: 8,
+        y: 3
+      )
+  }
+}
+
+/// Selected item: gold-tinted fill over an opaque card, with an optional gold ring.
+/// The ring is the only stroke a card-like surface carries.
+struct BirchSelected: ViewModifier {
+  var isSelected: Bool = true
+  var ring: Bool = true
+  var cornerRadius: CGFloat = 12
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    if isSelected {
+      content
+        .background(
+          shape
+            .fill(Color.hbSurface)
+            .overlay(shape.fill(Color.hbBitcoinOrange.opacity(0.12)))
+            .overlay {
+              if ring {
+                shape.strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+              }
+            }
+        )
+    } else {
+      content.birchCard()
+    }
+  }
+}
+
+/// Done / Cancel in a sheet's toolbar, drawn in the app's own button style.
+/// Prominent is the gold primary look; otherwise it takes the card fill.
+/// Pair with `hbHidesGlassBackground()` on the ToolbarItem so iOS 26 doesn't
+/// wrap it in a Liquid Glass capsule.
+struct HBBarButtonStyle: ButtonStyle {
+  var prominent = false
+
+  func makeBody(configuration: Configuration) -> some View {
+    HBBarButtonBody(label: configuration.label, prominent: prominent, isPressed: configuration.isPressed)
+  }
+}
+
+private struct HBBarButtonBody<Label: View>: View {
+  @Environment(\.colorScheme) private var scheme
+  let label: Label
+  let prominent: Bool
+  let isPressed: Bool
+
+  var body: some View {
+    label
+      .font(.hbBody(15).weight(.semibold))
+      .foregroundStyle(prominent ? Color.white : Color.hbTextPrimary)
+      // The toolbar measures the bare label, so keep it on one line at its own size
+      .lineLimit(1)
+      .fixedSize()
+      .padding(.horizontal, 14)
+      .frame(minHeight: 34)
+      .background(
+        prominent ? Color.hbBitcoinOrange : Color.hbSurface,
+        in: .rect(cornerRadius: 8, style: .continuous)
+      )
+      .shadow(color: .black.opacity(scheme == .dark || prominent ? 0 : 0.06), radius: 8, y: 3)
+      .opacity(isPressed ? 0.7 : 1)
+      .contentShape(Rectangle())
+  }
+}
+
+extension ToolbarContent {
+  /// Drops the Liquid Glass capsule iOS 26 draws behind toolbar items
+  @ToolbarContentBuilder
+  func hbHidesGlassBackground() -> some ToolbarContent {
+    if #available(iOS 26.0, *) {
+      sharedBackgroundVisibility(.hidden)
+    } else {
+      self
+    }
+  }
+}
+
 struct HBCardModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .padding(16)
-      .background(Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-      )
+      .birchCard()
   }
 }
 
@@ -272,11 +435,15 @@ struct HBPrimaryButtonModifier: ViewModifier {
       .foregroundStyle(.white)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 16)
-      .background(isEnabled ? Color.hbBitcoinOrange : Color.hbBorder)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .background(
+        isEnabled ? Color.hbBitcoinOrange : Color.hbBorder,
+        in: .rect(cornerRadius: 12, style: .continuous)
+      )
   }
 }
 
+/// Full-width secondary buttons sit on the ground, so they take the card fill
+/// (and its light-mode shadow) to stay visible in themes where nested == ground.
 struct HBSecondaryButtonModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
@@ -284,16 +451,26 @@ struct HBSecondaryButtonModifier: ViewModifier {
       .foregroundStyle(Color.hbBitcoinOrange)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 16)
-      .background(Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .strokeBorder(Color.hbBitcoinOrange, lineWidth: 1)
-      )
+      .birchCard()
   }
 }
 
 extension View {
+  func birchCard(_ level: CardLevel = .card) -> some View {
+    modifier(BirchCard(level: level))
+  }
+
+  /// Selected fill plus a gold ring; unselected falls back to a plain card.
+  func birchSelected(_ isSelected: Bool = true, ring: Bool = true, cornerRadius: CGFloat = 12) -> some View {
+    modifier(BirchSelected(isSelected: isSelected, ring: ring, cornerRadius: cornerRadius))
+  }
+
+  /// Sheet surface with 12pt corners
+  func birchSheet() -> some View {
+    presentationBackground(Color.hbSheet)
+      .presentationCornerRadius(12)
+  }
+
   func hbCard() -> some View {
     modifier(HBCardModifier())
   }
@@ -304,6 +481,13 @@ extension View {
 
   func hbSecondaryButton() -> some View {
     modifier(HBSecondaryButtonModifier())
+  }
+}
+
+/// 1pt line between rows inside a card
+struct HBDivider: View {
+  var body: some View {
+    Color.hbDivider.frame(height: 1)
   }
 }
 
@@ -391,7 +575,7 @@ struct WalletIdenticon: View {
         }
       }
     }
-    .clipShape(RoundedRectangle(cornerRadius: 6))
+    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
   }
 }
 

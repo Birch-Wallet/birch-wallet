@@ -42,8 +42,7 @@ struct ElectrumServerSetupSection: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .padding(10)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .birchCard(.nested)
             .foregroundStyle(Color.hbTextPrimary)
         }
 
@@ -56,8 +55,7 @@ struct ElectrumServerSetupSection: View {
               .font(.hbMono(14))
               .keyboardType(.numberPad)
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
           }
 
@@ -135,7 +133,7 @@ struct ElectrumServerSetupSection: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 12)
           .background(Color.hbSteelBlue.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .disabled(isTestingConnection)
       }
@@ -222,8 +220,7 @@ struct WalletAdvancedSetupSection: View {
             .font(.hbMono(14))
             .keyboardType(.numberPad)
             .padding(10)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .birchCard(.nested)
             .foregroundStyle(Color.hbTextPrimary)
         }
 
@@ -236,8 +233,7 @@ struct WalletAdvancedSetupSection: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .padding(10)
-            .background(Color.hbSurfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .birchCard(.nested)
             .foregroundStyle(Color.hbTextPrimary)
         }
       }

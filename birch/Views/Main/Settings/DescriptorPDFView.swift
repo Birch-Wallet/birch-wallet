@@ -29,8 +29,9 @@ struct DescriptorPDFView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
         ToolbarItem(placement: .primaryAction) {
           HStack(spacing: 16) {
             Button(action: printPDF) {

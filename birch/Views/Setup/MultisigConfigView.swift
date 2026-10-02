@@ -44,7 +44,7 @@ struct MultisigConfigView: View {
               .padding(.horizontal, 32)
               .padding(.vertical, 14)
               .background(Color.hbBitcoinOrange)
-              .clipShape(RoundedRectangle(cornerRadius: 12))
+              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
         }
         .padding(.horizontal, 24)
@@ -117,6 +117,7 @@ struct MultisigConfigView: View {
           range: 1 ... viewModel.totalCosigners,
           selection: $viewModel.requiredSignatures
         )
+        .birchSheet()
       }
 
       Text("of")
@@ -145,6 +146,7 @@ struct MultisigConfigView: View {
             }
           }
         )
+        .birchSheet()
       }
     }
   }

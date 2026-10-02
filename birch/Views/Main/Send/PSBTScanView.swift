@@ -31,7 +31,7 @@ struct PSBTScanView: View {
       }
       .aspectRatio(1, contentMode: .fit)
       .frame(maxHeight: 500)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
       .padding(.horizontal, 24)
 
       Button(action: { showImportFile = true }) {

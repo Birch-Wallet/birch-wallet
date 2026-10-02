@@ -128,7 +128,7 @@ private struct VerificationChip: View {
     }
     .padding(10)
     .background(tint.opacity(0.08))
-    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

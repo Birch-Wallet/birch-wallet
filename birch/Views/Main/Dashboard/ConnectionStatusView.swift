@@ -34,8 +34,9 @@ struct ConnectionStatusView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
   }
@@ -175,7 +176,7 @@ struct ConnectionStatusView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(Color.hbBitcoinOrange.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .disabled(isSyncing)
 
@@ -189,7 +190,7 @@ struct ConnectionStatusView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(Color.hbError.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .disabled(isSyncing)
 
@@ -207,11 +208,11 @@ struct ConnectionStatusView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .background(Color.hbSteelBlue.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .disabled(isTesting)
 
-      Divider().overlay(Color.hbBorder)
+      HBDivider()
 
       Button(action: copyDebugInfo) {
         HStack(spacing: 8) {
@@ -222,8 +223,7 @@ struct ConnectionStatusView: View {
         .foregroundStyle(Color.hbTextSecondary)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .birchCard(.nested)
       }
     }
     .hbCard()

@@ -38,7 +38,7 @@ struct ReceiveView: View {
             .aspectRatio(1, contentMode: .fit)
             .padding(16)
             .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .layoutPriority(1)
 
           gap
@@ -73,8 +73,7 @@ struct ReceiveView: View {
                 TextField("Add a label...", text: $editedLabel)
                   .font(.hbBody(14))
                   .padding(8)
-                  .background(Color.hbSurfaceElevated)
-                  .clipShape(RoundedRectangle(cornerRadius: 8))
+                  .birchCard()
                   .foregroundStyle(Color.hbTextPrimary)
                   .frame(maxWidth: 220)
                   .onSubmit { saveLabel() }

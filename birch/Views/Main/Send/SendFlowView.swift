@@ -112,12 +112,15 @@ struct SendFlowView: View {
       SavedPSBTListView(viewModel: viewModel) { savedPSBT in
         bumpFeeViewModel = BumpFeeViewModel(savedPSBT: savedPSBT)
       }
+      .birchSheet()
     }
     .sheet(item: $bumpFeeViewModel) { vm in
       BumpFeeView(viewModel: vm)
+        .birchSheet()
     }
     .sheet(isPresented: $viewModel.showImportPSBTQR) {
       ImportPSBTQRSheet(viewModel: viewModel)
+        .birchSheet()
     }
     .fileImporter(
       isPresented: $viewModel.showImportPSBTFile,
@@ -199,8 +202,9 @@ struct ImportPSBTQRSheet: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
     }
   }

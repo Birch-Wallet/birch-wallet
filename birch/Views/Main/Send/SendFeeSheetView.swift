@@ -109,7 +109,7 @@ struct SendFeeSheetView: View {
     }
     .presentationDetents([.height(sheetHeight)], selection: $detent)
     .presentationDragIndicator(.visible)
-    .presentationBackground(Color.hbBackground)
+    .birchSheet()
   }
 
   // MARK: - Typing a custom rate
@@ -137,14 +137,7 @@ struct SendFeeSheetView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 10)
           .padding(.horizontal, 8)
-          .background(
-            RoundedRectangle(cornerRadius: 14)
-              .fill(Color.hbSurface)
-              .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                  .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-              )
-          )
+          .birchCard()
         }
         .buttonStyle(.plain)
       }
@@ -161,14 +154,7 @@ struct SendFeeSheetView: View {
       .frame(maxWidth: .infinity)
       .padding(.vertical, 10)
       .padding(.horizontal, 8)
-      .background(
-        RoundedRectangle(cornerRadius: 14)
-          .fill(Color.hbBitcoinOrange.opacity(0.12))
-          .overlay(
-            RoundedRectangle(cornerRadius: 14)
-              .strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
-          )
-      )
+      .birchSelected()
     }
   }
 
@@ -217,14 +203,7 @@ struct SendFeeSheetView: View {
       }
     }
     .padding(16)
-    .background(
-      RoundedRectangle(cornerRadius: 20)
-        .fill(Color.hbBitcoinOrange.opacity(0.12))
-        .overlay(
-          RoundedRectangle(cornerRadius: 20)
-            .strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
-        )
-    )
+    .birchSelected()
   }
 
   /// The measured content plus room for the drag indicator. Applies to both
@@ -292,7 +271,7 @@ struct SendFeeSheetView: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 14)
       .frame(minHeight: 56)
-      .background(rowBackground(isSelected: isSelected))
+      .birchSelected(isSelected)
     }
     .buttonStyle(.plain)
   }
@@ -316,7 +295,7 @@ struct SendFeeSheetView: View {
     .padding(.horizontal, 16)
     .padding(.vertical, 14)
     .frame(minHeight: 62)
-    .background(rowBackground(isSelected: isSelected))
+    .birchSelected(isSelected)
     .contentShape(Rectangle())
     .onTapGesture { selectCustom() }
   }
@@ -332,8 +311,7 @@ struct SendFeeSheetView: View {
           .lineLimit(1)
           .minimumScaleFactor(0.7)
           .frame(width: 96, height: 44)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 12))
+          .birchCard(.nested)
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -375,18 +353,6 @@ struct SendFeeSheetView: View {
           .foregroundStyle(.white)
       }
     }
-  }
-
-  private func rowBackground(isSelected: Bool) -> some View {
-    RoundedRectangle(cornerRadius: 18)
-      .fill(isSelected ? Color.hbBitcoinOrange.opacity(0.12) : Color.hbSurface)
-      .overlay(
-        RoundedRectangle(cornerRadius: 18)
-          .strokeBorder(
-            isSelected ? Color.hbBitcoinOrange : Color.hbBorder,
-            lineWidth: isSelected ? 1.5 : 0.5
-          )
-      )
   }
 
   private var totalRow: some View {

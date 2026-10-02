@@ -146,6 +146,7 @@ struct BroadcastResultView: View {
     }
     .sheet(isPresented: $viewModel.showExportQR) {
       ExportTransactionSheet(txBytes: viewModel.finalizedTxBytes)
+        .birchSheet()
     }
   }
 
@@ -293,8 +294,9 @@ struct ExportTransactionSheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
   }

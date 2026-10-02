@@ -20,6 +20,7 @@ struct DescriptorImportView: View {
         }
         showScanner = false
       }
+      .birchSheet()
     }
   }
 
@@ -64,7 +65,7 @@ struct DescriptorImportView: View {
               .padding(.horizontal, 32)
               .padding(.vertical, 14)
               .background(canImport ? Color.hbBitcoinOrange : Color.hbBorder)
-              .clipShape(RoundedRectangle(cornerRadius: 12))
+              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
           .disabled(!canImport)
         }
@@ -152,8 +153,7 @@ struct DescriptorImportView: View {
         .frame(minHeight: 120, maxHeight: fillsHeight ? .infinity : nil)
         .scrollContentBackground(.hidden)
         .padding(12)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
         .onChange(of: viewModel.importedDescriptorText) {
           viewModel.importDescriptorError = nil
@@ -190,7 +190,7 @@ struct DescriptorImportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(Color.hbError.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
   }
 

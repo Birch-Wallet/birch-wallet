@@ -95,7 +95,7 @@ struct WalletInfoView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background(Color.hbBitcoinOrange.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
 
         // Copy descriptor
@@ -111,7 +111,7 @@ struct WalletInfoView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background(Color.hbSteelBlue.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
 
         // Descriptor PDF
@@ -125,7 +125,7 @@ struct WalletInfoView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background(Color.purple.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
 
         // Cosigners
@@ -165,8 +165,7 @@ struct WalletInfoView: View {
               .textInputAutocapitalization(.never)
               .autocorrectionDisabled()
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
               .onChange(of: electrumHostText) {
                 wallet.electrumHost = electrumHostText.trimmingCharacters(in: .whitespaces)
@@ -181,8 +180,7 @@ struct WalletInfoView: View {
               .font(.hbMono(14))
               .keyboardType(.numberPad)
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
               .onChange(of: electrumPortText) {
                 wallet.electrumPort = Int(electrumPortText) ?? 0
@@ -253,7 +251,7 @@ struct WalletInfoView: View {
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
               .background(Color.hbSteelBlue.opacity(0.12))
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .disabled(isTestingConnection)
 
@@ -266,8 +264,7 @@ struct WalletInfoView: View {
               .foregroundStyle(Color.hbTextSecondary)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
             }
           }
         }
@@ -297,8 +294,7 @@ struct WalletInfoView: View {
               .textInputAutocapitalization(.never)
               .autocorrectionDisabled()
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
               .onChange(of: blockExplorerText) {
                 wallet.blockExplorerHost = blockExplorerText.trimmingCharacters(in: .whitespaces)
@@ -330,8 +326,7 @@ struct WalletInfoView: View {
                 .multilineTextAlignment(.center)
                 .frame(width: 80)
                 .padding(10)
-                .background(Color.hbSurfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .birchCard(.nested)
                 .foregroundStyle(Color.hbTextPrimary)
                 .onChange(of: gapLimitText) {
                   if let value = Int(gapLimitText), value > 0 {
@@ -349,7 +344,7 @@ struct WalletInfoView: View {
               .foregroundStyle(Color.hbTextSecondary)
           }
 
-          Divider().overlay(Color.hbBorder)
+          HBDivider()
 
           VStack(spacing: 12) {
             Button(action: forceResync) {
@@ -367,7 +362,7 @@ struct WalletInfoView: View {
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
               .background(Color.hbBitcoinOrange.opacity(0.12))
-              .clipShape(RoundedRectangle(cornerRadius: 10))
+              .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .disabled(isResyncing)
 
@@ -422,7 +417,7 @@ struct WalletInfoView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background(Color.hbError.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .padding(.top, 16)
       }
@@ -468,12 +463,15 @@ struct WalletInfoView: View {
     }
     .sheet(isPresented: $showEditCosigners) {
       EditCosignersView(wallet: wallet)
+        .birchSheet()
     }
     .sheet(isPresented: $showDescriptorQR) {
       DescriptorQRSheet(descriptor: combinedDescriptor, walletName: wallet.name)
+        .birchSheet()
     }
     .sheet(isPresented: $showDescriptorPDF) {
       DescriptorPDFView(walletName: wallet.name, descriptor: combinedDescriptor)
+        .birchSheet()
     }
   }
 
@@ -573,16 +571,9 @@ private struct EditCosignersView: View {
               Button(action: { currentIndex = index }) {
                 VStack(spacing: 4) {
                   ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                      .fill(index == currentIndex ? Color.hbBitcoinOrange.opacity(0.2) : Color.hbSurface)
+                    Color.clear
                       .frame(height: 44)
-                      .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                          .strokeBorder(
-                            index == currentIndex ? Color.hbBitcoinOrange : Color.hbBorder,
-                            lineWidth: index == currentIndex ? 2 : 0.5
-                          )
-                      )
+                      .birchSelected(index == currentIndex)
                     Image(systemName: "person.badge.key.fill")
                       .font(.system(size: 14))
                       .foregroundStyle(index == currentIndex ? Color.hbBitcoinOrange : Color.hbTextSecondary)
@@ -615,7 +606,7 @@ private struct EditCosignersView: View {
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
               .background(Color.hbBitcoinOrange)
-              .clipShape(RoundedRectangle(cornerRadius: 12))
+              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
           .padding(.horizontal, 16)
           .padding(.bottom, 32)
@@ -632,14 +623,16 @@ private struct EditCosignersView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
-            .foregroundStyle(Color.hbTextSecondary)
+            .buttonStyle(HBBarButtonStyle(prominent: false))
         }
+        .hbHidesGlassBackground()
       }
       .sheet(isPresented: $showScanner) {
         URScannerSheet(expectedTypes: [.hdKey], onCancel: { showScanner = false }) { result in
           handleScanResult(result)
           showScanner = false
         }
+        .birchSheet()
       }
       .alert("Save Changes?", isPresented: $showSaveConfirmation) {
         Button("Save", role: .destructive) { saveChanges() }
@@ -661,8 +654,7 @@ private struct EditCosignersView: View {
         TextField("Cosigner name", text: $editableCosigners[index].label)
           .font(.hbBody())
           .padding(12)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .birchCard(.nested)
           .foregroundStyle(Color.hbTextPrimary)
       }
 
@@ -676,8 +668,7 @@ private struct EditCosignersView: View {
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
           .padding(12)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .birchCard(.nested)
           .foregroundStyle(Color.hbTextPrimary)
       }
 
@@ -690,8 +681,7 @@ private struct EditCosignersView: View {
           .font(.hbMono())
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(12)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .birchCard(.nested)
           .foregroundStyle(Color.hbTextPrimary)
       }
 
@@ -740,8 +730,7 @@ private struct EditCosignersView: View {
           .frame(minHeight: 80)
           .scrollContentBackground(.hidden)
           .padding(12)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 8))
+          .birchCard(.nested)
           .foregroundStyle(Color.hbTextPrimary)
 
         Button(action: { showScanner = true }) {
@@ -940,8 +929,9 @@ private struct DescriptorQRSheet: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
   }

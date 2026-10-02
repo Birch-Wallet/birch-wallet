@@ -102,8 +102,7 @@ struct TransactionDetailView: View {
             TextField("Add a label...", text: $editedLabel)
               .font(.hbBody())
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
               .onSubmit { saveLabel() }
           } else if !label.isEmpty {
@@ -262,7 +261,7 @@ struct TransactionDetailView: View {
               .padding(.vertical, 4)
 
               if input.id != transaction.inputs.last?.id {
-                Divider().overlay(Color.hbBorder)
+                HBDivider()
               }
             }
           }
@@ -314,7 +313,7 @@ struct TransactionDetailView: View {
               .padding(.vertical, 4)
 
               if output.id != transaction.outputs.last?.id {
-                Divider().overlay(Color.hbBorder)
+                HBDivider()
               }
             }
           }
@@ -330,7 +329,7 @@ struct TransactionDetailView: View {
               .frame(maxWidth: .infinity)
               .padding(14)
               .background(Color.hbBitcoinOrange.opacity(0.1))
-              .clipShape(RoundedRectangle(cornerRadius: 12))
+              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
         }
       }
@@ -340,6 +339,7 @@ struct TransactionDetailView: View {
     .navigationTitle("Transaction")
     .sheet(isPresented: $showBumpFee) {
       BumpFeeView(viewModel: BumpFeeViewModel(transaction: transaction))
+        .birchSheet()
     }
     .onAppear {
       loadLabel()
@@ -537,7 +537,7 @@ private struct TransactionDetailFlowDiagram: View {
       // Legend
       if hasAnyMine {
         HStack(spacing: 6) {
-          RoundedRectangle(cornerRadius: 2)
+          RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(Color.hbSteelBlue)
             .frame(width: 10, height: 10)
           Text("My Wallet")
