@@ -34,9 +34,9 @@ struct NumberPickerSheet: View {
           Button("Done") {
             dismiss()
           }
-          .foregroundStyle(Color.hbBitcoinOrange)
-          .font(.hbHeadline)
+          .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
     .presentationDetents([.height(300)])

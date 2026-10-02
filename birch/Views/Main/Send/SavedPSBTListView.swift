@@ -59,7 +59,7 @@ struct SavedPSBTListView: View {
                           .padding(.horizontal, 5)
                           .padding(.vertical, 2)
                           .background(Color.hbBitcoinOrange)
-                          .clipShape(RoundedRectangle(cornerRadius: 4))
+                          .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                       }
                     }
 
@@ -120,8 +120,9 @@ struct SavedPSBTListView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
       .alert("Rename PSBT", isPresented: .init(
         get: { renamingPSBT != nil },
@@ -207,6 +208,6 @@ private struct PSBTIdenticon: View {
         }
       }
     }
-    .clipShape(RoundedRectangle(cornerRadius: 6))
+    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
   }
 }

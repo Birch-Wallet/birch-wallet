@@ -47,7 +47,6 @@ struct CosignerCardView: View {
         .truncationMode(.middle)
     }
     .padding(12)
-    .background(Color.hbSurfaceElevated)
-    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .birchCard(.nested)
   }
 }

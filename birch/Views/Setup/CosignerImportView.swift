@@ -19,6 +19,7 @@ struct CosignerImportView: View {
         handleScanResult(result)
         showScanner = false
       }
+      .birchSheet()
     }
   }
 
@@ -55,7 +56,7 @@ struct CosignerImportView: View {
               .padding(.horizontal, 24)
               .padding(.vertical, 14)
               .background(viewModel.currentCosignerComplete ? Color.hbBitcoinOrange : Color.hbBorder)
-              .clipShape(RoundedRectangle(cornerRadius: 12))
+              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
           .disabled(!viewModel.currentCosignerComplete)
         }
@@ -150,8 +151,7 @@ struct CosignerImportView: View {
       TextField("Cosigner name", text: $viewModel.cosignerLabels[viewModel.currentCosignerIndex])
         .font(.hbBody())
         .padding(12)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
     }
 
@@ -166,8 +166,7 @@ struct CosignerImportView: View {
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .padding(12)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
     }
 
@@ -181,8 +180,7 @@ struct CosignerImportView: View {
         .font(.hbMono())
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
     }
   }
@@ -215,8 +213,7 @@ struct CosignerImportView: View {
         .frame(minHeight: 80, maxHeight: fillsHeight ? .infinity : nil)
         .scrollContentBackground(.hidden)
         .padding(12)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
 
       Button(action: { showScanner = true }) {
@@ -344,17 +341,9 @@ private struct CosignerSlot: View {
   var body: some View {
     VStack(spacing: 4) {
       ZStack {
-        RoundedRectangle(cornerRadius: 8)
-          .fill(isComplete ? Color.hbBitcoinOrange.opacity(0.2) : Color.hbSurface)
+        Color.clear
           .frame(height: 44)
-          .overlay(
-            RoundedRectangle(cornerRadius: 8)
-              .strokeBorder(
-                isCurrent ? Color.hbBitcoinOrange :
-                  isComplete ? Color.hbBitcoinOrange.opacity(0.5) : Color.hbBorder,
-                lineWidth: isCurrent ? 2 : 0.5
-              )
-          )
+          .birchSelected(isCurrent || isComplete, ring: isCurrent)
 
         if isComplete {
           Image(systemName: "lock.fill")

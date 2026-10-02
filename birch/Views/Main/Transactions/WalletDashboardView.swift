@@ -169,8 +169,9 @@ struct WalletDashboardView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
     }
   }
@@ -204,11 +205,6 @@ private struct DashboardMetricCard: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(16)
     .frame(minHeight: 110)
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 12))
-    .overlay(
-      RoundedRectangle(cornerRadius: 12)
-        .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-    )
+    .birchCard()
   }
 }

@@ -250,10 +250,7 @@ struct TransactionListView: View {
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 8)
-              .overlay(
-                RoundedRectangle(cornerRadius: 22)
-                  .strokeBorder(Color.hbBorder, lineWidth: 1)
-              )
+              .background(Color.hbTextPrimary.opacity(0.08), in: .rect(cornerRadius: 22, style: .continuous))
             }
             .accessibilityIdentifier("walletPicker")
 
@@ -346,9 +343,11 @@ struct TransactionListView: View {
       .overlay { walletPickerOverlay }
       .sheet(isPresented: $showConnectionStatus) {
         ConnectionStatusView()
+          .birchSheet()
       }
       .sheet(isPresented: $showDashboard) {
         WalletDashboardView()
+          .birchSheet()
       }
       .sheet(isPresented: $showAddWallet, onDismiss: {
         if let active = wallets.first(where: { $0.isActive }),
@@ -364,6 +363,7 @@ struct TransactionListView: View {
           // Page-sized on iPad so the wizard gets its readable column rather
           // than the phone layout squeezed into a form sheet.
           .presentationSizing(.page)
+          .birchSheet()
       }
       .sheet(isPresented: $showWalletInfo, onDismiss: {
         walletToEdit = nil
@@ -374,10 +374,12 @@ struct TransactionListView: View {
               .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                   Button("Done") { showWalletInfo = false }
-                    .foregroundStyle(Color.hbBitcoinOrange)
+                    .buttonStyle(HBBarButtonStyle(prominent: true))
                 }
+                .hbHidesGlassBackground()
               }
           }
+          .birchSheet()
         }
       }
       .fileImporter(
@@ -416,6 +418,7 @@ struct TransactionListView: View {
         URScannerSheet(expectedTypes: [.rawBytes], onCancel: { showImportQRScanner = false }) { result in
           handleQRImportResult(result)
         }
+        .birchSheet()
       }
       .sheet(isPresented: $showExportQR) {
         NavigationStack {
@@ -450,7 +453,9 @@ struct TransactionListView: View {
           .toolbar {
             ToolbarItem(placement: .cancellationAction) {
               Button("Done") { showExportQR = false }
+                .buttonStyle(HBBarButtonStyle(prominent: true))
             }
+            .hbHidesGlassBackground()
           }
         }
         .task {
@@ -459,6 +464,7 @@ struct TransactionListView: View {
             exportQRData = data
           }
         }
+        .birchSheet()
       }
     }
     .id(walletID)
@@ -555,8 +561,7 @@ struct TransactionListView: View {
           .padding(.horizontal, 14)
           .padding(.vertical, 12)
 
-          Divider()
-            .background(Color.hbBorder)
+          HBDivider()
 
           ScrollView {
             LazyVStack(spacing: 0) {
@@ -573,10 +578,6 @@ struct TransactionListView: View {
 
                   WalletIdenticon(id: wallet.id)
                     .frame(width: 32, height: 32)
-                    .overlay(
-                      RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.hbBitcoinOrange, lineWidth: wallet.isActive ? 2 : 0)
-                    )
                   VStack(spacing: 4) {
                     NetworkBadge(network: wallet.bitcoinNetwork)
                     Text(wallet.multisigDescription)
@@ -597,7 +598,7 @@ struct TransactionListView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 15)
-                .background(wallet.isActive ? Color.hbBitcoinOrange.opacity(0.08) : Color.clear)
+                .background(wallet.isActive ? Color.hbBitcoinOrange.opacity(0.12) : Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture {
                   if walletPickerEditMode {
@@ -619,8 +620,7 @@ struct TransactionListView: View {
                   walletPickerEditMode = true
                 }
                 if index < wallets.count - 1 {
-                  Divider()
-                    .background(Color.hbBorder)
+                  HBDivider()
                 }
               }
             }
@@ -629,12 +629,8 @@ struct TransactionListView: View {
           .scrollIndicators(.visible)
           .frame(maxHeight: 310)
         }
-        .background(Color.hbSurfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-          RoundedRectangle(cornerRadius: 12)
-            .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-        )
+        .background(Color.hbFloating)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
         .padding(.horizontal, 35)
         .padding(.top, 60)

@@ -76,8 +76,9 @@ struct PSBTInspectorView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") { dismiss() }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .buttonStyle(HBBarButtonStyle(prominent: true))
         }
+        .hbHidesGlassBackground()
       }
       .sensoryFeedback(.selection, trigger: openFieldID) { _, new in new != nil }
       // Pulling down at the top of the field list must not close the sheet; Done does
@@ -137,8 +138,7 @@ struct PSBTInspectorView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, 10)
       .padding(.horizontal, 12)
-      .background(Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .birchCard()
       .padding(.horizontal, 20)
       .padding(.bottom, 14)
 
@@ -183,8 +183,7 @@ struct PSBTInspectorView: View {
       }
       .padding(.vertical, 11)
       .padding(.horizontal, 14)
-      .background(Color.hbSurface)
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .birchCard()
       .padding(.horizontal, 30)
       .padding(.bottom, 14)
 
@@ -314,7 +313,7 @@ struct PSBTInspectorView: View {
     }
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.hbBorder, lineWidth: 1))
+    .birchCard()
   }
 
   private var legend: some View {
@@ -331,7 +330,7 @@ struct PSBTInspectorView: View {
 
   private func legendItem(_ label: String, color: Color) -> some View {
     HStack(spacing: 7) {
-      RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 9, height: 9)
+      RoundedRectangle(cornerRadius: 3, style: .continuous).fill(color).frame(width: 9, height: 9)
       Text(label)
         .font(.hbBody(12))
         .foregroundStyle(Color.hbTextSecondary)
@@ -417,7 +416,7 @@ private struct PSBTSectionView<Rows: View>: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(
-              RoundedRectangle(cornerRadius: 8)
+              RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.hbBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
         }
@@ -430,7 +429,7 @@ private struct PSBTSectionView<Rows: View>: View {
 
   private var header: some View {
     let content = HStack(spacing: 8) {
-      RoundedRectangle(cornerRadius: 3)
+      RoundedRectangle(cornerRadius: 3, style: .continuous)
         .fill(section.location.color)
         .frame(width: 9, height: 9)
       Text(section.label)
@@ -490,7 +489,7 @@ struct PSBTFieldRow: View {
     VStack(alignment: .leading, spacing: 0) {
       Button(action: onTap) {
         HStack(spacing: 9) {
-          RoundedRectangle(cornerRadius: 3)
+          RoundedRectangle(cornerRadius: 3, style: .continuous)
             .fill(field.section.color)
             .frame(width: 6)
           VStack(alignment: .leading, spacing: 2) {
@@ -526,7 +525,7 @@ struct PSBTFieldRow: View {
       }
     }
     .background(isOpen ? Color.hbTextPrimary.opacity(0.06) : Color.clear)
-    .clipShape(RoundedRectangle(cornerRadius: 9))
+    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
   }
 
   private var detail: some View {
@@ -611,7 +610,7 @@ private struct PSBTPartsBreakdown: View {
               .foregroundStyle(Color.hbTextSecondary)
           }
           GeometryReader { geo in
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
               .fill(color(part.tint))
               .frame(width: geo.size.width * max(0.03, CGFloat(part.bytes) / CGFloat(total)))
           }

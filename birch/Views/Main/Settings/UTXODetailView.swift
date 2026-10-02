@@ -150,7 +150,7 @@ struct UTXODetailView: View {
               }
             }
 
-            Divider().overlay(Color.hbBorder)
+            HBDivider()
           }
 
           DetailRow(label: "Amount", value: isPrivate ? Constants.privacyText() : utxo.amount.formattedSats)
@@ -208,8 +208,7 @@ struct UTXODetailView: View {
             TextField("Add a label...", text: $editedLabel)
               .font(.hbBody())
               .padding(10)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
               .onSubmit { saveUTXOLabel() }
           } else if !utxoLabel.isEmpty {
@@ -281,7 +280,7 @@ struct UTXODetailView: View {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
           .background((isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue).opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .hbCard()
       }

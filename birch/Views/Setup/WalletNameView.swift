@@ -25,8 +25,7 @@ struct WalletNameView: View {
         TextField("My Wallet", text: $viewModel.walletName)
           .font(.hbBody(18))
           .padding(14)
-          .background(Color.hbSurfaceElevated)
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+          .birchCard()
           .foregroundStyle(Color.hbTextPrimary)
       }
       .padding(.horizontal, 24)
@@ -63,7 +62,7 @@ struct WalletNameView: View {
             .padding(.horizontal, 32)
             .padding(.vertical, 14)
             .background(Color.hbBitcoinOrange)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
       }
       .padding(.horizontal, 24)

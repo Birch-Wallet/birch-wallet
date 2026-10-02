@@ -65,7 +65,7 @@ struct ResumePSBTSheet: View {
     .presentationSizing(.form.fitted(horizontal: false, vertical: true))
     .presentationDetents([.height(sheetHeight)], selection: $detent)
     .presentationDragIndicator(.visible)
-    .presentationBackground(Color.hbBackground)
+    .birchSheet()
   }
 
   // MARK: - Header
@@ -73,7 +73,7 @@ struct ResumePSBTSheet: View {
   private var header: some View {
     HStack(alignment: .top, spacing: 14) {
       ZStack {
-        RoundedRectangle(cornerRadius: 14)
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
           .fill(Color.hbBitcoinOrange.opacity(0.15))
         PSBTGlyph()
       }
@@ -112,19 +112,19 @@ struct ResumePSBTSheet: View {
     VStack(spacing: 0) {
       if details.recipients.count == 1, let recipient = details.recipients.first {
         valueRow("Amount", value: recipient.amount.formattedSats, font: .hbMono(17))
-        Divider().overlay(Color.hbBorder)
+        HBDivider()
         valueRow("To", value: recipient.address.truncatedMiddle(), font: .hbMono(15))
       } else {
         multiRecipientRows
       }
 
       if !details.recipients.isEmpty {
-        Divider().overlay(Color.hbBorder)
+        HBDivider()
       }
       valueRow("Fee", value: feeText, font: .hbMono(15))
 
       if isPartlySigned {
-        Divider().overlay(Color.hbBorder)
+        HBDivider()
         valueRow(
           "Signatures",
           value: "\(details.signaturesCollected) of \(savedPSBT.requiredSignatures)",
@@ -132,12 +132,7 @@ struct ResumePSBTSheet: View {
         )
       }
     }
-    .background(Color.hbSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 18))
-    .overlay(
-      RoundedRectangle(cornerRadius: 18)
-        .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-    )
+    .birchCard()
   }
 
   @ViewBuilder
@@ -163,12 +158,12 @@ struct ResumePSBTSheet: View {
     }
 
     ForEach(Array(visible.enumerated()), id: \.offset) { index, recipient in
-      Divider().overlay(Color.hbBorder)
+      HBDivider()
       recipientRow(number: index + 1, recipient: recipient)
     }
 
     if isCollapsed {
-      Divider().overlay(Color.hbBorder)
+      HBDivider()
       Button(action: { isExpanded = true }) {
         Text("+ \(recipients.count - Self.collapsedRowCount) more")
           .font(.hbBody(14).weight(.semibold))
@@ -259,8 +254,7 @@ struct ResumePSBTSheet: View {
           .font(.hbBody(17).weight(.bold))
           .foregroundStyle(.white)
           .frame(maxWidth: .infinity, minHeight: 56)
-          .background(Color.hbBitcoinOrange)
-          .clipShape(RoundedRectangle(cornerRadius: 16))
+          .background(Color.hbBitcoinOrange, in: .rect(cornerRadius: 12, style: .continuous))
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -271,12 +265,7 @@ struct ResumePSBTSheet: View {
           .font(.hbBody(17).weight(.semibold))
           .foregroundStyle(Color.hbTextPrimary)
           .frame(maxWidth: .infinity, minHeight: 52)
-          .background(Color.hbSurface)
-          .clipShape(RoundedRectangle(cornerRadius: 16))
-          .overlay(
-            RoundedRectangle(cornerRadius: 16)
-              .strokeBorder(Color.hbBorder, lineWidth: 0.5)
-          )
+          .birchCard()
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)

@@ -19,7 +19,7 @@ struct AddressDetailView: View {
         .frame(width: 240, height: 240)
         .padding(16)
         .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
       VStack(spacing: 8) {
         Text("Address #\(index)")
@@ -49,8 +49,7 @@ struct AddressDetailView: View {
             TextField("Add a label...", text: $editedLabel)
               .font(.hbBody(14))
               .padding(8)
-              .background(Color.hbSurfaceElevated)
-              .clipShape(RoundedRectangle(cornerRadius: 8))
+              .birchCard()
               .foregroundStyle(Color.hbTextPrimary)
               .frame(maxWidth: 220)
               .onSubmit { saveLabel() }

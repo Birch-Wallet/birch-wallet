@@ -81,8 +81,7 @@ struct SendReviewView: View {
             }
 
             if index < viewModel.recipients.count - 1 {
-              Divider()
-                .overlay(Color.hbBorder)
+              HBDivider()
             }
           }
 
@@ -221,6 +220,7 @@ struct SendReviewView: View {
         compactEnabled: compactPSBT,
         requiredSignatures: viewModel.requiredSignatures
       )
+      .birchSheet()
     }
     .alert("Exit Signing?", isPresented: $showExitConfirmation) {
       Button("Exit", role: .destructive) {

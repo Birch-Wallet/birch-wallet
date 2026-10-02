@@ -69,11 +69,11 @@ struct SetupWizardView: View {
             Button(action: { dismiss() }) {
               Image(systemName: "xmark")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.hbTextSecondary)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
             }
+            .buttonStyle(HBBarButtonStyle())
+            .accessibilityLabel("Close")
           }
+          .hbHidesGlassBackground()
         }
       }
       .alert("Error", isPresented: .init(
@@ -123,7 +123,7 @@ private struct ProgressBarView: View {
     GeometryReader { _ in
       HStack(spacing: 4) {
         ForEach(0 ..< stepCount, id: \.self) { index in
-          RoundedRectangle(cornerRadius: 2)
+          RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(Double(index) / Double(stepCount - 1) <= progress
               ? Color.hbBitcoinOrange
               : Color.hbBorder)
