@@ -1,3 +1,9 @@
+# Note: `fastlane screenshots` (fastlane/Fastfile) drives xcodebuild itself and
+# doesn't call the `snapshot` action, so the run settings below (devices,
+# concurrency, launch arguments, ...) document intent but aren't read by it.
+# The Fastfile's DEVICES, its `parallel:` option and ScreenshotTests' launch
+# arguments are what the lane actually uses.
+#
 # Devices to capture — full App Store iPhone set + iPad 13" (required by App
 # Review because the app declares iPad support, TARGETED_DEVICE_FAMILY = 1,2),
 # plus the iPhone Duo closed and open. The Fastfile's DEVICES drives the actual
@@ -36,7 +42,8 @@ override_status_bar(true)
 # SpringBoard hasn't finished registering the app before the test launches.
 headless(false)
 
-# Avoid Electrum sync contention between simulators running in parallel.
+# Not read by the lane, which runs simulators side by side itself (Fastfile
+# `parallel:`); the tour waits for the Electrum sync, so contention is fine.
 concurrent_simulators(false)
 
 # Fail fast — if one device fails, don't burn time on the rest.

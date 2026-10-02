@@ -73,12 +73,13 @@ end
 
 # Runs the tour while answering the capture requests SnapshotHelper makes when
 # SNAPSHOT_HOST_CAPTURE is set: XCUIScreen can't see the open Duo's inner
-# display, so each shot is taken here with `simctl io --display`.
-def run_tour_with_host_capture(command, udid)
+# display, so each shot is taken here with `simctl io --display`. Requests
+# land in the appearance subfolder the shot belongs to.
+def run_tour_with_host_capture(command, udid, name)
   display = inner_display(udid)
   pid = Process.spawn({ "TEST_RUNNER_SNAPSHOT_HOST_CAPTURE" => "1" }, command)
   loop do
-    Dir.glob("#{SCREENSHOT_SRC}/*.request").each do |request|
+    Dir.glob("#{SCREENSHOT_SRC}/*/#{name}-*.request").each do |request|
       partial = request.sub(/\.request\z/, ".partial")
       system("xcrun", "simctl", "io", udid, "screenshot", "--type=png", "--display=#{display}", partial, out: File::NULL)
       File.rename(partial, request.sub(/\.request\z/, ".png")) if File.exist?(partial)
@@ -90,21 +91,198 @@ def run_tour_with_host_capture(command, udid)
   $?.success?
 end
 
-platform :ios do
-  desc "Capture App Store + marketing screenshots (dark first, then light)"
-  #   fastlane screenshots                     # every device
-  #   fastlane screenshots only:"iPhone Duo"   # rerun one device, keep the rest
-  lane :screenshots do |options|
-    devices = DEVICES
-    if options[:only]
-      devices = DEVICES.select { |name, _| name == options[:only] }
-      UI.user_error!("Unknown device '#{options[:only]}'. Choose from: #{DEVICES.keys.join(', ')}") if devices.empty?
+APPEARANCES = ["dark", "light"].freeze
+
+# Each pass's xcodebuild output and result bundle, kept out of the console
+# because passes run side by side.
+PASS_LOGS = File.expand_path("../build/screenshot-logs", __dir__)
+
+# Seconds each pass's tour took, and whether it passed, for the summary.
+PASS_TIMES = {}
+PASS_TIMES_LOCK = Mutex.new
+
+def report_pass_times(lane_started)
+  rows = PASS_TIMES.map { |label, (seconds, passed)| [label, "#{seconds.round}s", passed ? "" : "FAILED"] }
+  rows << ["Lane so far (build + tours)", "#{(Time.now - lane_started).round}s", ""]
+  puts(Terminal::Table.new(title: "Tour times", rows: rows))
+end
+
+# Calls each job (a lambda) on up to `width` threads at once.
+def run_concurrently(jobs, width)
+  queue = Queue.new
+  jobs.each { |job| queue << job }
+  Array.new([width, jobs.size].min) do
+    Thread.new do
+      loop do
+        job = begin
+          queue.pop(true)
+        rescue ThreadError
+          break
+        end
+        job.call
+      end
+    end
+  end.each(&:join)
+end
+
+# Frames every capture left in screenshots/<mode>/en-US with frameit, one
+# frameit process per device and appearance, all at once. frameit frames one
+# image at a time, and its action changes the process's working directory, so
+# the work is split across processes rather than threads. Each process gets
+# its own folder, and everything (bare and _framed) moves back afterwards.
+def frame_in_parallel
+  staging = File.expand_path("screenshots/_frameit", __dir__)
+  FileUtils.rm_rf(staging)
+  jobs = []
+  APPEARANCES.each do |mode|
+    src_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
+    Dir.glob("#{src_dir}/*.png").group_by { |f| File.basename(f)[/\A(.+?)-\d\d-/, 1] }.each do |device, files|
+      dir = "#{staging}/#{mode}/#{device}"
+      FileUtils.mkdir_p(dir)
+      FileUtils.mv(files, dir)
+      jobs << { dir: dir, back_to: src_dir, log: "#{PASS_LOGS}/frameit-#{mode}-#{device}.log" }
+    end
+  end
+
+  UI.message("Framing #{jobs.size} device/appearance folders in parallel")
+  FileUtils.mkdir_p(PASS_LOGS)
+  pids = jobs.map do |job|
+    Process.spawn(Gem.ruby, Gem.bin_path("fastlane", "fastlane"), "run", "frameit", "path:#{job[:dir]}", "use_platform:IOS",
+                  out: job[:log], err: job[:log])
+  end
+  jobs.zip(pids).each do |job, pid|
+    Process.wait(pid)
+    UI.error("frameit failed for #{job[:dir]}. Log: #{job[:log]}") unless $?.success?
+    FileUtils.mv(Dir.glob("#{job[:dir]}/*.png"), job[:back_to])
+  end
+  FileUtils.rm_rf(staging)
+end
+
+# Runs every device's tour, `parallel` simulators at a time. The Duo runs its
+# two postures back to back on one simulator, so it starts first.
+def run_screenshot_passes(devices, parallel)
+  FileUtils.rm_rf(SCREENSHOT_SRC)
+  FileUtils.mkdir_p(SCREENSHOT_SRC)
+  FileUtils.mkdir_p(PASS_LOGS)
+
+  queue = Queue.new
+  devices.sort_by { |_, config| -(config[:postures] || [nil]).size }.each { |device| queue << device }
+  workers = Array.new([parallel, devices.size].min) do
+    Thread.new do
+      loop do
+        name, config = begin
+          queue.pop(true)
+        rescue ThreadError
+          break
+        end
+        run_device_passes(name, config)
+      end
+    end
+  end
+  workers.each(&:join)
+end
+
+# One device: boot it, then run the tour once per posture (once for most
+# devices) and collect that pass's dark and light captures.
+def run_device_passes(name, config)
+  udid = resolve_udid(name, config[:runtime])
+
+  (config[:postures] || [nil]).each do |posture|
+    label = posture ? "#{name} (#{posture.capitalize})" : name
+    UI.message("▶ #{label}: starting")
+
+    # Boot and wait until it's usable.
+    system("xcrun", "simctl", "boot", udid, out: File::NULL, err: File::NULL)
+    system("xcrun", "simctl", "bootstatus", udid, "-b", out: File::NULL)
+
+    set_posture(udid, posture) if posture
+
+    # A clean status bar: 9:41, full battery, full signal. The tour sets
+    # the appearance itself for each capture.
+    system("xcrun simctl status_bar #{udid} override " \
+           "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
+           "--cellularMode active --operatorName '' --cellularBars 4 " \
+           "--batteryState charged --batteryLevel 100", out: File::NULL, err: File::NULL)
+
+    # Clear this device's leftovers so passes don't mix (the Duo's two
+    # postures share a simulator name).
+    FileUtils.rm_f(Dir.glob("#{SCREENSHOT_SRC}/*/#{name}-*"))
+
+    # Run the test with the explicit xctestrun manifest.
+    # This installs all DependentProductPaths (including birch.app)
+    # automatically — works around the Xcode 26 bug where
+    # `xcodebuild build test` / `test-without-building -scheme` fail to
+    # install the host app.
+    log = "#{PASS_LOGS}/#{label}.log"
+    result = "#{PASS_LOGS}/#{label}.xcresult"
+    FileUtils.rm_rf(result)
+    command = "xcodebuild test-without-building " \
+              "-xctestrun '#{xctestrun_path}' " \
+              "-destination 'id=#{udid}' " \
+              "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
+              "-parallel-testing-enabled NO " \
+              "-resultBundlePath '#{result}' " \
+              "> '#{log}' 2>&1"
+    started = Time.now
+    passed = if posture == "open"
+               run_tour_with_host_capture(command, udid, name)
+             else
+               system(command)
+             end
+    seconds = Time.now - started
+    PASS_TIMES_LOCK.synchronize { PASS_TIMES[label] = [seconds, passed] }
+    if passed
+      UI.success("✓ #{label}: tour took #{seconds.round}s")
+    else
+      UI.error("✗ #{label}: tour failed after #{seconds.round}s. Log: #{log}")
+      File.foreach(log).grep(/error: -\[|failed \(/).first(5).each { |line| UI.error("  #{line.strip}") }
     end
 
+    # Collect screenshots into the output directory. SnapshotHelper names
+    # files after the simulator, so tag the Duo's with its posture.
+    APPEARANCES.each do |mode|
+      output_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
+      FileUtils.mkdir_p(output_dir)
+      Dir.glob("#{SCREENSHOT_SRC}/#{mode}/#{name}-*.png").each do |src|
+        dest = File.basename(src)
+        dest = dest.sub(/\A#{Regexp.escape(name)}-/, "#{label}-") if posture
+        FileUtils.cp(src, File.join(output_dir, dest))
+      end
+    end
+
+    # Reset status bar and shut down
+    system("xcrun", "simctl", "status_bar", udid, "clear", out: File::NULL, err: File::NULL)
+    system("xcrun", "simctl", "shutdown", udid, out: File::NULL, err: File::NULL)
+  end
+end
+
+platform :ios do
+  desc "Capture App Store + marketing screenshots (dark and light in one tour per device)"
+  #   fastlane screenshots                                   # every device
+  #   fastlane screenshots only:"iPhone Duo"                 # rerun one device, keep the rest
+  #   fastlane screenshots only:"iPhone 17 Pro,iPhone Duo"   # several devices
+  #   fastlane screenshots frame:false                       # skip framing (quick iteration)
+  #   fastlane screenshots parallel:1                        # one simulator at a time
+  lane :screenshots do |options|
+    devices = DEVICES
+    only = options[:only].to_s.split(",").map(&:strip).reject(&:empty?)
+    unless only.empty?
+      unknown = only - DEVICES.keys
+      UI.user_error!("Unknown device '#{unknown.join("', '")}'. Choose from: #{DEVICES.keys.join(', ')}") unless unknown.empty?
+      devices = DEVICES.select { |name, _| only.include?(name) }
+    end
+    frame = options[:frame].to_s != "false"
+    # Four at a time measured fastest (11.5 min vs 14.7 with three): the Duo's
+    # two back-to-back passes become the longest chain.
+    parallel = [(options[:parallel] || 4).to_i, 1].max
+    lane_started = Time.now
+
     # ── 0. Clear previous output so stale files don't accumulate ────────
-    if options[:only]
-      # Only this device's captures, bare and framed.
-      Dir.glob(File.expand_path("screenshots/{dark,light}/**/#{options[:only]}*.png", __dir__)).each { |f| FileUtils.rm_f(f) }
+    if !only.empty?
+      # Only these devices' captures, bare and framed.
+      only.each do |name|
+        Dir.glob(File.expand_path("screenshots/{dark,light}/**/#{name}*.png", __dir__)).each { |f| FileUtils.rm_f(f) }
+      end
     else
       FileUtils.rm_rf(File.expand_path("screenshots/dark", __dir__))
       FileUtils.rm_rf(File.expand_path("screenshots/light", __dir__))
@@ -116,7 +294,7 @@ platform :ios do
     end
 
     # Shut down any simulators left booted (e.g. from a manual test run) so the
-    # per-device appearance/status-bar overrides in run_screenshot_pass apply to
+    # per-device status-bar overrides in run_device_passes apply to
     # the right device. Belt-and-suspenders alongside targeting by UDID.
     sh("xcrun simctl shutdown all 2>/dev/null || true")
 
@@ -135,11 +313,15 @@ platform :ios do
        "-parallel-testing-enabled NO " \
        "| xcpretty")
 
-    # ── 2. Dark mode ────────────────────────────────────────────────────
-    run_screenshot_pass(mode: "dark", devices: devices)
+    # ── 2. One tour per device: SnapshotHelper captures every shot in dark
+    #       and then light, so a single pass covers both appearances. Up to
+    #       `parallel` devices run at once; the tour waits on the Electrum
+    #       sync rather than sleeping, so a slower shared sync is fine ─────
+    UI.header("Tours on #{devices.size} device(s), #{parallel} at a time")
+    run_screenshot_passes(devices, parallel)
 
-    # ── 3. Light mode ───────────────────────────────────────────────────
-    run_screenshot_pass(mode: "light", devices: devices)
+    report_pass_times(lane_started)
+    next unless frame
 
     # ── 4. Prep captures for frameit ────────────────────────────────────
     # frameit gem 2.232.2 hardcodes its device list. scripts/patch-frameit.rb
@@ -183,9 +365,8 @@ platform :ios do
       end
     end
 
-    # ── 5. Frame both passes via frameit (11 Pro Max + 17 Pro Max) ─────
-    frameit(path: "./fastlane/screenshots/dark",  use_platform: "IOS")
-    frameit(path: "./fastlane/screenshots/light", use_platform: "IOS")
+    # ── 5. Frame via frameit (17 Pro Max, 17 Pro, 11 Pro Max) ───────────
+    frame_in_parallel
 
     # ── 6. Restore original names and separate framed into subfolder ───
     ["dark", "light"].each do |mode|
@@ -209,14 +390,17 @@ platform :ios do
       framed_dir = File.expand_path("screenshots/#{mode}/framed", __dir__)
       mode_holding = "#{thirteen_mini_holding}/#{mode}"
 
-      Dir.glob("#{mode_holding}/*.png").each do |src|
-        base  = File.basename(src, ".png")
-        framed = "#{framed_dir}/#{base}_framed.png"
-        sh("magick '#{mini_frame}' \\( '#{src}' -resize 1086x2353! \\) " \
-           "-gravity center -composite '#{framed}'")
-        # Restore bare capture to en-US/ for the normal bare output tree
-        FileUtils.mv(src, "#{src_dir}/#{base}.png")
+      composites = Dir.glob("#{mode_holding}/*.png").map do |src|
+        base = File.basename(src, ".png")
+        -> {
+          system("magick", mini_frame, "(", src, "-resize", "1086x2353!", ")",
+                 "-gravity", "center", "-composite", "#{framed_dir}/#{base}_framed.png") ||
+            UI.error("Could not frame #{base}")
+          # Restore bare capture to en-US/ for the normal bare output tree
+          FileUtils.mv(src, "#{src_dir}/#{base}.png")
+        }
       end
+      run_concurrently(composites, 8)
     end
     FileUtils.rm_rf(thirteen_mini_holding)
 
@@ -231,68 +415,5 @@ platform :ios do
       end
     end
     FileUtils.rm_rf(ipad_holding)
-  end
-
-  # ────────────────────────────────────────────────────────────────────────
-  private_lane :run_screenshot_pass do |options|
-    mode    = options[:mode]  # "dark" or "light"
-
-    options[:devices].each do |name, config|
-      udid = resolve_udid(name, config[:runtime])
-
-      (config[:postures] || [nil]).each do |posture|
-        label = posture ? "#{name} (#{posture.capitalize})" : name
-        UI.header("#{mode} mode — #{label}")
-
-        # Boot and wait until it's usable.
-        sh("xcrun simctl boot #{udid} 2>/dev/null || true")
-        sh("xcrun simctl bootstatus #{udid} -b > /dev/null")
-        sleep(5) # let SpringBoard settle
-
-        set_posture(udid, posture) if posture
-
-        # Appearance and a clean status bar: 9:41, full battery, full signal.
-        sh("xcrun simctl ui #{udid} appearance #{mode}")
-        sh("xcrun simctl status_bar #{udid} override " \
-           "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
-           "--cellularMode active --operatorName '' --cellularBars 4 " \
-           "--batteryState charged --batteryLevel 100 2>/dev/null || true")
-
-        # Clear previous screenshots from the cache so we don't mix passes
-        FileUtils.rm_rf(SCREENSHOT_SRC)
-        FileUtils.mkdir_p(SCREENSHOT_SRC)
-
-        # Run the test with the explicit xctestrun manifest.
-        # This installs all DependentProductPaths (including birch.app)
-        # automatically — works around the Xcode 26 bug where
-        # `xcodebuild build test` / `test-without-building -scheme` fail to
-        # install the host app.
-        command = "xcodebuild test-without-building " \
-                  "-xctestrun '#{xctestrun_path}' " \
-                  "-destination 'id=#{udid}' " \
-                  "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
-                  "-parallel-testing-enabled NO"
-        passed = if posture == "open"
-                   run_tour_with_host_capture(command, udid)
-                 else
-                   system(command)
-                 end
-        UI.error("Test failed on #{label} (#{mode} mode)") unless passed
-
-        # Collect screenshots into the output directory. SnapshotHelper names
-        # files after the simulator, so tag the Duo's with its posture.
-        output_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
-        FileUtils.mkdir_p(output_dir)
-        Dir.glob("#{SCREENSHOT_SRC}/*.png").each do |src|
-          dest = File.basename(src)
-          dest = dest.sub(/\A#{Regexp.escape(name)}-/, "#{label}-") if posture
-          FileUtils.cp(src, File.join(output_dir, dest))
-        end
-
-        # Reset status bar and shut down
-        sh("xcrun simctl status_bar #{udid} clear 2>/dev/null || true")
-        sh("xcrun simctl shutdown #{udid} 2>/dev/null || true")
-      end
-    end
   end
 end

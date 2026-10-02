@@ -20,7 +20,12 @@ final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws {
     continueAfterFailure = false
     app = XCUIApplication()
-    app.launchArguments += ["-UITesting"]
+    // Animations off: every step settles immediately, so XCTest's idle wait
+    // after each tap is short. birchUITests.swift keeps real animations.
+    // Fiat display on from launch (Constants.fiatEnabledKey; the argument
+    // domain survives -UITesting's UserDefaults wipe), so the tour needn't
+    // toggle it in Settings first.
+    app.launchArguments += ["-UITesting", "-DisableAnimations", "-fiatEnabled", "YES"]
   }
 
   override func tearDownWithError() throws {
@@ -43,7 +48,21 @@ final class ScreenshotTests: XCTestCase {
     } else {
       app.swipeDown()
     }
-    sleep(1)
+    waitForKeyboardToHide()
+  }
+
+  /// Waits up to `timeout` for the keyboard to go away. Returns false if it
+  /// is still showing.
+  @discardableResult
+  private func waitForKeyboardToHide(timeout: TimeInterval = 3) -> Bool {
+    let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+    return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
+  }
+
+  /// A short pause before a capture, for the last frame of layout to land.
+  /// Animations are off in the tour, so this needn't cover a transition.
+  private func settle() {
+    usleep(300_000)
   }
 
   /// On iPad a numeric keypad floats as a popover, and dismissing a sheet hands
@@ -54,7 +73,7 @@ final class ScreenshotTests: XCTestCase {
     let region = app.otherElements["PopoverDismissRegion"].firstMatch
     guard app.keyboards.firstMatch.exists, region.waitForExistence(timeout: 1) else { return }
     region.tap()
-    sleep(1)
+    waitForKeyboardToHide()
   }
 
   /// Pops the current navigation stack by tapping the system back button,
@@ -81,6 +100,14 @@ final class ScreenshotTests: XCTestCase {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch
   }
 
+  /// Captures without fastlane's status-bar spinner wait (the lane overrides
+  /// the status bar, so there is never a spinner) or its fixed one-second
+  /// animation sleep (setupSnapshot turns that off below).
+  @MainActor
+  private func snapshot(_ name: String) {
+    Snapshot.snapshot(name, timeWaitingForIdle: 0)
+  }
+
   private func tabButton(_ name: String) -> XCUIElement {
     if app.tabBars.firstMatch.exists {
       return app.tabBars.buttons[name]
@@ -90,7 +117,7 @@ final class ScreenshotTests: XCTestCase {
 
   @MainActor
   func testScreenshotTour() {
-    setupSnapshot(app)
+    setupSnapshot(app, waitForAnimations: false)
     app.launch()
 
     // MARK: 01 - Welcome
@@ -104,7 +131,7 @@ final class ScreenshotTests: XCTestCase {
 
     let walletSetupTitle = app.staticTexts["Wallet Setup"]
     XCTAssertTrue(walletSetupTitle.waitForExistence(timeout: 3), "Wallet Setup screen should appear")
-    sleep(1)
+    settle()
     snapshot("02-Wallet-Setup")
 
     // MARK: Walk the descriptor-import flow to reach a loaded wallet.
@@ -137,8 +164,14 @@ final class ScreenshotTests: XCTestCase {
       textEditor.typeText(testDescriptor)
     }
 
-    // Dismiss keyboard by tapping a non-field area
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+    // Dismiss the keyboard by tapping the subtitle: the screen's content
+    // resigns focus on tap, but the top of the window is the wizard's progress
+    // header, which doesn't, and the system's "pasted from" banner covers the
+    // title. The shot needs the keyboard gone, because one that is already on
+    // screen keeps its dark appearance when the light copy is taken.
+    app.staticTexts["Paste or scan a multisig output descriptor"].firstMatch.tap()
+    XCTAssertTrue(waitForKeyboardToHide(), "Keyboard should be dismissed before 03")
+    // The system's "pasted from" banner is still fading out; let it clear.
     sleep(1)
 
     // MARK: 03 - Descriptor Import (filled)
@@ -170,44 +203,13 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(createButton.waitForExistence(timeout: 3), "Create Wallet button should exist")
     createButton.tap()
 
-    // Wait for the main Transactions tab to render with a balance, then let
-    // Electrum sync catch up so the balance/tx list aren't stuck at zero.
+    // Wait for the main Transactions tab, then for the Electrum sync to land
+    // (the first transaction row) and the fiat rates (the balance's fiat line).
     let balanceExists = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'sats'")).firstMatch
     XCTAssertTrue(balanceExists.waitForExistence(timeout: 15), "Main screen should appear after wallet creation")
-    sleep(12)
-
-    // Enable "Show Fiat Price" in Settings before capturing Transactions
-    let settingsTabEarly = tabButton("Settings")
-    XCTAssertTrue(settingsTabEarly.waitForExistence(timeout: 5), "Settings tab should exist")
-    settingsTabEarly.tap()
-    sleep(1)
-
-    let fiatToggle = app.switches["showFiatPriceToggle"]
-    XCTAssertTrue(fiatToggle.waitForExistence(timeout: 5), "Show Fiat Price toggle should exist in Settings")
-    // Tap near the trailing edge of the row where the switch thumb lives. A
-    // plain fiatToggle.tap() lands in the center of the accessibility frame,
-    // which for a full-width Toggle row hits the label, not the control. The
-    // 0.95 offset puts the tap on the switch on both iPhone and the much wider
-    // iPad row (where the switch sits ~960pt out in a 992pt-wide frame).
-    // Prefer the switch's own element where the OS exposes one: on the open
-    // iPhone Duo the row's frame doesn't put the switch at the 0.95 offset.
-    let toggleSwitch = fiatToggle.switches.firstMatch
-    let toggleThumb = toggleSwitch.exists
-      ? toggleSwitch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-      : fiatToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
-    if fiatToggle.value as? String == "0" {
-      toggleThumb.tap()
-      sleep(1)
-    }
-    XCTAssertEqual(fiatToggle.value as? String, "1", "Show Fiat Price toggle should be on after tap")
-
-    // Return to Transactions tab
-    let transactionsTabEarly = tabButton("Transactions")
-    XCTAssertTrue(transactionsTabEarly.waitForExistence(timeout: 5), "Transactions tab should exist")
-    transactionsTabEarly.tap()
-    // Give the fiat rates fetch (kicked off when the toggle flipped) time to
-    // complete so the balance hero renders the secondary fiat line.
-    sleep(5)
+    XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 45), "Transactions should appear once the wallet syncs")
+    XCTAssertTrue(app.staticTexts["balanceFiat"].waitForExistence(timeout: 20), "Balance should show its fiat value")
+    settle()
 
     // MARK: 04 - Transactions (balance hero + tx list)
 
@@ -220,11 +222,10 @@ final class ScreenshotTests: XCTestCase {
       walletPicker.tap()
       let walletsTitle = app.staticTexts["Wallets"]
       XCTAssertTrue(walletsTitle.waitForExistence(timeout: 3), "Wallet picker overlay should appear")
-      sleep(1)
+      settle()
       snapshot("05-WalletPicker")
       // Dismiss by tapping the wallet picker button again
       walletPicker.tap()
-      sleep(1)
     }
 
     // MARK: 06 - Transaction Detail (tap first received transaction)
@@ -236,11 +237,10 @@ final class ScreenshotTests: XCTestCase {
       let sentLabel = app.staticTexts["Sent"]
       let detailAppeared = receivedLabel.waitForExistence(timeout: 5) || sentLabel.waitForExistence(timeout: 2)
       XCTAssertTrue(detailAppeared, "Transaction detail should show Received or Sent label")
-      sleep(1)
+      settle()
       snapshot("06-TransactionDetail")
       // Go back to transaction list
       navigateBack()
-      sleep(1)
     }
 
     // MARK: 07 - Dashboard sheet (via "..." overflow menu)
@@ -251,8 +251,8 @@ final class ScreenshotTests: XCTestCase {
       let dashboardMenuItem = app.buttons["Dashboard"]
       if dashboardMenuItem.waitForExistence(timeout: 3) {
         dashboardMenuItem.tap()
-        // Give the sheet a beat to animate in.
-        sleep(1)
+        // Let the sheet finish laying out.
+        settle()
         snapshot("07-Dashboard")
         // Dismiss the sheet by swiping the window down.
         app.windows.firstMatch.swipeDown(velocity: .fast)
@@ -285,7 +285,6 @@ final class ScreenshotTests: XCTestCase {
       snapshot("10-AddressDetail")
       // Go back to address list
       navigateBack()
-      sleep(1)
     }
 
     // MARK: 11 - Send (lands on recipients step)
@@ -305,7 +304,7 @@ final class ScreenshotTests: XCTestCase {
     utxosTab.tap()
     let utxosHeader = app.staticTexts["UTXOs"]
     XCTAssertTrue(utxosHeader.waitForExistence(timeout: 5), "UTXOs header should appear")
-    sleep(1)
+    settle()
     snapshot("12-UTXOs")
 
     // MARK: 13 - UTXO Detail (tap first UTXO)
@@ -318,7 +317,6 @@ final class ScreenshotTests: XCTestCase {
       snapshot("13-UTXODetail")
       // Go back to UTXO list
       navigateBack()
-      sleep(1)
     }
 
     // MARK: 14 - Settings
@@ -326,7 +324,7 @@ final class ScreenshotTests: XCTestCase {
     let settingsTab = tabButton("Settings")
     XCTAssertTrue(settingsTab.waitForExistence(timeout: 5), "Settings tab should exist")
     settingsTab.tap()
-    sleep(1)
+    settle()
     snapshot("14-Settings")
 
     // MARK: Navigate to Transactions and open wallet picker
@@ -334,14 +332,12 @@ final class ScreenshotTests: XCTestCase {
     let transactionsTab = tabButton("Transactions")
     XCTAssertTrue(transactionsTab.waitForExistence(timeout: 5), "Transactions tab should exist")
     transactionsTab.tap()
-    sleep(1)
 
     let walletPickerBtn = barItem("walletPicker")
     XCTAssertTrue(walletPickerBtn.waitForExistence(timeout: 3), "Wallet picker button should exist")
     walletPickerBtn.tap()
     let walletsTitleAdd = app.staticTexts["Wallets"]
     XCTAssertTrue(walletsTitleAdd.waitForExistence(timeout: 3), "Wallet picker overlay should appear")
-    sleep(1)
 
     let addWalletBtn = app.buttons["Add"]
     XCTAssertTrue(addWalletBtn.waitForExistence(timeout: 3), "Add button should exist in wallet picker")
@@ -361,14 +357,14 @@ final class ScreenshotTests: XCTestCase {
 
     let multisigTitle = app.staticTexts["Multisig Configuration"]
     XCTAssertTrue(multisigTitle.waitForExistence(timeout: 5), "Multisig Configuration screen should appear")
-    sleep(1)
+    settle()
     snapshot("15-MultisigConfig-Testnet4")
 
     // Switch to Mainnet
     let mainnetSegBtn = app.segmentedControls.firstMatch.buttons["Mainnet"]
     XCTAssertTrue(mainnetSegBtn.waitForExistence(timeout: 3), "Mainnet segment button should exist")
     mainnetSegBtn.tap()
-    sleep(1)
+    settle()
 
     // MARK: 16 - Multisig Configuration (Mainnet)
 
@@ -378,7 +374,6 @@ final class ScreenshotTests: XCTestCase {
     let testnet4SegBtn = app.segmentedControls.firstMatch.buttons["Testnet4"]
     XCTAssertTrue(testnet4SegBtn.waitForExistence(timeout: 3), "Testnet4 segment button should exist")
     testnet4SegBtn.tap()
-    sleep(1)
 
     // Advance to cosigner import
     let multisigNextBtn = app.buttons["Next"]
@@ -389,7 +384,7 @@ final class ScreenshotTests: XCTestCase {
 
     let cosignerImportTitle = app.staticTexts["Import Cosigners"]
     XCTAssertTrue(cosignerImportTitle.waitForExistence(timeout: 5), "Import Cosigners screen should appear")
-    sleep(1)
+    settle()
     snapshot("17-CosignerImport-Empty")
 
     // MARK: Fill Cosigner 1
@@ -412,7 +407,8 @@ final class ScreenshotTests: XCTestCase {
     xpubEditor1.typeText("tpubDE2gU1F6b1GXDg2bFjeq6RUnBmAe2moTNG7x47Cga3VnVnm7EJWLdJE73ZL2MEwKTc2dLNeSudXUjexm2xJ5qboosbnEb1SEiGyJtJcqqZK")
     // Dismiss keyboard by tapping a non-field area
     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
-    sleep(1)
+    waitForKeyboardToHide()
+    settle()
 
     // MARK: 18 - Cosigner 1 Filled (no keyboard)
 
@@ -421,7 +417,7 @@ final class ScreenshotTests: XCTestCase {
     let nextCosignerBtn1 = app.buttons["Next Cosigner"]
     XCTAssertTrue(nextCosignerBtn1.waitForExistence(timeout: 3), "Next Cosigner button should exist")
     nextCosignerBtn1.tap()
-    sleep(1)
+    XCTAssertTrue(app.staticTexts["Cosigner 2 of 3"].waitForExistence(timeout: 3), "Should have advanced to Cosigner 2 of 3")
 
     // MARK: Fill Cosigner 2
 
@@ -439,12 +435,11 @@ final class ScreenshotTests: XCTestCase {
     // starts the sheet-dismiss gesture, leaving the sheet in a partially-
     // dragged state where the subsequent "Next Cosigner" tap fails to advance.
     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
-    sleep(1)
+    waitForKeyboardToHide()
 
     let nextCosignerBtn2 = app.buttons["Next Cosigner"]
     XCTAssertTrue(nextCosignerBtn2.waitForExistence(timeout: 3), "Next Cosigner button should exist for cosigner 2")
     nextCosignerBtn2.tap()
-    sleep(1)
 
     // MARK: Fill Cosigner 3
 
@@ -465,7 +460,8 @@ final class ScreenshotTests: XCTestCase {
     xpubEditor3.typeText("tpubDF3GwUrMb5WkigsDUpUWUADH55G3Ez771QujmFqeyrNEPD7onkqTwCsCEjNRbSrbD9VYKDfMHfg7bajem5aEX7CyMp2q5fvQzacy75bUesQ")
     // Dismiss keyboard by tapping a non-field area
     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
-    sleep(1)
+    waitForKeyboardToHide()
+    settle()
 
     // MARK: 19 - Cosigner 3 Filled (no keyboard)
 
@@ -484,7 +480,8 @@ final class ScreenshotTests: XCTestCase {
     newWalletNameField.tap()
     newWalletNameField.typeText("My New Wallet")
     app.swipeDown()
-    sleep(1)
+    waitForKeyboardToHide()
+    settle()
     snapshot("20-WalletName")
 
     let walletNameNextBtn = app.buttons["Next"]
@@ -495,7 +492,7 @@ final class ScreenshotTests: XCTestCase {
 
     let verifyWalletTitle = app.staticTexts["Verify Wallet"]
     XCTAssertTrue(verifyWalletTitle.waitForExistence(timeout: 30), "Verify Wallet screen should appear")
-    sleep(2)
+    sleep(1)
     snapshot("21-VerifyWallet-Top")
 
     // Scroll up a controlled amount to land at the "Back Up Your Descriptor"
@@ -526,7 +523,9 @@ final class ScreenshotTests: XCTestCase {
     // MARK: 24 - New Wallet syncing
 
     // Capture the transaction screen ~3 seconds into the sync (sheet animates
-    // away in ~1s, then sync starts — total sleep of 4s lands mid-sync).
+    // away in ~1s, then sync starts). snapshot() no longer waits on its own,
+    // so hold here to keep landing mid-sync.
+    sleep(2)
     snapshot("24-NewWalletLoading")
 
     // MARK: - Send Flow Screenshots
@@ -536,13 +535,11 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(sendTabFlow.waitForExistence(timeout: 5), "Send tab should exist")
     sendTabFlow.tap()
     _ = app.staticTexts["Send"].waitForExistence(timeout: 5)
-    sleep(1)
 
     // Dismiss any resume signing card if present
     let noBtn = app.buttons["No"]
     if noBtn.waitForExistence(timeout: 2) {
       noBtn.tap()
-      sleep(1)
     }
 
     // MARK: Fill Recipient 1
@@ -581,14 +578,13 @@ final class ScreenshotTests: XCTestCase {
     let feeRow = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Fee'")).firstMatch
     XCTAssertTrue(feeRow.waitForExistence(timeout: 3), "Fee row should exist")
     feeRow.tap()
-    sleep(1)
 
     // MARK: 25 - Network Fee sheet (Fast preset selected)
 
     let fastOption = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Fast'")).firstMatch
     XCTAssertTrue(fastOption.waitForExistence(timeout: 3), "Fast fee option should exist")
     fastOption.tap()
-    sleep(1)
+    settle()
     snapshot("25-NetworkFee-Fast")
 
     // Custom fee — the rate is a button that both selects Custom and opens the
@@ -599,24 +595,23 @@ final class ScreenshotTests: XCTestCase {
     let customRateButton = app.buttons.matching(NSPredicate(format: "label MATCHES '^[0-9.]+$'")).firstMatch
     XCTAssertTrue(customRateButton.waitForExistence(timeout: 3), "Custom rate control should exist")
     customRateButton.tap()
-    sleep(1)
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3), "Custom rate keypad should appear")
 
     // The entry field takes focus on appear and opens pre-filled with the
     // current rate, so clear it before typing rather than appending.
     app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8))
     app.typeText("0.51")
-    sleep(1)
 
     // Commit the sheet — there is no inline card left to collapse.
     let useFeeButton = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use '")).firstMatch
     XCTAssertTrue(useFeeButton.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
     useFeeButton.tap()
-    sleep(1)
+    settle()
     // On iPad the decimal pad floats as a popover, and the first tap outside it
     // only dismisses the keypad, so the sheet is still up. Tap again to commit.
     if useFeeButton.exists, useFeeButton.isHittable {
       useFeeButton.tap()
-      sleep(1)
+      settle()
     }
     dismissKeypadPopover(app)
 
@@ -625,13 +620,13 @@ final class ScreenshotTests: XCTestCase {
     // Reopen so the custom rate shows in the priced list rather than mid-entry
     // — the typing layout covers the rows with the keypad.
     feeRow.tap()
-    sleep(1)
+    settle()
     snapshot("26-NetworkFee-Custom")
 
     let closeFeeSheet = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use '")).firstMatch
     XCTAssertTrue(closeFeeSheet.waitForExistence(timeout: 3), "Fee sheet commit button should exist")
     closeFeeSheet.tap()
-    sleep(1)
+    settle()
     dismissKeypadPopover(app)
 
     // MARK: 27 - Send Recipients Filled
@@ -647,7 +642,7 @@ final class ScreenshotTests: XCTestCase {
     // Wait for the Review Transaction screen
     let reviewTitle = app.staticTexts["Review Transaction"]
     XCTAssertTrue(reviewTitle.waitForExistence(timeout: 15), "Review Transaction screen should appear")
-    sleep(1)
+    settle()
 
     // MARK: 28 - Review Transaction (top)
 
@@ -670,13 +665,12 @@ final class ScreenshotTests: XCTestCase {
     let inputSection = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Input 0'")).firstMatch
     XCTAssertTrue(inputSection.waitForExistence(timeout: 10), "Input 0 section should appear in the inspector")
     inputSection.tap()
-    sleep(1)
 
     // Open the witness script row so its definition shows
     let witnessScriptRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'witness_script'")).firstMatch
     XCTAssertTrue(witnessScriptRow.waitForExistence(timeout: 3), "witness_script row should exist in Input 0")
     witnessScriptRow.tap()
-    sleep(1)
+    settle()
 
     // MARK: 30 - PSBT Inspector (Input 0, witness_script open)
 
@@ -686,7 +680,6 @@ final class ScreenshotTests: XCTestCase {
     let inspectorDone = app.buttons["Done"]
     XCTAssertTrue(inspectorDone.waitForExistence(timeout: 3), "Inspector Done button should exist")
     inspectorDone.tap()
-    sleep(1)
 
     // Tap "Show QR for Signing"
     let showQRBtn = app.buttons["Show QR for Signing"]
@@ -696,7 +689,7 @@ final class ScreenshotTests: XCTestCase {
     // Wait for the PSBT Display / signing QR screen
     let scanSignedBtn = app.buttons["Scan Signed PSBT"]
     XCTAssertTrue(scanSignedBtn.waitForExistence(timeout: 15), "Scan Signed PSBT button should appear on QR display")
-    sleep(2)
+    sleep(1)
 
     // MARK: 31 - PSBT QR Display (animated QR showing)
 
@@ -706,7 +699,7 @@ final class ScreenshotTests: XCTestCase {
     let advancedToggle = app.staticTexts["Advanced"]
     XCTAssertTrue(advancedToggle.waitForExistence(timeout: 3), "Advanced disclosure group should exist")
     advancedToggle.tap()
-    sleep(1)
+    settle()
 
     // Quarter-scroll to show Advanced settings below the QR
     let qtrStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
@@ -726,7 +719,7 @@ final class ScreenshotTests: XCTestCase {
     // Wait for the Scan Signed PSBT screen
     let scanTitle = app.staticTexts["Scan Signed PSBT"]
     XCTAssertTrue(scanTitle.waitForExistence(timeout: 5), "Scan Signed PSBT screen should appear")
-    sleep(1)
+    settle()
 
     // MARK: 33 - Scan Signed PSBT Screen
 
@@ -736,7 +729,6 @@ final class ScreenshotTests: XCTestCase {
     let backToQR = app.buttons["Back to QR Display"]
     XCTAssertTrue(backToQR.waitForExistence(timeout: 3), "Back to QR Display button should exist")
     backToQR.tap()
-    sleep(1)
 
     // Tap "Save PSBT"
     let savePSBTBtn = app.buttons["Save PSBT"]
@@ -746,7 +738,7 @@ final class ScreenshotTests: XCTestCase {
     // Wait for the Save PSBT alert to appear
     let saveAlert = app.alerts["Save PSBT"]
     XCTAssertTrue(saveAlert.waitForExistence(timeout: 5), "Save PSBT alert should appear")
-    sleep(1)
+    settle()
 
     // MARK: 34 - Save PSBT Dialog
 

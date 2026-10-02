@@ -275,6 +275,7 @@ struct TransactionListView: View {
               Text(fiatStr)
                 .font(.hbAmountLarge)
                 .foregroundStyle(Color.hbTextPrimary)
+                .accessibilityIdentifier("balanceFiat")
               Text(viewModel.balance.formattedSats)
                 .font(.hbBody(14))
                 .foregroundStyle(Color.hbTextSecondary)
@@ -286,6 +287,7 @@ struct TransactionListView: View {
                 Text(fiatStr)
                   .font(.hbBody(14))
                   .foregroundStyle(Color.hbTextSecondary)
+                  .accessibilityIdentifier("balanceFiat")
               }
             }
           }
