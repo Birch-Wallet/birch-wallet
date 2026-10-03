@@ -1,6 +1,7 @@
 @testable import birch
 import Foundation
 import Testing
+import URKit
 
 struct URServiceTests {
   @Test func psbtURRoundTrip() throws {
@@ -286,5 +287,65 @@ struct URServiceTests {
 
     // Should have extracted the P2WSH multisig key (script type 2')
     #expect(derivationPath.hasSuffix("/2'"), "Should prefer BIP48 P2WSH derivation path ending in /2', got: \(derivationPath)")
+  }
+
+  // MARK: - Out-of-range CBOR integers
+
+  /// A crypto-hdkey UR for m/48'/1'/0'/2'. Each override replaces one field
+  /// with a value too large for its type.
+  private func hdKeyUR(
+    depth: UInt64 = 4,
+    sourceFingerprint: UInt64 = 0x7A13_A7B1,
+    parentFingerprint: UInt64 = 0x1234_5678,
+    lastIndex: UInt64 = 2
+  ) throws -> UR {
+    var keypath = Map()
+    keypath.insert(CBOR.unsigned(1), CBOR.array([
+      .unsigned(48), .simple(.true), .unsigned(1), .simple(.true),
+      .unsigned(0), .simple(.true), .unsigned(lastIndex), .simple(.true),
+    ]))
+    keypath.insert(CBOR.unsigned(2), CBOR.unsigned(sourceFingerprint))
+    keypath.insert(CBOR.unsigned(3), CBOR.unsigned(depth))
+
+    var hdKey = Map()
+    hdKey.insert(CBOR.unsigned(3), CBOR.bytes(Data([0x02] + [UInt8](repeating: 0x11, count: 32))))
+    hdKey.insert(CBOR.unsigned(4), CBOR.bytes(Data(repeating: 0x22, count: 32)))
+    hdKey.insert(CBOR.unsigned(6), CBOR.tagged(Tag(304), CBOR.map(keypath)))
+    hdKey.insert(CBOR.unsigned(8), CBOR.unsigned(parentFingerprint))
+    return try UR(type: "crypto-hdkey", cbor: CBOR.map(hdKey))
+  }
+
+  @Test func hdKeyInRangeStillParses() throws {
+    let result = try URService.parseHDKey(from: hdKeyUR())
+    #expect(result.fingerprint == "7a13a7b1")
+    #expect(result.derivationPath == "m/48'/1'/0'/2'")
+    #expect(!result.xpub.isEmpty)
+  }
+
+  @Test func hdKeyRejectsOutOfRangeDepth() throws {
+    let ur = try hdKeyUR(depth: 300)
+    #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
+  }
+
+  @Test func hdKeyRejectsOutOfRangeParentFingerprint() throws {
+    let ur = try hdKeyUR(parentFingerprint: 1 << 40)
+    #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
+  }
+
+  @Test func hdKeyRejectsOutOfRangeSourceFingerprint() throws {
+    let ur = try hdKeyUR(sourceFingerprint: 1 << 40)
+    #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
+  }
+
+  @Test func hdKeyRejectsChildIndexWithHardenedBitSet() throws {
+    let ur = try hdKeyUR(lastIndex: 1 << 31)
+    #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
+  }
+
+  @Test func processURReportsBadKeyInsteadOfCrashing() throws {
+    let result = try URService.processUR(hdKeyUR(depth: UInt64.max))
+    if case .hdKey = result {
+      Issue.record("An out-of-range depth must not produce a key")
+    }
   }
 }

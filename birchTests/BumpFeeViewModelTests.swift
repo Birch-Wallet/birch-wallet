@@ -120,4 +120,18 @@ struct BumpFeeViewModelTests {
     vm.newFeeRate = "1"
     #expect(vm.isValidFeeRate == true, "Any rate > 0 is valid without original")
   }
+
+  @Test func feeRateAboveMaximumIsInvalid() {
+    let vm = BumpFeeViewModel(transaction: makeTransaction())
+
+    vm.newFeeRate = "10000"
+    #expect(vm.isValidFeeRate == true, "The maximum itself is allowed")
+
+    vm.newFeeRate = "20000"
+    #expect(vm.isValidFeeRate == false)
+    #expect(vm.feeRateValue == 0)
+
+    vm.newFeeRate = String(repeating: "9", count: 400)
+    #expect(vm.isValidFeeRate == false, "A huge rate must not parse to infinity")
+  }
 }

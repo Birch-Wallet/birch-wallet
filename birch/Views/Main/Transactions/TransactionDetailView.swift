@@ -103,6 +103,7 @@ struct TransactionDetailView: View {
           if isEditingLabel {
             TextField("Add a label...", text: $editedLabel)
               .font(.hbBody())
+              .labelLengthLimit($editedLabel)
               .padding(10)
               .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
@@ -370,10 +371,7 @@ struct TransactionDetailView: View {
 
   private func saveLabel() {
     guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
-    var trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.utf8.count > WalletLabel.maxLabelLength {
-      trimmed = String(trimmed.utf8.prefix(WalletLabel.maxLabelLength))!
-    }
+    let trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines).truncatedLabel
     let txid = transaction.id
     let descriptor = FetchDescriptor<WalletLabel>(predicate: #Predicate {
       $0.walletID == walletID && $0.type == "tx" && $0.ref == txid

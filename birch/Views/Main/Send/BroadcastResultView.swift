@@ -198,11 +198,8 @@ struct BroadcastResultView: View {
     guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
     var firstLabel: String?
     for recipient in viewModel.recipients {
-      var trimmed = recipient.label.trimmingCharacters(in: .whitespacesAndNewlines)
+      let trimmed = recipient.label.trimmingCharacters(in: .whitespacesAndNewlines).truncatedLabel
       guard !trimmed.isEmpty else { continue }
-      if trimmed.utf8.count > WalletLabel.maxLabelLength {
-        trimmed = String(trimmed.utf8.prefix(WalletLabel.maxLabelLength))!
-      }
       if firstLabel == nil {
         firstLabel = trimmed
       }

@@ -44,7 +44,7 @@ struct SendFeeSheetView: View {
   }
 
   private var draftRateValue: Double {
-    Double(draftRate) ?? 0
+    InputLimits.parseFeeRate(draftRate) ?? 0
   }
 
   private var draftFee: UInt64 {
@@ -188,8 +188,8 @@ struct SendFeeSheetView: View {
               isTypingRate = false
             }
           }
-          .onChange(of: draftRate) { _, newValue in
-            let filtered = sanitizeRate(newValue)
+          .onChange(of: draftRate) { oldValue, newValue in
+            let filtered = sanitizeRate(newValue, old: oldValue)
             if filtered != newValue {
               draftRate = filtered
             }
@@ -383,12 +383,13 @@ struct SendFeeSheetView: View {
     }
   }
 
-  private func sanitizeRate(_ value: String) -> String {
-    var filtered = value.filter { $0.isNumber || $0 == "." }
-    if let dotIdx = filtered.firstIndex(of: ".") {
-      let afterDot = filtered[filtered.index(after: dotIdx)...]
-      filtered = String(filtered[...dotIdx]) + afterDot.filter { $0 != "." }
-    }
-    return filtered
+  /// Rejects a keystroke that isn't a number, adds a third decimal or goes
+  /// over `InputLimits.maxFeeRate`; a typed "," becomes ".".
+  private func sanitizeRate(_ value: String, old: String) -> String {
+    InputLimits.sanitizeDecimal(
+      value, old: old,
+      max: Decimal(InputLimits.maxFeeRate),
+      fractionDigits: InputLimits.feeRateFractionDigits
+    )
   }
 }

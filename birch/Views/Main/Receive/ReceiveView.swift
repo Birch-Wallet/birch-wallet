@@ -72,6 +72,7 @@ struct ReceiveView: View {
               if isEditingLabel {
                 TextField("Add a label...", text: $editedLabel)
                   .font(.hbBody(14))
+                  .labelLengthLimit($editedLabel)
                   .padding(8)
                   .birchCard()
                   .foregroundStyle(Color.hbTextPrimary)
@@ -179,7 +180,7 @@ struct ReceiveView: View {
 
   private func saveLabel() {
     guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
-    let trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines).truncatedLabel
     let addr = viewModel.currentAddress
     let descriptor = FetchDescriptor<WalletLabel>(predicate: #Predicate {
       $0.walletID == walletID && $0.type == "addr" && $0.ref == addr

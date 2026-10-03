@@ -7,8 +7,12 @@ struct Recipient: Identifiable {
   var isSendMax: Bool = false
   var label: String = ""
 
+  /// Nil when empty, not a whole number, or above `InputLimits.maxAmountSats`
+  /// — a bogus amount from a saved PSBT makes the recipient invalid rather
+  /// than overflowing the totals.
   var amountValue: UInt64? {
-    UInt64(amountSats)
+    guard let value = UInt64(amountSats), value <= InputLimits.maxAmountSats else { return nil }
+    return value
   }
 
   var isAddressEmpty: Bool {
