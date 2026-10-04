@@ -85,7 +85,7 @@ enum URService {
       throw AppError.urDecodingFailed("Invalid CBOR structure for crypto-hdkey")
     }
 
-    return extractHDKeyFields(from: map)
+    return try extractHDKeyFields(from: map)
   }
 
   // MARK: - Crypto Account (crypto-account)
@@ -110,7 +110,7 @@ enum URService {
       switch key {
       case 1: // master-fingerprint
         if case let .unsigned(fp) = mapValue {
-          masterFingerprint = String(format: "%08x", fp)
+          masterFingerprint = try fingerprintHex(fp)
         }
       case 2: // output-descriptors array
         descriptorsCBOR = mapValue
@@ -132,7 +132,7 @@ enum URService {
       guard let hdKeyMapCBOR = unwrapTagsToMap(descriptor) else { continue }
       guard case let .map(hdKeyMap) = hdKeyMapCBOR else { continue }
 
-      var result = extractHDKeyFields(from: hdKeyMap)
+      var result = try extractHDKeyFields(from: hdKeyMap)
 
       // Use master fingerprint from account level if the key doesn't have one
       if result.fingerprint.isEmpty, !masterFingerprint.isEmpty {
@@ -171,9 +171,36 @@ enum URService {
     }
   }
 
+  // MARK: - Range-Checked CBOR Integers
+
+  /// CBOR integers are 64-bit; a key field that doesn't fit its type means the
+  /// QR is corrupt or hostile, so the scan is rejected rather than trapping.
+  private static func checkedInteger<T: FixedWidthInteger>(_ value: UInt64, as _: T.Type, field: String) throws -> T {
+    guard let result = T(exactly: value) else {
+      throw AppError.urDecodingFailed("Invalid key data in QR: \(field) out of range")
+    }
+    return result
+  }
+
+  /// A 32-bit key fingerprint as 8 hex characters.
+  private static func fingerprintHex(_ value: UInt64) throws -> String {
+    try String(format: "%08x", checkedInteger(value, as: UInt32.self, field: "fingerprint"))
+  }
+
+  /// A BIP-32 child number. The index must fit in 31 bits so the hardened flag
+  /// can't be smuggled in through the index itself.
+  private static func bip32ChildNumber(index: UInt64, hardened: Bool) throws -> UInt32 {
+    guard index < 0x8000_0000 else {
+      throw AppError.urDecodingFailed("Invalid key data in QR: child index out of range")
+    }
+    return UInt32(index) | (hardened ? 0x8000_0000 : 0)
+  }
+
   /// Extract xpub, fingerprint, and derivation path from an HD key CBOR map.
   /// Shared between parseHDKey and parseCryptoAccount.
-  private static func extractHDKeyFields(from map: some Sequence<(CBOR, CBOR)>) -> (xpub: String, fingerprint: String, derivationPath: String) {
+  private static func extractHDKeyFields(
+    from map: some Sequence<(CBOR, CBOR)>
+  ) throws -> (xpub: String, fingerprint: String, derivationPath: String) {
     var keyData = Data()
     var chainCode = Data()
     var fingerprint = ""
@@ -226,11 +253,11 @@ enum URService {
               }
             case 2: // source-fingerprint (master fingerprint)
               if case let .unsigned(fp) = pathValue {
-                fingerprint = String(format: "%08x", fp)
+                fingerprint = try fingerprintHex(fp)
               }
             case 3: // depth
               if case let .unsigned(d) = pathValue {
-                depth = UInt8(d)
+                depth = try checkedInteger(d, as: UInt8.self, field: "depth")
               }
             default: break
             }
@@ -238,7 +265,7 @@ enum URService {
         }
       case 8: // parent-fingerprint
         if case let .unsigned(pf) = mapValue {
-          parentFP = UInt32(pf)
+          parentFP = try checkedInteger(pf, as: UInt32.self, field: "parent fingerprint")
         }
       default:
         break
@@ -250,10 +277,7 @@ enum URService {
     if pathComponents.count >= 2 {
       let lastIdx = pathComponents.count - 2
       if case let .unsigned(idx) = pathComponents[lastIdx] {
-        childNumber = UInt32(idx)
-        if cborToBool(pathComponents[lastIdx + 1]) {
-          childNumber |= 0x8000_0000
-        }
+        childNumber = try bip32ChildNumber(index: idx, hardened: cborToBool(pathComponents[lastIdx + 1]))
       }
     }
 
@@ -399,11 +423,11 @@ enum URService {
                 }
               case 2: // source-fingerprint (master fingerprint)
                 if case let .unsigned(fp) = pv {
-                  originFingerprint = String(format: "%08x", fp)
+                  originFingerprint = try fingerprintHex(fp)
                 }
               case 3: // depth
                 if case let .unsigned(d) = pv {
-                  originDepth = UInt8(d)
+                  originDepth = try checkedInteger(d, as: UInt8.self, field: "depth")
                 }
               default: break
               }
@@ -423,7 +447,7 @@ enum URService {
         }
       case 8: // parent-fingerprint
         if case let .unsigned(pf) = v {
-          parentFingerprintValue = UInt32(pf)
+          parentFingerprintValue = try checkedInteger(pf, as: UInt32.self, field: "parent fingerprint")
         }
       default: break
       }
@@ -436,10 +460,7 @@ enum URService {
       // Last pair: second-to-last = index, last = hardened flag
       let lastIdx = originPathComponents.count - 2
       if case let .unsigned(idx) = originPathComponents[lastIdx] {
-        childNumber = UInt32(idx)
-        if cborToBool(originPathComponents[lastIdx + 1]) {
-          childNumber |= 0x8000_0000 // hardened flag
-        }
+        childNumber = try bip32ChildNumber(index: idx, hardened: cborToBool(originPathComponents[lastIdx + 1]))
       }
     }
 

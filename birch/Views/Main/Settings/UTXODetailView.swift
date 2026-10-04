@@ -209,6 +209,7 @@ struct UTXODetailView: View {
           if isEditingLabel {
             TextField("Add a label...", text: $editedLabel)
               .font(.hbBody())
+              .labelLengthLimit($editedLabel)
               .padding(10)
               .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
@@ -304,10 +305,7 @@ struct UTXODetailView: View {
 
   private func saveUTXOLabel() {
     guard let walletID = service.currentProfile?.id else { return }
-    var trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.utf8.count > WalletLabel.maxLabelLength {
-      trimmed = String(trimmed.utf8.prefix(WalletLabel.maxLabelLength))!
-    }
+    let trimmed = editedLabel.trimmingCharacters(in: .whitespacesAndNewlines).truncatedLabel
     let outpoint = utxo.id
     let descriptor = FetchDescriptor<WalletLabel>(predicate: #Predicate {
       $0.walletID == walletID && $0.type == "utxo" && $0.ref == outpoint

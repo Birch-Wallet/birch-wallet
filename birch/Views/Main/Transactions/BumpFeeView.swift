@@ -230,12 +230,14 @@ private struct BumpFeeRateCard: View {
               lineWidth: 1.5
             )
         )
-        .onChange(of: viewModel.newFeeRate) { _, newValue in
-          var filtered = newValue.filter { $0.isNumber || $0 == "." }
-          if let dotIdx = filtered.firstIndex(of: ".") {
-            let afterDot = filtered[filtered.index(after: dotIdx)...]
-            filtered = String(filtered[...dotIdx]) + afterDot.filter { $0 != "." }
-          }
+        .onChange(of: viewModel.newFeeRate) { oldValue, newValue in
+          // Reject a keystroke that isn't a number, adds a third decimal or
+          // goes over the maximum; a typed "," becomes "."
+          let filtered = InputLimits.sanitizeDecimal(
+            newValue, old: oldValue,
+            max: Decimal(InputLimits.maxFeeRate),
+            fractionDigits: InputLimits.feeRateFractionDigits
+          )
           if filtered != newValue {
             viewModel.newFeeRate = filtered
           }

@@ -928,6 +928,11 @@ final class BitcoinService {
     let url = URL(string: "\(base)/api/v1/fees/precise")!
     let (data, _) = try await URLSession.shared.data(from: url)
     let decoded = try JSONDecoder().decode(MempoolPreciseFees.self, from: data)
+    // An absurd estimate is treated like a failed fetch, so callers use the fallback rates.
+    let rates = [decoded.fastestFee, decoded.halfHourFee, decoded.economyFee]
+    guard rates.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= InputLimits.maxFeeRate }) else {
+      throw AppError.syncFailed("mempool.space returned an out-of-range fee estimate: \(rates)")
+    }
     return RecommendedFees(
       fast: decoded.fastestFee,
       medium: decoded.halfHourFee,
@@ -1006,6 +1011,18 @@ final class BitcoinService {
     let inputCount: Int
   }
 
+  /// Converts sat/vB to BDK's sat/kwu, refusing a rate that is not finite,
+  /// not positive or above `InputLimits.maxFeeRate` instead of trapping.
+  private func makeFeeRate(satPerVb feeRate: Double) throws -> FeeRate {
+    guard feeRate.isFinite, feeRate > 0, feeRate <= InputLimits.maxFeeRate else {
+      throw AppError.psbtCreationFailed(
+        "Fee rate must be between 0 and \(formatFeeRate(InputLimits.maxFeeRate)) sat/vB"
+      )
+    }
+    let satKwu = max(UInt64(round(feeRate * 250.0)), 1)
+    return FeeRate.fromSatPerKwu(satKwu: satKwu)
+  }
+
   func createPSBT(
     recipients: [(address: String, amount: UInt64, isSendMax: Bool)],
     feeRate: Double,
@@ -1015,8 +1032,7 @@ final class BitcoinService {
     guard let wallet else { throw AppError.walletNotLoaded }
 
     let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
-    let satKwu = max(UInt64(round(feeRate * 250.0)), 1)
-    let bdkFeeRate = FeeRate.fromSatPerKwu(satKwu: satKwu)
+    let bdkFeeRate = try makeFeeRate(satPerVb: feeRate)
 
     let safeHeight = chainTipHeight > 0 ? chainTipHeight - 1 : 0
     var builder = TxBuilder()
@@ -1085,8 +1101,7 @@ final class BitcoinService {
     guard let wallet else { throw AppError.walletNotLoaded }
 
     let network = bdkNetwork(from: currentProfile?.bitcoinNetwork ?? .testnet4)
-    let satKwu = max(UInt64(round(feeRate * 250.0)), 1)
-    let bdkFeeRate = FeeRate.fromSatPerKwu(satKwu: satKwu)
+    let bdkFeeRate = try makeFeeRate(satPerVb: feeRate)
 
     let safeHeight = chainTipHeight > 0 ? chainTipHeight - 1 : 0
     let bdkTxid = try Txid.fromString(hex: txid)

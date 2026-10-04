@@ -56,7 +56,7 @@ struct DenominationTests {
     #expect(Denomination.parseBTC("2.") == 200_000_000)
     #expect(Denomination.parseBTC("0,25") == 25_000_000)
     #expect(Denomination.parseBTC(" 1.5 ") == 150_000_000)
-    #expect(Denomination.parseBTC("21000000") == Denomination.maxSats)
+    #expect(Denomination.parseBTC("1000000") == InputLimits.maxAmountSats)
   }
 
   @Test func rejectsInvalidBTC() {
@@ -67,12 +67,13 @@ struct DenominationTests {
     #expect(Denomination.parseBTC("-1") == nil)
     #expect(Denomination.parseBTC("1e-5") == nil)
     #expect(Denomination.parseBTC("abc") == nil)
-    #expect(Denomination.parseBTC("21000000.00000001") == nil)
+    #expect(Denomination.parseBTC("1000000.00000001") == nil, "Above the 1M BTC input limit")
+    #expect(Denomination.parseBTC("21000000") == nil, "Above the 1M BTC input limit")
     #expect(Denomination.parseBTC("999999999") == nil)
   }
 
   @Test func roundTripsThroughFormatAndParse() {
-    for sats: UInt64 in [1, 29, 546, 50000, 99_999_999, 100_000_001, 2_099_999_999_999_999] {
+    for sats: UInt64 in [1, 29, 546, 50000, 99_999_999, 100_000_001, InputLimits.maxAmountSats] {
       #expect(Denomination.parseBTC(Denomination.btc.format(sats, includeUnit: false)) == sats)
     }
   }
@@ -83,5 +84,14 @@ struct DenominationTests {
     var recipient = Recipient()
     recipient.parseBIP21("bitcoin:tb1qexampleaddress0000000000000000000000?amount=0.00000029")
     #expect(recipient.amountSats == "29")
+  }
+
+  @Test func bip21RejectsHostileAmounts() {
+    for amount in ["1e30", "-1", "nan", "inf", "21000000", "184467440737.09551616"] {
+      var recipient = Recipient()
+      recipient.parseBIP21("bitcoin:tb1qexampleaddress0000000000000000000000?amount=\(amount)")
+      #expect(recipient.amountSats.isEmpty, "amount=\(amount) must be ignored")
+      #expect(recipient.address == "tb1qexampleaddress0000000000000000000000")
+    }
   }
 }

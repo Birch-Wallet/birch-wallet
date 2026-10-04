@@ -426,6 +426,13 @@ private struct AmountHeroCard: View {
           .focused($isAmountFocused)
           .disabled(isMaxActive)
           .foregroundStyle(isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary)
+          .onChange(of: fiatBinding.wrappedValue) { old, new in
+            guard let id = viewModel.recipients.first?.id else { return }
+            let accepted = viewModel.sanitizedFiatInput(new, old: old, for: id)
+            if accepted != new {
+              fiatBinding.wrappedValue = accepted
+            }
+          }
       } else {
         if Denomination.current == .btc {
           BTCAmountField(
@@ -447,7 +454,13 @@ private struct AmountHeroCard: View {
             .focused($isAmountFocused)
             .disabled(isMaxActive)
             .foregroundStyle(isMaxActive ? Color.hbTextSecondary : Color.hbTextPrimary)
-            .onChange(of: viewModel.recipients[index].amountSats) {
+            .onChange(of: viewModel.recipients[index].amountSats) { old, new in
+              let accepted = InputLimits.sanitizeSats(new, old: old)
+              if accepted != new {
+                // Over the limit or not a whole number — ignore the keystroke
+                viewModel.recipients[index].amountSats = accepted
+                return
+              }
               if !isMaxActive {
                 viewModel.recalculateMaxIfNeeded()
               }
@@ -637,6 +650,7 @@ private struct RecipientCard: View {
     if isEditingLabel {
       TextField("Label", text: $viewModel.recipients[index].label)
         .font(.hbBody(14))
+        .labelLengthLimit($viewModel.recipients[index].label)
         .focused($isLabelFocused)
         .foregroundStyle(Color.hbTextPrimary)
         .onSubmit { isEditingLabel = false }
@@ -839,6 +853,13 @@ private struct RecipientCard: View {
               .focused($isAmountFocused)
               .disabled(viewModel.recipients[index].isSendMax)
               .foregroundStyle(amountColor)
+              .onChange(of: fiatBinding.wrappedValue) { old, new in
+                guard index < viewModel.recipients.count else { return }
+                let accepted = viewModel.sanitizedFiatInput(new, old: old, for: viewModel.recipients[index].id)
+                if accepted != new {
+                  fiatBinding.wrappedValue = accepted
+                }
+              }
           } else {
             if Denomination.current == .btc {
               BTCAmountField(
@@ -860,7 +881,13 @@ private struct RecipientCard: View {
                 .focused($isAmountFocused)
                 .disabled(viewModel.recipients[index].isSendMax)
                 .foregroundStyle(amountColor)
-                .onChange(of: viewModel.recipients[index].amountSats) {
+                .onChange(of: viewModel.recipients[index].amountSats) { old, new in
+                  let accepted = InputLimits.sanitizeSats(new, old: old)
+                  if accepted != new {
+                    // Over the limit or not a whole number — ignore the keystroke
+                    viewModel.recipients[index].amountSats = accepted
+                    return
+                  }
                   if !viewModel.recipients[index].isSendMax {
                     viewModel.recalculateMaxIfNeeded()
                   }

@@ -46,7 +46,8 @@ enum Denomination: String, CaseIterable {
   }
 
   /// Parse a typed BTC amount into sats. Accepts "." or "," as the decimal
-  /// separator; rejects more than eight decimals and anything above 21M BTC.
+  /// separator; rejects more than eight decimals and anything above
+  /// `InputLimits.maxAmountSats`.
   static func parseBTC(_ text: String) -> UInt64? {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
     guard !trimmed.isEmpty else { return nil }
@@ -60,13 +61,7 @@ enum Denomination: String, CaseIterable {
     let whole = wholePart.isEmpty ? 0 : (UInt64(wholePart) ?? 0)
     let fraction = UInt64(fractionPart + String(repeating: "0", count: 8 - fractionPart.count)) ?? 0
     let sats = whole * satsPerBTC + fraction
-    return sats <= maxSats ? sats : nil
-  }
-}
-
-private extension Character {
-  var isASCIIDigit: Bool {
-    isASCII && isNumber
+    return sats <= InputLimits.maxAmountSats ? sats : nil
   }
 }
 

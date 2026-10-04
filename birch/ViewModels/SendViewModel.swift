@@ -22,6 +22,8 @@ final class SendViewModel: PSBTFlowManaging {
   var recipients: [Recipient] = [Recipient()]
   var amountInFiat: Bool = false
   var fiatDisplayAmount: [UUID: String] = [:] // per-recipient fiat display strings
+  /// Fiat strings written by `setFormattedFiat`, exempt from the typing limits
+  @ObservationIgnored private var formattedFiat: [UUID: String] = [:]
   var feeRateSatVb: String = "" // empty until rates load
   var selectedFeePreset: FeePreset = .medium
   var showAddressScanner: Bool = false
@@ -135,8 +137,10 @@ final class SendViewModel: PSBTFlowManaging {
     bitcoinService.currentNetwork
   }
 
+  /// The entered rate, or 0 when it is empty or outside the allowed range —
+  /// including a rate restored from a saved PSBT.
   var feeRateValue: Double {
-    Double(feeRateSatVb) ?? 0
+    InputLimits.parseFeeRate(feeRateSatVb) ?? 0
   }
 
   var isValidFeeRate: Bool {
@@ -165,9 +169,7 @@ final class SendViewModel: PSBTFlowManaging {
 
   var isBalanceExceeded: Bool {
     guard !hasSendMax else { return false } // send-max self-adjusts
-    let totalAmount = totalSendAmount
-    let fee = estimateFee()
-    return totalAmount + fee > selectedUTXOTotal
+    return totalWithEstimatedFee > selectedUTXOTotal
   }
 
   /// Attempt to proceed to review; builds a draft PSBT to get exact fee/change info
@@ -186,7 +188,7 @@ final class SendViewModel: PSBTFlowManaging {
   }
 
   var totalSendAmount: UInt64 {
-    recipients.reduce(0) { $0 + ($1.amountValue ?? 0) }
+    InputLimits.sum(recipients.map { $0.amountValue ?? 0 })
   }
 
   var hasSendMax: Bool {
@@ -211,7 +213,7 @@ final class SendViewModel: PSBTFlowManaging {
     }
     return TransactionItem(
       id: broadcastTxid.isEmpty ? "Unsigned" : broadcastTxid,
-      amount: -Int64(totalSendAmount),
+      amount: -Int64(clamping: totalSendAmount),
       fee: nil,
       confirmations: 0,
       timestamp: nil,
@@ -223,12 +225,12 @@ final class SendViewModel: PSBTFlowManaging {
 
   /// Total deducted from wallet = send amount + fee
   var totalSpendAmount: UInt64 {
-    totalSendAmount + totalFee
+    InputLimits.sum([totalSendAmount, totalFee])
   }
 
   /// Total sats of all inputs = send amount + fee + change
   var inputsAmount: UInt64 {
-    totalSendAmount + totalFee + (changeAmount ?? 0)
+    InputLimits.sum([totalSendAmount, totalFee, changeAmount ?? 0])
   }
 
   // signatureProgress and needsMoreSignatures provided by PSBTFlowManaging
@@ -259,7 +261,7 @@ final class SendViewModel: PSBTFlowManaging {
           continue
         }
         let fiatStr = fiatDisplayAmount[recipients[i].id] ?? ""
-        if let fiatVal = Double(fiatStr), fiatVal > 0,
+        if let fiatVal = Self.fiatValue(fiatStr), fiatVal > 0,
            let sats = fiatService.fiatToSats(fiatVal)
         {
           recipients[i].amountSats = "\(sats)"
@@ -269,17 +271,13 @@ final class SendViewModel: PSBTFlowManaging {
       // Switching from sats to fiat: convert sats to fiat display amounts
       for i in recipients.indices {
         if recipients[i].isSendMax {
-          if let sats = recipients[i].amountValue,
-             let fiatVal = fiatService.satsToFiat(sats)
-          {
-            fiatDisplayAmount[recipients[i].id] = String(format: "%.2f", fiatVal)
+          if let sats = recipients[i].amountValue {
+            setFormattedFiat(sats, for: recipients[i].id)
           }
           continue
         }
-        if let sats = recipients[i].amountValue,
-           let fiatVal = fiatService.satsToFiat(sats)
-        {
-          fiatDisplayAmount[recipients[i].id] = String(format: "%.2f", fiatVal)
+        if let sats = recipients[i].amountValue, fiatService.satsToFiat(sats) != nil {
+          setFormattedFiat(sats, for: recipients[i].id)
         } else {
           fiatDisplayAmount[recipients[i].id] = ""
         }
@@ -293,13 +291,42 @@ final class SendViewModel: PSBTFlowManaging {
   func updateSatsFromFiat(for index: Int) {
     guard amountInFiat, !recipients[index].isSendMax else { return }
     let fiatStr = fiatDisplayAmount[recipients[index].id] ?? ""
-    if let fiatVal = Double(fiatStr), fiatVal > 0,
+    if let fiatVal = Self.fiatValue(fiatStr), fiatVal > 0,
        let sats = fiatService.fiatToSats(fiatVal)
     {
       recipients[index].amountSats = "\(sats)"
     } else {
       recipients[index].amountSats = ""
     }
+  }
+
+  /// The fiat text to keep after an edit: `new` (with "," normalised to ".")
+  /// when it is within the fiat limit and converts to no more than the
+  /// per-recipient bitcoin limit, otherwise `old` — the keystroke is rejected.
+  /// Text this view model formatted itself is already within limits and kept.
+  func sanitizedFiatInput(_ new: String, old: String, for id: UUID) -> String {
+    if new == formattedFiat[id] {
+      return new
+    }
+    let candidate = InputLimits.sanitizeDecimal(
+      new, old: old, max: InputLimits.maxFiatAmount, fractionDigits: InputLimits.fiatFractionDigits
+    )
+    guard let value = Self.fiatValue(candidate), value > 0 else { return candidate }
+    return fiatService.fiatToSats(value) != nil ? candidate : old
+  }
+
+  /// Writes fiat text converted from a sats amount, remembering it so the
+  /// typing limits are not applied to it.
+  private func setFormattedFiat(_ sats: UInt64, for id: UUID) {
+    guard let fiatVal = fiatService.satsToFiat(sats) else { return }
+    let text = String(format: "%.2f", fiatVal)
+    formattedFiat[id] = text
+    fiatDisplayAmount[id] = text
+  }
+
+  /// Parses fiat text with either "." or "," as the decimal separator.
+  private static func fiatValue(_ text: String) -> Double? {
+    InputLimits.decimalValue(text).map { NSDecimalNumber(decimal: $0).doubleValue }
   }
 
   // MARK: - Recipients
@@ -398,15 +425,16 @@ final class SendViewModel: PSBTFlowManaging {
 
   private func recalculateMax(for index: Int) {
     let spendableBalance = selectedUTXOTotal
-    let otherAmounts = recipients.enumerated()
-      .filter { $0.offset != index }
-      .reduce(UInt64(0)) { $0 + ($1.element.amountValue ?? 0) }
-    let feeEstimate = estimateFee()
-    let maxAmount = spendableBalance > (otherAmounts + feeEstimate) ?
-      spendableBalance - otherAmounts - feeEstimate : 0
+    let otherAmounts = InputLimits.sum(
+      recipients.enumerated()
+        .filter { $0.offset != index }
+        .map { $0.element.amountValue ?? 0 }
+    )
+    let reserved = InputLimits.sum([otherAmounts, estimateFee()])
+    let maxAmount = spendableBalance > reserved ? spendableBalance - reserved : 0
     recipients[index].amountSats = "\(maxAmount)"
-    if amountInFiat, let fiatVal = fiatService.satsToFiat(maxAmount) {
-      fiatDisplayAmount[recipients[index].id] = String(format: "%.2f", fiatVal)
+    if amountInFiat {
+      setFormattedFiat(maxAmount, for: recipients[index].id)
     }
   }
 
@@ -415,7 +443,7 @@ final class SendViewModel: PSBTFlowManaging {
   }
 
   func estimatedFee(for rate: Double) -> UInt64 {
-    UInt64(Double(estimatedVsize) * max(rate, 0.001))
+    InputLimits.estimatedFee(vsize: estimatedVsize, rate: rate)
   }
 
   /// Rough estimate: P2WSH multisig input ~200 vbytes, output ~43 vbytes each, overhead ~10
@@ -459,7 +487,7 @@ final class SendViewModel: PSBTFlowManaging {
 
   /// Total leaving the wallet — recipients plus the estimated fee
   var totalWithEstimatedFee: UInt64 {
-    totalSendAmount + estimateFee()
+    InputLimits.sum([totalSendAmount, estimateFee()])
   }
 
   /// Parse a BIP-21 URI or plain address string
@@ -773,6 +801,7 @@ final class SendViewModel: PSBTFlowManaging {
     recipients = [Recipient()]
     amountInFiat = false
     fiatDisplayAmount.removeAll()
+    formattedFiat.removeAll()
     feeRateSatVb = ""
     recommendedFees = nil
     selectedFeePreset = .medium

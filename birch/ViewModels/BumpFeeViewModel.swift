@@ -72,8 +72,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     }
   }
 
+  /// The entered rate, or 0 when it is empty or outside the allowed range —
+  /// including a rate restored from a saved PSBT.
   var feeRateValue: Double {
-    Double(newFeeRate) ?? 0
+    InputLimits.parseFeeRate(newFeeRate) ?? 0
   }
 
   /// Minimum fee rate (sat/vB) required to replace the original transaction.
@@ -82,7 +84,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   }
 
   var isValidFeeRate: Bool {
-    guard let rate = Double(newFeeRate), rate > 0 else { return false }
+    guard let rate = InputLimits.parseFeeRate(newFeeRate) else { return false }
     if let original = originalFeeRate {
       return rate > Double(original)
     }

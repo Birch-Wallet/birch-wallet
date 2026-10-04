@@ -355,4 +355,50 @@ struct SendViewModelTests {
     #expect(!vm.isSelfRecipient(Recipient(address: "", amountSats: "1000")),
             "empty address must never classify as self")
   }
+
+  // MARK: - Input Limits (no traps)
+
+  @Test func amountAboveLimitIsInvalidNotOverflowing() {
+    let vm = SendViewModel()
+    vm.feeRateSatVb = "1"
+    vm.recipients = [
+      Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "18446744073709551615"),
+      Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "100000000000001"),
+    ]
+    #expect(vm.recipients[0].amountValue == nil)
+    #expect(vm.recipients[1].amountValue == nil)
+    #expect(!vm.recipients[0].isValidAmount)
+    #expect(vm.totalSendAmount == 0)
+    _ = vm.isBalanceExceeded
+    _ = vm.totalWithEstimatedFee
+    _ = vm.previewTransaction
+  }
+
+  @Test func capAmountsAcrossManyRecipientsDoNotOverflow() {
+    let vm = SendViewModel()
+    vm.feeRateSatVb = "10000"
+    vm.recipients = (0 ..< 50).map { _ in
+      Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "100000000000000")
+    }
+    #expect(vm.totalSendAmount == 50 * InputLimits.maxAmountSats)
+    #expect(vm.isBalanceExceeded)
+    vm.recipients[49].isSendMax = true
+    vm.recalculateMaxIfNeeded()
+    #expect(vm.recipients[49].amountSats == "0")
+  }
+
+  @Test func extremeFeeRatesDoNotTrap() {
+    let vm = SendViewModel()
+    #expect(vm.estimatedFee(for: .infinity) > 0)
+    #expect(vm.estimatedFee(for: 1e300) == vm.estimatedFee(for: InputLimits.maxFeeRate))
+    _ = vm.estimatedFee(for: .nan)
+
+    vm.feeRateSatVb = "99999"
+    #expect(!vm.isValidFeeRate)
+    vm.feeRateSatVb = String(repeating: "9", count: 400)
+    #expect(!vm.isValidFeeRate)
+    _ = vm.estimateFee()
+    vm.feeRateSatVb = "12,5"
+    #expect(vm.feeRateValue == 12.5)
+  }
 }

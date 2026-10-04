@@ -109,7 +109,7 @@ enum LabelService {
     walletID: UUID
   ) throws {
     guard !txLabel.isEmpty, !changeAddress.isEmpty else { return }
-    let changeLabel = "Change From: \(txLabel)"
+    let changeLabel = "Change From: \(txLabel)".truncatedLabel
     let allLabels = fetchAllLabels(walletID: walletID, context: context)
     let addrLabelRefs = Set(allLabels.filter { $0.type == "addr" }.map(\.ref))
     let utxoLabelRefs = Set(allLabels.filter { $0.type == "utxo" }.map(\.ref))
@@ -169,7 +169,7 @@ enum LabelService {
     var importedCount = 0
 
     for record in records {
-      let label = record.label
+      let label = record.label?.truncatedLabel
       let hasLabel = label != nil && !label!.isEmpty
 
       switch record.type {

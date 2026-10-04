@@ -158,10 +158,17 @@ final class FiatPriceService {
   }
 
   func fiatToSats(_ fiatAmount: Double) -> UInt64? {
-    guard let rate = currentRate, rate > 0 else { return nil }
-    let btc = fiatAmount / rate
-    let sats = btc * 100_000_000.0
-    return sats >= 0 ? UInt64(sats) : 0
+    guard let rate = currentRate else { return nil }
+    return Self.sats(fromFiat: fiatAmount, rate: rate)
+  }
+
+  /// Converts a fiat amount to sats at `rate` (fiat per BTC). Nil for a
+  /// non-finite input or rate, or a result above `InputLimits.maxAmountSats`.
+  static func sats(fromFiat fiatAmount: Double, rate: Double) -> UInt64? {
+    guard fiatAmount.isFinite, rate.isFinite, rate > 0 else { return nil }
+    let sats = fiatAmount / rate * Double(Denomination.satsPerBTC)
+    guard sats.isFinite, sats <= Double(InputLimits.maxAmountSats) else { return nil }
+    return sats > 0 ? UInt64(sats) : 0
   }
 
   var currentCurrencyCode: String {

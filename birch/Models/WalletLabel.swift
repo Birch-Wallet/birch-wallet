@@ -25,6 +25,8 @@ final class WalletLabel {
     case utxo
   }
 
+  /// Maximum label length in characters (what the user sees, so an emoji
+  /// counts as one). Enforced while typing and on save/import via `truncatedLabel`.
   static let maxLabelLength = 255
 
   var labelType: LabelType {
