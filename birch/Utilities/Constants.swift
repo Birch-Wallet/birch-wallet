@@ -19,6 +19,7 @@ enum Constants {
   static let autoRefreshEnabledKey = "autoRefreshEnabled"
   static let autoRefreshIntervalKey = "autoRefreshInterval"
   static let denominationKey = "denomination"
+  static let utxoFilterKey = "utxoFilter"
   static let appLockEnabledKey = "appLockEnabled"
   static let fiatEnabledKey = "fiatEnabled"
   static let fiatCurrencyKey = "fiatCurrency"

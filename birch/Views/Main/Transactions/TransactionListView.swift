@@ -502,7 +502,7 @@ struct TransactionListView: View {
         do {
           try LabelService.propagateAddressLabels(
             transactions: bitcoinService.transactions,
-            utxos: bitcoinService.utxos,
+            utxos: bitcoinService.outputs,
             context: modelContext,
             walletID: walletID
           )
