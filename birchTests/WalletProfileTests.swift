@@ -115,6 +115,41 @@ struct WalletProfileTests {
     #expect(wallet.multisigDescription == "2-of-3")
   }
 
+  private func profile(electrumPort: Int = 0, addressGapLimit: Int = 20) -> WalletProfile {
+    WalletProfile(
+      name: "Test", requiredSignatures: 2, totalCosigners: 3,
+      externalDescriptor: "", internalDescriptor: "",
+      network: .testnet4, addressGapLimit: addressGapLimit, electrumPort: electrumPort
+    )
+  }
+
+  /// A stored port that is not a port number must not trap: the wallet is loaded
+  /// on every launch, so a trap there would make the app impossible to open.
+  @Test(arguments: [65536, 500_022, -1, Int.max, Int.min])
+  func outOfRangePortFallsBackToTheDefault(port: Int) {
+    #expect(profile(electrumPort: port).electrumConfig.port == BitcoinNetwork.testnet4.defaultElectrumPort)
+  }
+
+  @Test func customPortIsUsedWhenItIsAPortNumber() {
+    #expect(profile(electrumPort: 1).electrumConfig.port == 1)
+    #expect(profile(electrumPort: 12345).electrumConfig.port == 12345)
+    #expect(profile(electrumPort: 65535).electrumConfig.port == 65535)
+    #expect(profile(electrumPort: 0).electrumConfig.port == BitcoinNetwork.testnet4.defaultElectrumPort)
+  }
+
+  /// The gap limit is converted to an unsigned count for every full scan and
+  /// bounds the address list, so a stored value out of range must be held in.
+  @Test func scanGapLimitStaysWithinRange() {
+    #expect(profile(addressGapLimit: 20).scanGapLimit == 20)
+    #expect(profile(addressGapLimit: InputLimits.maxGapLimit).scanGapLimit == InputLimits.maxGapLimit)
+
+    #expect(profile(addressGapLimit: 0).scanGapLimit == 1)
+    #expect(profile(addressGapLimit: -1).scanGapLimit == 1)
+    #expect(profile(addressGapLimit: Int.min).scanGapLimit == 1)
+    #expect(profile(addressGapLimit: InputLimits.maxGapLimit + 1).scanGapLimit == InputLimits.maxGapLimit)
+    #expect(profile(addressGapLimit: Int.max).scanGapLimit == InputLimits.maxGapLimit)
+  }
+
   @Test func multipleWalletsSwitching() throws {
     let container = try createTestContainer()
     let context = ModelContext(container)

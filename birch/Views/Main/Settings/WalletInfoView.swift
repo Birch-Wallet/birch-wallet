@@ -182,8 +182,14 @@ struct WalletInfoView: View {
               .padding(10)
               .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
-              .onChange(of: electrumPortText) {
-                wallet.electrumPort = Int(electrumPortText) ?? 0
+              .onChange(of: electrumPortText) { old, new in
+                let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxPort)
+                if accepted != new {
+                  // Not a port number — ignore the keystroke
+                  electrumPortText = accepted
+                  return
+                }
+                wallet.electrumPort = Int(accepted) ?? 0
               }
           }
 
@@ -328,8 +334,14 @@ struct WalletInfoView: View {
                 .padding(10)
                 .birchCard(.nested)
                 .foregroundStyle(Color.hbTextPrimary)
-                .onChange(of: gapLimitText) {
-                  if let value = Int(gapLimitText), value > 0 {
+                .onChange(of: gapLimitText) { old, new in
+                  let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxGapLimit)
+                  if accepted != new {
+                    // Out of range or not a whole number — ignore the keystroke
+                    gapLimitText = accepted
+                    return
+                  }
+                  if let value = Int(accepted) {
                     wallet.addressGapLimit = value
                   }
                 }
@@ -436,9 +448,9 @@ struct WalletInfoView: View {
     .background(Color.hbBackground)
     .navigationTitle("Wallet Settings")
     .onAppear {
-      gapLimitText = "\(wallet.addressGapLimit)"
+      gapLimitText = "\(wallet.scanGapLimit)"
       electrumHostText = wallet.electrumHost
-      electrumPortText = wallet.electrumPort > 0 ? "\(wallet.electrumPort)" : ""
+      electrumPortText = wallet.customElectrumPort.map { "\($0)" } ?? ""
       blockExplorerText = wallet.blockExplorerHost
       initialElectrumConfig = wallet.electrumConfig
     }

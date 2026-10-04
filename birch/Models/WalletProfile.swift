@@ -63,10 +63,24 @@ final class WalletProfile {
     BitcoinNetwork(rawValue: network) ?? .testnet4
   }
 
+  /// The custom server port, or nil when none is set. A stored value that is not
+  /// a port number counts as not set: this is read on every wallet load, so it
+  /// must never trap.
+  var customElectrumPort: UInt16? {
+    (1 ... InputLimits.maxPort).contains(electrumPort) ? UInt16(electrumPort) : nil
+  }
+
+  /// The gap limit to scan and list addresses with: the stored value held to
+  /// 1...`InputLimits.maxGapLimit`, so one saved out of range cannot trap or
+  /// scan without end.
+  var scanGapLimit: Int {
+    min(max(addressGapLimit, 1), InputLimits.maxGapLimit)
+  }
+
   var electrumConfig: ElectrumConfig {
     let net = bitcoinNetwork
     let host = electrumHost.isEmpty ? (net.defaultElectrumHost ?? "") : electrumHost
-    let port = electrumPort > 0 ? UInt16(electrumPort) : net.defaultElectrumPort
+    let port = customElectrumPort ?? net.defaultElectrumPort
     let ssl: Bool = switch electrumSSL {
     case 1: false // TCP
     case 2: true // SSL
