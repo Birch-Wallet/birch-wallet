@@ -37,12 +37,15 @@ final class ReceiveViewModel {
       return
     }
     do {
-      let (address, index) = try bitcoinService.revealNextAddress()
+      // Step from the address on screen, not from the wallet's reveal counter
+      let (address, index) = try currentAddress.isEmpty
+        ? bitcoinService.getNextAddress()
+        : bitcoinService.getNextAddress(after: addressIndex)
       currentAddress = address
       addressIndex = index
-      logger.info("Revealed new receive address #\(index): \(address)")
+      logger.info("Next receive address #\(index): \(address)")
     } catch {
-      logger.error("Failed to reveal next receive address: \(error.localizedDescription)")
+      logger.error("Failed to get next receive address: \(error.localizedDescription)")
       errorMessage = error.localizedDescription
     }
   }

@@ -801,45 +801,52 @@ final class BitcoinService {
 
   // MARK: - Addresses
 
+  /// The receive address to hand out: the lowest-index one that has no
+  /// transactions and no label.
   func getNextAddress() throws -> (String, UInt32) {
+    try receiveAddress(from: 0)
+  }
+
+  /// "Next Address": the first available receive address after `index`.
+  func getNextAddress(after index: UInt32) throws -> (String, UInt32) {
+    try receiveAddress(from: index + 1)
+  }
+
+  private func receiveAddress(from start: UInt32) throws -> (String, UInt32) {
     guard let wallet else { throw AppError.walletNotLoaded }
-    let usedAddresses = buildUsedAddressSet()
-    for i in 0 ..< UInt32(Constants.maxAddressGap) {
-      let info = wallet.peekAddress(keychain: .external, index: i)
-      if !usedAddresses.contains(info.address.description) {
-        // Reveal addresses up to this index so that incremental syncs
-        // (startSyncWithRevealedSpks) will monitor it for incoming funds.
-        var revealed = wallet.revealNextAddress(keychain: .external)
-        while revealed.index < info.index {
-          revealed = wallet.revealNextAddress(keychain: .external)
-        }
-        guard let persister else {
-          logger.warning("Address revealed without persister — derivation state may be lost")
-          return (info.address.description, info.index)
-        }
+    // A labeled address counts as handed out even before it is paid, so it
+    // isn't offered to someone else while that payment is still outstanding.
+    var taken = buildUsedAddressSet()
+    if let walletID = currentProfile?.id, let container = modelContainer {
+      taken.formUnion(LabelService.labeledAddresses(walletID: walletID, context: container.mainContext))
+    }
+    let (info, didReveal) = Self.availableReceiveAddress(in: wallet, from: start, taken: taken)
+    if didReveal {
+      if let persister {
         _ = try wallet.persist(persister: persister)
-        return (info.address.description, info.index)
+      } else {
+        logger.warning("Address revealed without persister — derivation state may be lost")
       }
     }
-    // All peeked addresses are used — reveal a new one
-    let info = wallet.revealNextAddress(keychain: .external)
-    guard let persister else {
-      logger.warning("Address revealed without persister — derivation state may be lost")
-      return (info.address.description, info.index)
-    }
-    _ = try wallet.persist(persister: persister)
     return (info.address.description, info.index)
   }
 
-  func revealNextAddress() throws -> (String, UInt32) {
-    guard let wallet else { throw AppError.walletNotLoaded }
-    let info = wallet.revealNextAddress(keychain: .external)
-    guard let persister else {
-      logger.warning("Address revealed without persister — derivation state may be lost")
-      return (info.address.description, info.index)
+  /// The first receive address at or after `start` that isn't in `taken`.
+  /// It is revealed if it wasn't already, so incremental syncs
+  /// (startSyncWithRevealedSpks) watch it for incoming funds. Revealing up to
+  /// an index is a no-op once that index is revealed, so looking at an
+  /// address never moves the wallet's derivation index.
+  static func availableReceiveAddress(
+    in wallet: Wallet,
+    from start: UInt32,
+    taken: Set<String>
+  ) -> (info: AddressInfo, didReveal: Bool) {
+    var info = wallet.peekAddress(keychain: .external, index: start)
+    while taken.contains(info.address.description) {
+      info = wallet.peekAddress(keychain: .external, index: info.index + 1)
     }
-    _ = try wallet.persist(persister: persister)
-    return (info.address.description, info.index)
+    let revealed = wallet.revealAddressesTo(keychain: .external, index: info.index)
+    return (info, !revealed.isEmpty)
   }
 
   func getAddresses(keychain: UTXOItem.KeychainKind) -> [AddressItem] {
