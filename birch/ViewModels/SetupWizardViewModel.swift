@@ -143,19 +143,59 @@ final class SetupWizardViewModel {
   // MARK: - Validation
 
   func validateCosignerXpub(_ xpub: String, at index: Int) -> String? {
-    if xpub.isEmpty {
+    if let error = Self.validateXpub(xpub, for: network) {
+      return error
+    }
+
+    // Check for duplicates in standard form, so a Vpub and its tpub count as the same key
+    let isTestnet = network != .mainnet
+    let canonical = URService.canonicalXpub(xpub, isTestnet: isTestnet)
+    for (i, existing) in cosignerXpubs.enumerated() where i != index {
+      if !existing.isEmpty, URService.canonicalXpub(existing, isTestnet: isTestnet) == canonical {
+        return "Duplicate xpub (same as Cosigner \(i + 1))"
+      }
+    }
+
+    return nil
+  }
+
+  /// Returns an error message unless the text is exactly one extended public key
+  /// for the network (surrounding whitespace is ignored) that sits where a BIP48
+  /// P2WSH key does, nil when it is valid.
+  ///
+  /// Pass `checkingPlacement: false` only for a key that is already part of a saved
+  /// wallet: wallets created before this rule are not re-checked.
+  static func validateXpub(_ xpub: String, for network: BitcoinNetwork, checkingPlacement: Bool = true) -> String? {
+    let key = xpub.trimmingCharacters(in: .whitespacesAndNewlines)
+    if key.isEmpty {
       return "Xpub is required"
     }
 
     let expectedPrefixes = network == .mainnet ? ["xpub", "Zpub"] : ["tpub", "Vpub"]
-    if !expectedPrefixes.contains(where: { xpub.hasPrefix($0) }) {
+    if !expectedPrefixes.contains(where: { key.hasPrefix($0) }) {
       return "Expected \(expectedPrefixes.joined(separator: " or ")) prefix for \(network.displayName)"
     }
 
-    // Check for duplicates
-    for (i, existing) in cosignerXpubs.enumerated() where i != index {
-      if !existing.isEmpty, existing == xpub {
-        return "Duplicate xpub (same as Cosigner \(i + 1))"
+    // The key text goes into the descriptor, so it must decode as a single key:
+    // anything after it (a path, a comma, another key) would change the wallet.
+    guard let placement = URService.extendedPublicKeyPlacement(key) else {
+      return "Not a valid extended public key. Enter the whole key with nothing before or after it."
+    }
+
+    // Every cosigner is pinned to m/48'/coin'/0'/2'. A key records how many steps it
+    // is from the master key and the last step taken, so a key at that path is four
+    // steps down with a last step of 2'. The earlier steps (48', coin, account) leave
+    // no trace in a public key; only the signer can vouch for those.
+    if checkingPlacement {
+      let origin = PSBTGroundTruth.accountOrigin(for: network)
+      if Int(placement.depth) != origin.count || placement.childNumber != origin.last {
+        let hardened: UInt32 = 0x8000_0000
+        let lastStep = placement.childNumber >= hardened
+          ? "\(placement.childNumber - hardened)'"
+          : "\(placement.childNumber)"
+        return "This key is not at \(Constants.derivationPath(for: network)). A key at that path is "
+          + "\(origin.count) steps from the master key with a last step of 2'; this one is "
+          + "\(placement.depth) steps with a last step of \(lastStep). Export the multisig (P2WSH) key from the signer."
       }
     }
 
@@ -204,68 +244,83 @@ final class SetupWizardViewModel {
 
   // MARK: - Descriptor Building
 
-  func buildDescriptors() {
-    guard allCosignersComplete else { return }
+  private var cosignerData: [(xpub: String, fingerprint: String, derivationPath: String)] {
+    (0 ..< totalCosigners).map {
+      (xpub: cosignerXpubs[$0], fingerprint: cosignerFingerprints[$0], derivationPath: cosignerDerivationPaths[$0])
+    }
+  }
 
-    // Build key origin strings — normalize to standard xpub/tpub format before
-    // sorting so BIP67 ordering matches what's emitted in the descriptor.
-    let isTestnet = network != .mainnet
-    var keyEntries: [(origin: String, xpub: String, fingerprint: String, path: String, label: String, index: Int)] = []
+  /// Builds both descriptors from the cosigner list. Returns false, leaving the
+  /// descriptors empty and `errorMessage` set, when they cannot be built.
+  @discardableResult
+  func buildDescriptors() -> Bool {
+    externalDescriptor = ""
+    internalDescriptor = ""
 
-    for i in 0 ..< totalCosigners {
-      let raw = cosignerXpubs[i].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-      let normalized = URService.normalizeXpub(raw, isTestnet: isTestnet) ?? raw
-      keyEntries.append((
-        origin: "[\(cosignerFingerprints[i])/48'/\(network.coinType)'/0'/2']",
-        xpub: normalized,
-        fingerprint: cosignerFingerprints[i],
-        path: cosignerDerivationPaths[i],
-        label: cosignerLabels[i],
-        index: i
-      ))
+    guard allCosignersComplete else {
+      errorMessage = "Every cosigner needs an xpub and a fingerprint"
+      return false
     }
 
-    // Sort by xpub for BIP67 compliance
-    keyEntries.sort { $0.xpub < $1.xpub }
+    // Each screen validates its own cosigner; check them all again here, so the
+    // descriptors can only be built from keys at the standard BIP48 path whichever
+    // way the list was filled in
+    for i in 0 ..< totalCosigners {
+      let problem = validateCosignerXpub(cosignerXpubs[i], at: i)
+        ?? validateFingerprint(cosignerFingerprints[i])
+        ?? validateDerivationPath(cosignerDerivationPaths[i])
+      if let problem {
+        errorMessage = "Cosigner \(i + 1): \(problem)"
+        return false
+      }
+    }
 
-    let externalKeys = keyEntries.map {
-      "\($0.origin)\($0.xpub)/0/*"
-    }.joined(separator: ",")
-    let internalKeys = keyEntries.map {
-      "\($0.origin)\($0.xpub)/1/*"
-    }.joined(separator: ",")
+    do {
+      let external = try BitcoinService.buildDescriptor(
+        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: false
+      )
+      let change = try BitcoinService.buildDescriptor(
+        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: true
+      )
+      externalDescriptor = external
+      internalDescriptor = change
+    } catch {
+      logger.error("Failed to build descriptors: \(error.localizedDescription)")
+      errorMessage = error.localizedDescription
+      return false
+    }
 
-    externalDescriptor = "wsh(sortedmulti(\(requiredSignatures),\(externalKeys)))"
-    internalDescriptor = "wsh(sortedmulti(\(requiredSignatures),\(internalKeys)))"
     logger.info("Built \(requiredSignatures)-of-\(totalCosigners) descriptors on \(network.displayName): \(externalDescriptor)")
+    return true
   }
 
   var combinedDescriptor: String {
-    let cosignerData = (0 ..< totalCosigners).map {
-      (xpub: cosignerXpubs[$0], fingerprint: cosignerFingerprints[$0], derivationPath: cosignerDerivationPaths[$0])
-    }
-    return BitcoinService.buildCombinedDescriptor(
+    let combined = try? BitcoinService.buildCombinedDescriptor(
       requiredSignatures: requiredSignatures,
       cosigners: cosignerData,
       network: network
     )
+    return combined ?? ""
+  }
+
+  /// Addresses at the first `count` indexes of the receive chain, then of the
+  /// change chain, from a throwaway in-memory wallet.
+  private func peekAddresses(external: String, change: String, count: UInt32) throws -> [String] {
+    let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
+    let tempWallet = try Wallet(
+      descriptor: Descriptor(descriptor: external, networkKind: bdkNetworkKind),
+      changeDescriptor: Descriptor(descriptor: change, networkKind: bdkNetworkKind),
+      network: BitcoinService.shared.bdkNetwork(from: network),
+      persister: Persister.newInMemory()
+    )
+    return [KeychainKind.external, .internal].flatMap { keychain in
+      (0 ..< count).map { tempWallet.peekAddress(keychain: keychain, index: $0).address.description }
+    }
   }
 
   func deriveFirstAddress() {
-    let bdkNetwork = BitcoinService.shared.bdkNetwork(from: network)
-    let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
     do {
-      let extDesc = try Descriptor(descriptor: externalDescriptor, networkKind: bdkNetworkKind)
-      let chgDesc = try Descriptor(descriptor: internalDescriptor, networkKind: bdkNetworkKind)
-      let persister = try Persister.newInMemory()
-      let tempWallet = try Wallet(
-        descriptor: extDesc,
-        changeDescriptor: chgDesc,
-        network: bdkNetwork,
-        persister: persister
-      )
-      let info = tempWallet.peekAddress(keychain: .external, index: 0)
-      firstReceiveAddress = info.address.description
+      firstReceiveAddress = try peekAddresses(external: externalDescriptor, change: internalDescriptor, count: 1)[0]
       addressDerivationError = nil
     } catch {
       addressDerivationError = "Failed to derive address: \(error.localizedDescription)"
@@ -297,134 +352,250 @@ final class SetupWizardViewModel {
     }
 
     // Normalize hardened notation: h → '
-    text = text.replacingOccurrences(of: "h/", with: "'/")
-    text = text.replacingOccurrences(of: "h]", with: "']")
-    text = text.replacingOccurrences(of: "h)", with: "')")
+    text = Self.normalizeHardenedNotation(text)
 
-    // Basic validation - check it starts with wsh(sortedmulti(
-    guard text.hasPrefix("wsh(sortedmulti(") else {
+    // Birch is watch-only: refuse a descriptor carrying a private key before any
+    // of it is parsed, stored or logged. A key starts after "(", "," or "]", none
+    // of which occur inside a base58 key, so a public key cannot match.
+    if text.range(of: #"[,(\]][A-Za-z]prv"#, options: .regularExpression) != nil {
+      errorMessage = "This descriptor contains a private key. Birch is watch-only: import the public descriptor, with xpub or tpub keys only."
+      return false
+    }
+
+    // The whole text must be a single wsh(sortedmulti(...)) with nothing after it
+    let prefix = "wsh(sortedmulti("
+    guard text.hasPrefix(prefix), text.hasSuffix("))"),
+          let arguments = Self.splitDescriptorArguments(text.dropFirst(prefix.count).dropLast(2))
+    else {
       errorMessage = "Descriptor must be wsh(sortedmulti(...)) format"
       return false
     }
 
     // Extract M value
-    let afterPrefix = text.dropFirst("wsh(sortedmulti(".count)
-    guard let commaIndex = afterPrefix.firstIndex(of: ",") else {
+    guard arguments.count > 1 else {
       errorMessage = "Cannot parse M value from descriptor"
       return false
     }
-    guard let m = Int(afterPrefix[afterPrefix.startIndex ..< commaIndex]) else {
+    guard let m = Int(arguments[0]), m > 0 else {
       errorMessage = "Invalid M value"
       return false
     }
 
-    // Handle BIP-389 multipath descriptors: /<0;1>/* → split into /0/* and /1/*
-    if text.contains("<0;1>/*") {
-      externalDescriptor = text.replacingOccurrences(of: "<0;1>/*", with: "0/*")
-      internalDescriptor = text.replacingOccurrences(of: "<0;1>/*", with: "1/*")
-    } else if text.contains("<1;0>/*") {
-      externalDescriptor = text.replacingOccurrences(of: "<1;0>/*", with: "0/*")
-      internalDescriptor = text.replacingOccurrences(of: "<1;0>/*", with: "1/*")
-    } else if text.contains("{0,1}/*") {
-      // Pre-BIP389 Specter DIY format: {0,1}/* → split into /0/* and /1/*
-      externalDescriptor = text.replacingOccurrences(of: "{0,1}/*", with: "0/*")
-      internalDescriptor = text.replacingOccurrences(of: "{0,1}/*", with: "1/*")
-    } else if text.contains("{1,0}/*") {
-      externalDescriptor = text.replacingOccurrences(of: "{1,0}/*", with: "0/*")
-      internalDescriptor = text.replacingOccurrences(of: "{1,0}/*", with: "1/*")
-    } else if text.contains("/0/*") {
-      // Standard single-path descriptor (external)
-      externalDescriptor = text
-      internalDescriptor = text.replacingOccurrences(of: "/0/*", with: "/1/*")
-    } else if text.contains("/1/*") {
-      // Standard single-path descriptor (internal)
-      internalDescriptor = text
-      externalDescriptor = text.replacingOccurrences(of: "/1/*", with: "/0/*")
-    } else {
-      // No derivation suffix (e.g. Specter Desktop format) — append /0/* and /1/*
-      // Replace each bare xpub (followed by , or )) with xpub/0/* for external
-      let xpubPattern = #"([xt]pub[a-zA-Z0-9]+)(?=[,)])"#
-      if let xpubRegex = try? NSRegularExpression(pattern: xpubPattern) {
-        let nsText = text as NSString
-        externalDescriptor = xpubRegex.stringByReplacingMatches(
-          in: text, range: NSRange(location: 0, length: nsText.length),
-          withTemplate: "$1/0/*"
-        )
-        internalDescriptor = xpubRegex.stringByReplacingMatches(
-          in: text, range: NSRange(location: 0, length: nsText.length),
-          withTemplate: "$1/1/*"
-        )
-      } else {
-        externalDescriptor = text
-        internalDescriptor = text
-      }
-    }
-
-    // Parse cosigner info from key origins
+    // Every argument after M must be one key in the form Birch supports — a BIP48
+    // origin, an xpub/tpub and an optional receive/change suffix — matched in full,
+    // so nothing in the descriptor goes unread.
     // Supports both ' and h for hardened notation (already normalized to ' above)
-    let pattern = #"\[([0-9a-fA-F]{8})/48'/([01])'/(\d+)'/2'\]([xt]pub[a-zA-Z0-9]+)"#
-    guard let regex = try? NSRegularExpression(pattern: pattern) else {
+    let keyPattern = #"^\[([0-9a-fA-F]{8})/48'/([01])'/(\d+)'/2'\]([xt]pub[a-zA-Z0-9]+)(.*)$"#
+    guard let keyRegex = try? NSRegularExpression(pattern: keyPattern) else {
       errorMessage = "Failed to parse cosigner keys"
       return false
     }
 
-    let nsText = text as NSString
-    let matches = regex.matches(in: text, range: NSRange(location: 0, length: nsText.length))
+    var keys: [(xpub: String, fingerprint: String, derivationPath: String)] = []
+    var suffixes: Set<String> = []
 
-    if matches.isEmpty {
-      errorMessage = "No cosigner keys found in descriptor"
-      return false
-    }
-
-    // Every key must carry BIP48 origin info — otherwise keys without an origin
-    // would be silently dropped and the cosigner count would be wrong.
-    // Keys always follow "," (no origin) or "]" (after origin), which cannot
-    // occur inside a base58 key body, so this counts keys without false matches.
-    let keyPattern = #"[,\]][xt]pub"#
-    if let keyRegex = try? NSRegularExpression(pattern: keyPattern) {
-      let keyCount = keyRegex.numberOfMatches(in: text, range: NSRange(location: 0, length: nsText.length))
-      if keyCount != matches.count {
+    for (i, argument) in arguments.dropFirst().enumerated() {
+      let nsArgument = argument as NSString
+      guard let match = keyRegex.firstMatch(in: argument, range: NSRange(location: 0, length: nsArgument.length)) else {
+        // Bare xpubs, raw public keys and non-BIP48 origins all end up here
         errorMessage = "All keys must include BIP48 origin info like [fingerprint/48'/\(network.coinType)'/0'/2']"
         return false
       }
-    }
 
-    // Validate each key's origin path (coin type must match the network, account must be 0)
-    for match in matches {
-      let coin = nsText.substring(with: match.range(at: 2))
-      let account = nsText.substring(with: match.range(at: 3))
-      if let error = Self.validateDerivationPath("m/48'/\(coin)'/\(account)'/2'", for: network) {
+      let fingerprint = nsArgument.substring(with: match.range(at: 1))
+      let coin = nsArgument.substring(with: match.range(at: 2))
+      let account = nsArgument.substring(with: match.range(at: 3))
+      let xpub = nsArgument.substring(with: match.range(at: 4))
+      let suffix = nsArgument.substring(with: match.range(at: 5))
+      let derivationPath = "m/48'/\(coin)'/\(account)'/2'"
+
+      // Validate the key's origin path (coin type must match the network, account must be 0)
+      if let error = Self.validateDerivationPath(derivationPath, for: network) {
         errorMessage = error
         return false
       }
+      if let error = Self.validateXpub(xpub, for: network) {
+        errorMessage = "Key \(i + 1): \(error)"
+        return false
+      }
+      guard Self.importableKeySuffixes.contains(suffix) else {
+        errorMessage = "Key \(i + 1) has a derivation suffix Birch does not support. Use /<0;1>/*, /0/*, /1/* or no suffix."
+        return false
+      }
+
+      keys.append((xpub: xpub, fingerprint: fingerprint, derivationPath: derivationPath))
+      suffixes.insert(suffix)
     }
 
-    requiredSignatures = m
-    totalCosigners = matches.count
-
-    cosignerLabels = []
-    cosignerXpubs = []
-    cosignerFingerprints = []
-    cosignerDerivationPaths = []
-
-    for (i, match) in matches.enumerated() {
-      let fp = nsText.substring(with: match.range(at: 1))
-      let coin = nsText.substring(with: match.range(at: 2))
-      let account = nsText.substring(with: match.range(at: 3))
-      let xpub = nsText.substring(with: match.range(at: 4))
-
-      cosignerLabels.append("Cosigner \(i + 1)")
-      cosignerFingerprints.append(fp)
-      cosignerXpubs.append(xpub)
-      cosignerDerivationPaths.append("m/48'/\(coin)'/\(account)'/2'")
-    }
-
-    if requiredSignatures > totalCosigners {
-      errorMessage = "M (\(requiredSignatures)) cannot be greater than N (\(totalCosigners))"
+    guard suffixes.count == 1 else {
+      errorMessage = "All keys must use the same derivation suffix"
       return false
     }
 
+    guard Set(keys.map(\.xpub)).count == keys.count else {
+      errorMessage = "The same key appears more than once in the descriptor"
+      return false
+    }
+
+    if m > keys.count {
+      errorMessage = "M (\(m)) cannot be greater than N (\(keys.count))"
+      return false
+    }
+
+    // Store the descriptor the cosigner list describes, rebuilt from the parsed
+    // keys, rather than the pasted text — so the wallet, the cosigners shown and
+    // the exported backup cannot differ. As a backstop, the rebuilt descriptors
+    // must give the same addresses as the text as it was imported.
+    let canonicalExternal: String
+    let canonicalInternal: String
+    do {
+      canonicalExternal = try BitcoinService.buildDescriptor(
+        requiredSignatures: m, cosigners: keys, network: network, isChange: false
+      )
+      canonicalInternal = try BitcoinService.buildDescriptor(
+        requiredSignatures: m, cosigners: keys, network: network, isChange: true
+      )
+
+      let imported = Self.splitImportedDescriptor(text)
+      let canonicalAddresses = try peekAddresses(external: canonicalExternal, change: canonicalInternal, count: 3)
+      let importedAddresses = try peekAddresses(external: imported.external, change: imported.change, count: 3)
+      guard canonicalAddresses == importedAddresses else {
+        logger.error("Imported descriptor rejected: addresses differ from the descriptor rebuilt from its cosigner keys")
+        errorMessage = "This descriptor does not match the cosigner keys read from it, so it was not imported. "
+          + "Expected wsh(sortedmulti(M,[fingerprint/48'/\(network.coinType)'/0'/2']xpub/<0;1>/*,...))"
+        return false
+      }
+    } catch let error as AppError {
+      errorMessage = error.localizedDescription
+      return false
+    } catch {
+      errorMessage = "Invalid descriptor: \(error.localizedDescription)"
+      return false
+    }
+
+    externalDescriptor = canonicalExternal
+    internalDescriptor = canonicalInternal
+
+    requiredSignatures = m
+    totalCosigners = keys.count
+
+    cosignerLabels = keys.indices.map { "Cosigner \($0 + 1)" }
+    cosignerXpubs = keys.map(\.xpub)
+    cosignerFingerprints = keys.map(\.fingerprint)
+    cosignerDerivationPaths = keys.map(\.derivationPath)
+
     return true
+  }
+
+  /// Rewrites hardened notation (h → ') inside key origins ([fingerprint/48h/...]) only.
+  /// A base58 key can end in "h", so an "h" outside the brackets is part of a key.
+  /// One pass over the text, so a very long pasted or scanned input stays cheap.
+  private static func normalizeHardenedNotation(_ text: String) -> String {
+    let characters = Array(text)
+    var result = ""
+    var insideOrigin = false
+
+    for (i, character) in characters.enumerated() {
+      if character == "[" {
+        insideOrigin = true
+      } else if character == "]" {
+        insideOrigin = false
+      }
+
+      let next = i + 1 < characters.count ? characters[i + 1] : nil
+      if insideOrigin, character == "h", next == "/" || next == "]" {
+        result.append("'")
+      } else {
+        result.append(character)
+      }
+    }
+
+    return result
+  }
+
+  /// Key suffixes accepted on import. Every key in a descriptor must use the same one.
+  private static let importableKeySuffixes: Set<String> = [
+    "", "/<0;1>/*", "/<1;0>/*", "/{0,1}/*", "/{1,0}/*", "/0/*", "/1/*",
+  ]
+
+  /// Splits the arguments of a descriptor function on its top-level commas (the
+  /// {0,1} chain form has a comma of its own). Returns nil when brackets are unbalanced.
+  private static func splitDescriptorArguments(_ text: Substring) -> [String]? {
+    var arguments: [String] = []
+    var current = ""
+    var depth = 0
+
+    for character in text {
+      switch character {
+      case "(", "[", "<", "{":
+        depth += 1
+        current.append(character)
+      case ")", "]", ">", "}":
+        depth -= 1
+        guard depth >= 0 else { return nil }
+        current.append(character)
+      case "," where depth == 0:
+        arguments.append(current)
+        current = ""
+      default:
+        current.append(character)
+      }
+    }
+
+    guard depth == 0 else { return nil }
+    arguments.append(current)
+    return arguments
+  }
+
+  /// Receive and change descriptors for imported descriptor text as it was
+  /// written, without reading its keys.
+  private static func splitImportedDescriptor(_ text: String) -> (external: String, change: String) {
+    // Handle BIP-389 multipath descriptors: /<0;1>/* → split into /0/* and /1/*
+    if text.contains("<0;1>/*") {
+      return (
+        text.replacingOccurrences(of: "<0;1>/*", with: "0/*"),
+        text.replacingOccurrences(of: "<0;1>/*", with: "1/*")
+      )
+    }
+    if text.contains("<1;0>/*") {
+      return (
+        text.replacingOccurrences(of: "<1;0>/*", with: "0/*"),
+        text.replacingOccurrences(of: "<1;0>/*", with: "1/*")
+      )
+    }
+    // Pre-BIP389 Specter DIY format: {0,1}/* → split into /0/* and /1/*
+    if text.contains("{0,1}/*") {
+      return (
+        text.replacingOccurrences(of: "{0,1}/*", with: "0/*"),
+        text.replacingOccurrences(of: "{0,1}/*", with: "1/*")
+      )
+    }
+    if text.contains("{1,0}/*") {
+      return (
+        text.replacingOccurrences(of: "{1,0}/*", with: "0/*"),
+        text.replacingOccurrences(of: "{1,0}/*", with: "1/*")
+      )
+    }
+    // Standard single-path descriptor (external)
+    if text.contains("/0/*") {
+      return (text, text.replacingOccurrences(of: "/0/*", with: "/1/*"))
+    }
+    // Standard single-path descriptor (internal)
+    if text.contains("/1/*") {
+      return (text.replacingOccurrences(of: "/1/*", with: "/0/*"), text)
+    }
+
+    // No derivation suffix (e.g. Specter Desktop format) — append /0/* and /1/*
+    // Replace each bare xpub (followed by , or )) with xpub/0/* for external
+    let xpubPattern = #"([xt]pub[a-zA-Z0-9]+)(?=[,)])"#
+    guard let xpubRegex = try? NSRegularExpression(pattern: xpubPattern) else {
+      return (text, text)
+    }
+    let range = NSRange(location: 0, length: (text as NSString).length)
+    return (
+      xpubRegex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1/0/*"),
+      xpubRegex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1/1/*")
+    )
   }
 
   // MARK: - Navigation
@@ -453,7 +624,7 @@ final class SetupWizardViewModel {
       initializeCosigners()
       currentStep = .cosignerImport
     case .cosignerImport:
-      buildDescriptors()
+      guard buildDescriptors() else { return }
       currentStep = .walletName
     case .descriptorImport:
       importDescriptorError = nil

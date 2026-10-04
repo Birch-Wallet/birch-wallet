@@ -279,6 +279,8 @@ struct CosignerImportView: View {
   private func goNext() {
     // Validate current cosigner
     let idx = viewModel.currentCosignerIndex
+    // Drop surrounding whitespace first, so the key that is validated is the key that is stored
+    viewModel.cosignerXpubs[idx] = viewModel.cosignerXpubs[idx].trimmingCharacters(in: .whitespacesAndNewlines)
     if let error = viewModel.validateCosignerXpub(viewModel.cosignerXpubs[idx], at: idx) {
       validationError = error
       return

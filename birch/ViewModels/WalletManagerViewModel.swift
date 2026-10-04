@@ -41,6 +41,114 @@ final class WalletManagerViewModel {
     }
   }
 
+  /// Replaces a wallet's cosigner details and rebuilds its descriptors from them.
+  /// Returns false with `errorMessage` set, leaving the wallet as it was, when
+  /// the edited cosigners cannot be saved.
+  @discardableResult
+  func updateCosigners(
+    of wallet: WalletProfile,
+    to edited: [(label: String, xpub: String, fingerprint: String, derivationPath: String)],
+    modelContext: ModelContext
+  ) -> Bool {
+    let network = wallet.bitcoinNetwork
+    let existingCosigners = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
+
+    // The wallet's M-of-N is fixed; only the details of each cosigner can change
+    guard edited.count == existingCosigners.count else {
+      errorMessage = "The number of cosigners cannot be changed"
+      return false
+    }
+
+    // Validate all cosigners
+    let isTestnet = network != .mainnet
+    let existingXpubs = Set(existingCosigners.compactMap { URService.canonicalXpub($0.xpub, isTestnet: isTestnet) })
+    var canonicalXpubs: [String?] = []
+    for (i, cosigner) in edited.enumerated() {
+      // Compare in standard form, so a Vpub and its tpub count as the same key
+      let canonical = URService.canonicalXpub(cosigner.xpub, isTestnet: isTestnet)
+      // A key that is being added must sit at the BIP48 path. One that is already
+      // in the wallet is left alone: existing wallets are not re-checked.
+      let isNewKey = canonical.map { !existingXpubs.contains($0) } ?? true
+      if let error = SetupWizardViewModel.validateXpub(cosigner.xpub, for: network, checkingPlacement: isNewKey) {
+        errorMessage = "Cosigner \(i + 1): \(error)"
+        return false
+      }
+      if let duplicate = canonicalXpubs.firstIndex(of: canonical) {
+        errorMessage = "Cosigner \(i + 1) has the same xpub as Cosigner \(duplicate + 1)"
+        return false
+      }
+      canonicalXpubs.append(canonical)
+      if cosigner.fingerprint.count != 8 || !cosigner.fingerprint.allSatisfy(\.isHexDigit) {
+        errorMessage = "Cosigner \(i + 1) has an invalid fingerprint"
+        return false
+      }
+      if let error = SetupWizardViewModel.validateDerivationPath(cosigner.derivationPath, for: network) {
+        errorMessage = "Cosigner \(i + 1): \(error)"
+        return false
+      }
+    }
+
+    // Rebuild descriptors from the edited cosigner data before changing any
+    // record, so a key that cannot go into a descriptor leaves the wallet as it was
+    let cosignerData = edited.map {
+      (xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath)
+    }
+    let extDesc: String
+    let intDesc: String
+    do {
+      extDesc = try BitcoinService.buildDescriptor(
+        requiredSignatures: wallet.requiredSignatures,
+        cosigners: cosignerData,
+        network: network,
+        isChange: false
+      )
+      intDesc = try BitcoinService.buildDescriptor(
+        requiredSignatures: wallet.requiredSignatures,
+        cosigners: cosignerData,
+        network: network,
+        isChange: true
+      )
+    } catch {
+      errorMessage = error.localizedDescription
+      return false
+    }
+
+    errorMessage = nil
+
+    // Update cosigner records in SwiftData
+    for (cosigner, edit) in zip(existingCosigners, edited) {
+      cosigner.label = edit.label
+      cosigner.xpub = edit.xpub.trimmingCharacters(in: .whitespacesAndNewlines)
+      cosigner.fingerprint = edit.fingerprint
+      cosigner.derivationPath = edit.derivationPath
+    }
+
+    wallet.externalDescriptor = extDesc
+    wallet.internalDescriptor = intDesc
+
+    logger.info("Cosigner changes saved, rebuilding descriptors")
+
+    // Delete old BDK wallet database so it reloads fresh
+    let dbPath = Constants.walletDatabasePath(for: wallet.id)
+    try? FileManager.default.removeItem(at: dbPath)
+
+    do {
+      try modelContext.save()
+    } catch {
+      logger.error("Failed to save cosigner changes: \(error)")
+    }
+
+    // Reload wallet if this is the active wallet
+    if wallet.isActive {
+      Task {
+        try? await BitcoinService.shared.loadWallet(profile: wallet)
+        try? await BitcoinService.shared.fullResync()
+      }
+    }
+
+    return true
+  }
+
   func deleteWallet(_ wallet: WalletProfile, modelContext: ModelContext) {
     logger.info("Deleting wallet \(wallet.name)")
     let wasActive = wallet.isActive

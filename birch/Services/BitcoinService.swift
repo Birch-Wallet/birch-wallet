@@ -152,7 +152,9 @@ final class BitcoinService {
     return msg
   }
 
-  private init() {}
+  /// Not private, so a test can load a wallet into a service of its own instead
+  /// of the one the running app is using. App code goes through `shared`.
+  init() {}
 
   // MARK: - Wallet Lifecycle
 
@@ -1628,25 +1630,42 @@ final class BitcoinService {
   // Both builders rebuild the key origin as [fp/48'/coinType'/0'/2'] rather than
   // using cosigner.derivationPath. This is safe because Birch only supports
   // account-0 BIP48 keys — every entry point (setup wizard, descriptor import,
-  // cosigner editing) validates paths via SetupWizardViewModel.validateDerivationPath.
+  // cosigner editing) validates paths via SetupWizardViewModel.validateDerivationPath,
+  // and that a new key sits at that path (depth 4, last step 2') via validateXpub.
+  // The builders do not repeat the placement check, so wallets saved before it
+  // existed still build.
+
+  /// Normalizes each cosigner xpub to standard xpub/tpub format (BDK descriptor
+  /// parser does not accept SLIP132-tagged Vpub/Zpub keys) and sorts by it for BIP67.
+  /// Throws when a key is not exactly one extended public key — the key text is
+  /// placed in the descriptor, so anything else could add keys the cosigner list
+  /// does not show.
+  private static func canonicalCosigners(
+    _ cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
+    network: BitcoinNetwork
+  ) throws -> [(xpub: String, fingerprint: String, derivationPath: String)] {
+    let isTestnet = network != .mainnet
+
+    let normalized = try cosigners.enumerated().map { index, cosigner -> (xpub: String, fingerprint: String, derivationPath: String) in
+      guard let xpub = URService.canonicalXpub(cosigner.xpub, isTestnet: isTestnet) else {
+        throw AppError.descriptorInvalid("Cosigner key \(index + 1) is not a valid extended public key")
+      }
+      return (xpub: xpub, fingerprint: cosigner.fingerprint, derivationPath: cosigner.derivationPath)
+    }
+
+    return normalized.sorted { $0.xpub < $1.xpub }
+  }
 
   static func buildDescriptor(
     requiredSignatures: Int,
     cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
     network: BitcoinNetwork,
     isChange: Bool
-  ) -> String {
+  ) throws -> String {
     let chain = isChange ? "1" : "0"
     let coinType = network.coinType
-    let isTestnet = network != .mainnet
 
-    let normalized = cosigners.map { cosigner -> (xpub: String, fingerprint: String, derivationPath: String) in
-      let raw = cosigner.xpub.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-      let xpub = URService.normalizeXpub(raw, isTestnet: isTestnet) ?? raw
-      return (xpub: xpub, fingerprint: cosigner.fingerprint, derivationPath: cosigner.derivationPath)
-    }
-
-    let sorted = normalized.sorted { $0.xpub < $1.xpub }
+    let sorted = try canonicalCosigners(cosigners, network: network)
 
     let keys = sorted.map { cosigner in
       "[\(cosigner.fingerprint)/48'/\(coinType)'/0'/2']\(cosigner.xpub)/\(chain)/*"
@@ -1660,19 +1679,10 @@ final class BitcoinService {
     requiredSignatures: Int,
     cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
     network: BitcoinNetwork
-  ) -> String {
+  ) throws -> String {
     let coinType = network.coinType
-    let isTestnet = network != .mainnet
 
-    // Normalize each cosigner xpub to standard xpub/tpub format (BDK descriptor
-    // parser does not accept SLIP132-tagged Vpub/Zpub/Ypub/Upub keys).
-    let normalized = cosigners.map { cosigner -> (xpub: String, fingerprint: String, derivationPath: String) in
-      let raw = cosigner.xpub.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-      let xpub = URService.normalizeXpub(raw, isTestnet: isTestnet) ?? raw
-      return (xpub: xpub, fingerprint: cosigner.fingerprint, derivationPath: cosigner.derivationPath)
-    }
-
-    let sorted = normalized.sorted { $0.xpub < $1.xpub }
+    let sorted = try canonicalCosigners(cosigners, network: network)
 
     let keys = sorted.map { cosigner in
       "[\(cosigner.fingerprint)/48'/\(coinType)'/0'/2']\(cosigner.xpub)/<0;1>/*"

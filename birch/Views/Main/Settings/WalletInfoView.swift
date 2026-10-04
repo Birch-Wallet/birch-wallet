@@ -28,11 +28,13 @@ struct WalletInfoView: View {
   @State private var showResetElectrumConfirmation = false
   @State private var showDescriptorPDF = false
 
-  private var combinedDescriptor: String {
+  /// The output descriptor rebuilt from the saved cosigners, or nil when one of
+  /// their keys is not a valid extended public key.
+  private var combinedDescriptor: String? {
     let cosignerData = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }.map {
       (xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath)
     }
-    return BitcoinService.buildCombinedDescriptor(
+    return try? BitcoinService.buildCombinedDescriptor(
       requiredSignatures: wallet.requiredSignatures,
       cosigners: cosignerData,
       network: wallet.bitcoinNetwork
@@ -42,6 +44,8 @@ struct WalletInfoView: View {
   var body: some View {
     ScrollView {
       VStack(spacing: 16) {
+        let exportDescriptor = combinedDescriptor
+
         // Overview
         VStack(spacing: 12) {
           // Editable name row
@@ -97,10 +101,14 @@ struct WalletInfoView: View {
           .background(Color.hbBitcoinOrange.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
+        .disabled(exportDescriptor == nil)
+        .opacity(exportDescriptor == nil ? 0.5 : 1)
 
         // Copy descriptor
         Button(action: {
-          UIPasteboard.general.string = combinedDescriptor
+          if let exportDescriptor {
+            UIPasteboard.general.string = exportDescriptor
+          }
         }) {
           HStack(spacing: 8) {
             Image(systemName: "doc.on.doc")
@@ -113,6 +121,8 @@ struct WalletInfoView: View {
           .background(Color.hbSteelBlue.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
+        .disabled(exportDescriptor == nil)
+        .opacity(exportDescriptor == nil ? 0.5 : 1)
 
         // Descriptor PDF
         Button(action: { showDescriptorPDF = true }) {
@@ -126,6 +136,15 @@ struct WalletInfoView: View {
           .padding(.vertical, 14)
           .background(Color.purple.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .disabled(exportDescriptor == nil)
+        .opacity(exportDescriptor == nil ? 0.5 : 1)
+
+        if exportDescriptor == nil {
+          Text("The output descriptor can't be exported: a saved cosigner key is not a valid extended public key. Use Edit under Cosigners to correct it.")
+            .font(.hbLabel())
+            .foregroundStyle(Color.hbError)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
 
         // Cosigners
@@ -466,11 +485,11 @@ struct WalletInfoView: View {
         .birchSheet()
     }
     .sheet(isPresented: $showDescriptorQR) {
-      DescriptorQRSheet(descriptor: combinedDescriptor, walletName: wallet.name)
+      DescriptorQRSheet(descriptor: combinedDescriptor ?? "", walletName: wallet.name)
         .birchSheet()
     }
     .sheet(isPresented: $showDescriptorPDF) {
-      DescriptorPDFView(walletName: wallet.name, descriptor: combinedDescriptor)
+      DescriptorPDFView(walletName: wallet.name, descriptor: combinedDescriptor ?? "")
         .birchSheet()
     }
   }
@@ -788,72 +807,16 @@ private struct EditCosignersView: View {
   }
 
   private func saveChanges() {
-    // Validate all cosigners
-    for (i, cosigner) in editableCosigners.enumerated() {
-      if cosigner.xpub.isEmpty {
-        validationError = "Cosigner \(i + 1) is missing an xpub"
-        return
-      }
-      if cosigner.fingerprint.count != 8 || !cosigner.fingerprint.allSatisfy(\.isHexDigit) {
-        validationError = "Cosigner \(i + 1) has an invalid fingerprint"
-        return
-      }
-      if let error = SetupWizardViewModel.validateDerivationPath(cosigner.derivationPath, for: wallet.bitcoinNetwork) {
-        validationError = "Cosigner \(i + 1): \(error)"
-        return
-      }
+    let walletManager = WalletManagerViewModel()
+    let edited = editableCosigners.map {
+      (label: $0.label, xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath)
+    }
+    guard walletManager.updateCosigners(of: wallet, to: edited, modelContext: modelContext) else {
+      validationError = walletManager.errorMessage
+      return
     }
 
     validationError = nil
-
-    // Update cosigner records in SwiftData
-    let existingCosigners = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
-    for (i, edited) in editableCosigners.enumerated() {
-      if i < existingCosigners.count {
-        let cosigner = existingCosigners[i]
-        cosigner.label = edited.label
-        cosigner.xpub = edited.xpub
-        cosigner.fingerprint = edited.fingerprint
-        cosigner.derivationPath = edited.derivationPath
-      }
-    }
-
-    // Rebuild descriptors from updated cosigner data
-    let cosignerData = editableCosigners.map {
-      (xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath)
-    }
-    let extDesc = BitcoinService.buildDescriptor(
-      requiredSignatures: wallet.requiredSignatures,
-      cosigners: cosignerData,
-      network: wallet.bitcoinNetwork,
-      isChange: false
-    )
-    let intDesc = BitcoinService.buildDescriptor(
-      requiredSignatures: wallet.requiredSignatures,
-      cosigners: cosignerData,
-      network: wallet.bitcoinNetwork,
-      isChange: true
-    )
-
-    wallet.externalDescriptor = extDesc
-    wallet.internalDescriptor = intDesc
-
-    logger.info("Cosigner changes saved, rebuilding descriptors")
-
-    // Delete old BDK wallet database so it reloads fresh
-    let dbPath = Constants.walletDatabasePath(for: wallet.id)
-    try? FileManager.default.removeItem(at: dbPath)
-
-    try? modelContext.save()
-
-    // Reload wallet if this is the active wallet
-    if wallet.isActive {
-      Task {
-        try? await BitcoinService.shared.loadWallet(profile: wallet)
-        try? await BitcoinService.shared.fullResync()
-      }
-    }
-
     dismiss()
   }
 }
