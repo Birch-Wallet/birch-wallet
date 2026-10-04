@@ -454,6 +454,21 @@ enum LabelService {
 
   // MARK: - Private
 
+  /// Addresses in this wallet that carry a non-empty label.
+  static func labeledAddresses(walletID: UUID, context: ModelContext) -> Set<String> {
+    let addrType = WalletLabel.LabelType.addr.rawValue
+    let descriptor = FetchDescriptor<WalletLabel>(predicate: #Predicate {
+      $0.walletID == walletID && $0.type == addrType
+    })
+    do {
+      let labels = try context.fetch(descriptor)
+      return Set(labels.filter { !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.ref))
+    } catch {
+      logger.error("Failed to fetch address labels for wallet \(walletID): \(error)")
+      return []
+    }
+  }
+
   private static func fetchAllLabels(walletID: UUID, context: ModelContext) -> [WalletLabel] {
     let descriptor = FetchDescriptor<WalletLabel>(predicate: #Predicate { $0.walletID == walletID })
     do {
