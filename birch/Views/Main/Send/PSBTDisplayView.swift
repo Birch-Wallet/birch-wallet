@@ -477,7 +477,7 @@ private struct PSBTReviewCard: View {
             }
           } else {
             HStack(spacing: 6) {
-              Text(recipient.amountValue?.formattedSats ?? "0 sats")
+              Text(recipient.amountValue?.formattedSats ?? UInt64(0).formattedSats)
                 .font(.hbMonoBold(16))
                 .foregroundStyle(Color.hbBitcoinOrange)
               if fiatEnabled, let sats = recipient.amountValue,
@@ -520,7 +520,7 @@ private struct PSBTReviewCard: View {
       if viewModel.totalFee > 0 {
         ReviewItem(label: "Total Fee") {
           HStack(spacing: 6) {
-            Text(viewModel.totalFee.formattedSats)
+            Text(viewModel.totalFee.formattedFeeSats)
               .font(.hbMono())
               .foregroundStyle(Color.hbTextPrimary)
             if fiatEnabled, let fiat = fiatService.formattedSatsToFiat(viewModel.totalFee) {

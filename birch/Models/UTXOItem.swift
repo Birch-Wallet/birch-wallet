@@ -12,14 +12,6 @@ struct UTXOItem: Identifiable, Equatable {
     "\(txid):\(vout)"
   }
 
-  var formattedAmount: String {
-    if amount >= 100_000_000 {
-      let btc = Double(amount) / 100_000_000.0
-      return String(format: "%.8f BTC", btc)
-    }
-    return "\(amount) sats"
-  }
-
   enum KeychainKind: String {
     case external
     case `internal`

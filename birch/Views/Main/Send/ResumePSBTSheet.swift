@@ -198,7 +198,7 @@ struct ResumePSBTSheet: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      Text(Self.bareAmount(recipient.amount))
+      Text(recipient.amount.formattedBare)
         .font(.hbMono(15))
         .foregroundStyle(Color.hbTextPrimary)
         .lineLimit(1)
@@ -225,21 +225,8 @@ struct ResumePSBTSheet: View {
 
   private var feeText: String {
     let rate = savedPSBT.feeRateSatVb.trimmingCharacters(in: .whitespaces)
-    guard !rate.isEmpty else { return details.fee.formattedSats }
-    return "\(details.fee.formattedSats) · \(rate) sat/vB"
-  }
-
-  /// Per-recipient amounts drop the unit — the header total carries it.
-  private static func bareAmount(_ sats: UInt64) -> String {
-    switch Denomination.current {
-    case .btc:
-      return sats.formattedBTC
-    case .sats:
-      let formatter = NumberFormatter()
-      formatter.numberStyle = .decimal
-      formatter.groupingSeparator = ","
-      return formatter.string(from: NSNumber(value: sats)) ?? "\(sats)"
-    }
+    guard !rate.isEmpty else { return details.fee.formattedFeeSats }
+    return "\(details.fee.formattedFeeSats) · \(rate) sat/vB"
   }
 
   // MARK: - Actions

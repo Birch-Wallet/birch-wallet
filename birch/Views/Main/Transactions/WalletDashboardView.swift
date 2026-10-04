@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WalletDashboardView: View {
   @Environment(\.dismiss) private var dismiss
+  @AppStorage(Constants.denominationKey) private var denomination: String = "sats"
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
 
   private var bitcoinService: BitcoinService {
@@ -82,6 +83,8 @@ struct WalletDashboardView: View {
   }
 
   var body: some View {
+    // Amounts format from the Bitcoin unit setting; read it so a change redraws them
+    let _ = denomination
     NavigationStack {
       ScrollView {
         VStack(spacing: 16) {
@@ -150,7 +153,7 @@ struct WalletDashboardView: View {
             DashboardMetricCard(
               icon: "creditcard",
               label: "Total Fees Paid",
-              value: isPrivate ? Constants.privacyText() : (totalFeesPaid > 0 ? totalFeesPaid.formattedSats : "—")
+              value: isPrivate ? Constants.privacyText() : (totalFeesPaid > 0 ? totalFeesPaid.formattedFeeSats : "—")
             )
             if let age = avgUTXOAge {
               DashboardMetricCard(

@@ -57,7 +57,7 @@ private struct BumpFeeInputView: View {
         // Original fee info
         VStack(spacing: 12) {
           DetailRow(label: "Original Fee") {
-            Text(viewModel.originalFee.formattedSats)
+            Text(viewModel.originalFee.formattedFeeSats)
               .font(.hbMono())
               .foregroundStyle(Color.hbTextPrimary)
           }
