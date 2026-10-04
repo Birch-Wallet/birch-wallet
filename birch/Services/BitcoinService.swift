@@ -41,6 +41,8 @@ final class BitcoinService {
   private(set) var balance: UInt64 = 0
   private(set) var transactions: [TransactionItem] = []
   private(set) var utxos: [UTXOItem] = []
+  /// Every output this wallet has received, spent or not. `utxos` is the unspent subset.
+  private(set) var outputs: [UTXOItem] = []
   private(set) var requiredSignatures: Int = 2
   private(set) var totalCosigners: Int = 1
   private(set) var chainTipHeight: UInt32 = 0
@@ -169,6 +171,7 @@ final class BitcoinService {
     balance = 0
     transactions = []
     utxos = []
+    outputs = []
     syncState = .notStarted
     lastSyncDate = nil
     syncLog = []
@@ -721,8 +724,11 @@ final class BitcoinService {
       return ($0.timestamp ?? $0.firstSeen ?? .distantPast) > ($1.timestamp ?? $1.firstSeen ?? .distantPast)
     }
 
-    let unspent = wallet.listUnspent()
-    utxos = unspent.map { output in
+    let txDates = Dictionary(
+      transactions.map { ($0.id, $0.timestamp ?? $0.firstSeen ?? .distantPast) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    outputs = wallet.listOutput().map { output in
       let confirmed = switch output.chainPosition {
       case .confirmed: true
       case .unconfirmed: false
@@ -733,7 +739,8 @@ final class BitcoinService {
         amount: output.txout.value.toSat(),
         isConfirmed: confirmed,
         keychain: output.keychain == .external ? .external : .internal,
-        derivationIndex: output.derivationIndex
+        derivationIndex: output.derivationIndex,
+        isSpent: output.isSpent
       )
     }.sorted { u0, u1 in
       let isUnconfirmed0 = !u0.isConfirmed
@@ -741,10 +748,10 @@ final class BitcoinService {
       if isUnconfirmed0 != isUnconfirmed1 {
         return isUnconfirmed0
       }
-      let tx0 = transactions.first(where: { $0.id == u0.txid })
-      let tx1 = transactions.first(where: { $0.id == u1.txid })
-      return (tx0?.timestamp ?? tx0?.firstSeen ?? .distantPast) > (tx1?.timestamp ?? tx1?.firstSeen ?? .distantPast)
+      return (txDates[u0.txid] ?? .distantPast) > (txDates[u1.txid] ?? .distantPast)
     }
+    utxos = outputs.filter { !$0.isSpent }
+    logger.debug("Outputs: \(outputs.count) total, \(utxos.count) unspent, \(outputs.count - utxos.count) spent")
   }
 
   // MARK: - Saved PSBT Pruning

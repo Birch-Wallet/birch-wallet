@@ -33,8 +33,16 @@ struct UTXODetailView: View {
     return tx.outputs[Int(utxo.vout)].address
   }
 
+  /// The wallet transaction that spent this output, when it is spent
+  private var spendingTransaction: TransactionItem? {
+    guard utxo.isSpent else { return nil }
+    return service.transactions.first { tx in
+      tx.inputs.contains { $0.prevTxid == utxo.txid && $0.prevVout == utxo.vout }
+    }
+  }
+
   private var isFrozen: Bool {
-    guard let walletID = service.currentProfile?.id else { return false }
+    guard !utxo.isSpent, let walletID = service.currentProfile?.id else { return false }
     return frozenUTXOs.contains { $0.walletID == walletID && $0.outpoint == utxo.id }
   }
 
@@ -45,9 +53,9 @@ struct UTXODetailView: View {
       VStack(spacing: 16) {
         // Amount header
         VStack(spacing: 8) {
-          Image(systemName: isFrozen ? "snowflake" : "bitcoinsign.circle.fill")
+          Image(systemName: isFrozen ? "snowflake" : (utxo.isSpent ? "bitcoinsign.circle" : "bitcoinsign.circle.fill"))
             .font(.system(size: 44))
-            .foregroundStyle(isFrozen ? Color.hbSteelBlue : Color.hbBitcoinOrange)
+            .foregroundStyle(isFrozen ? Color.hbSteelBlue : (utxo.isSpent ? Color.hbTextSecondary : Color.hbBitcoinOrange))
 
           if isPrivate {
             Text(Constants.privacyText())
@@ -72,7 +80,15 @@ struct UTXODetailView: View {
           }
 
           HStack(spacing: 8) {
-            if isFrozen {
+            if utxo.isSpent {
+              Text("Spent")
+                .font(.hbLabel(11))
+                .foregroundStyle(Color.hbTextSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.hbTextSecondary.opacity(0.15))
+                .clipShape(Capsule())
+            } else if isFrozen {
               Text("Frozen")
                 .font(.hbLabel(11))
                 .foregroundStyle(Color.hbSteelBlue)
@@ -82,13 +98,15 @@ struct UTXODetailView: View {
                 .clipShape(Capsule())
             }
 
-            Text(utxo.isConfirmed ? "Confirmed" : "Unconfirmed")
-              .font(.hbLabel(11))
-              .foregroundStyle(utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange)
-              .padding(.horizontal, 8)
-              .padding(.vertical, 3)
-              .background((utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange).opacity(0.15))
-              .clipShape(Capsule())
+            if !utxo.isSpent {
+              Text(utxo.isConfirmed ? "Confirmed" : "Unconfirmed")
+                .font(.hbLabel(11))
+                .foregroundStyle(utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background((utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange).opacity(0.15))
+                .clipShape(Capsule())
+            }
           }
         }
         .onTapGesture(count: 2) {
@@ -272,20 +290,68 @@ struct UTXODetailView: View {
         }
         .hbCard()
 
-        // Freeze / Unfreeze action
-        Button(action: toggleFreeze) {
-          HStack(spacing: 8) {
-            Image(systemName: isFrozen ? "flame" : "snowflake")
-            Text(isFrozen ? "Unfreeze UTXO" : "Freeze UTXO")
-              .font(.hbBody(15))
+        // Spending transaction
+        if let spender = spendingTransaction {
+          NavigationLink(destination: TransactionDetailView(transaction: spender, network: service.currentNetwork)) {
+            VStack(alignment: .leading, spacing: 6) {
+              Text("Spent In")
+                .font(.hbLabel())
+                .foregroundStyle(Color.hbTextSecondary)
+
+              HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                  if let txLabel = txLabel(for: spender.id), !txLabel.isEmpty {
+                    HStack(spacing: 4) {
+                      Image(systemName: "tag.fill")
+                        .font(.system(size: 10))
+                      Text(txLabel)
+                        .font(.hbBody(14))
+                        .lineLimit(2)
+                    }
+                    .foregroundStyle(Color.hbSteelBlue)
+                  }
+
+                  Text(isPrivate ? Constants.privacyText(length: 8) : spender.id.truncatedMiddle(leading: 10, trailing: 8))
+                    .font(.hbMono(12))
+                    .foregroundStyle(Color.hbTextPrimary)
+
+                  if let date = spender.timestamp ?? spender.firstSeen {
+                    Text(date.longFormatString)
+                      .font(.hbBody(12))
+                      .foregroundStyle(Color.hbTextSecondary)
+                  }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                  .font(.system(size: 13, weight: .semibold))
+                  .foregroundStyle(Color.hbTextSecondary)
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
           }
-          .foregroundStyle(isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 14)
-          .background((isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue).opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          .buttonStyle(.plain)
+          .hbCard()
         }
-        .hbCard()
+
+        // Freeze / Unfreeze action (spent outputs can't be frozen)
+        if !utxo.isSpent {
+          Button(action: toggleFreeze) {
+            HStack(spacing: 8) {
+              Image(systemName: isFrozen ? "flame" : "snowflake")
+              Text(isFrozen ? "Unfreeze UTXO" : "Freeze UTXO")
+                .font(.hbBody(15))
+            }
+            .foregroundStyle(isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background((isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue).opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+          }
+          .hbCard()
+        }
       }
       .padding(16)
     }
@@ -337,6 +403,11 @@ struct UTXODetailView: View {
     }
     utxoLabel = trimmed
     isEditingLabel = false
+  }
+
+  private func txLabel(for txid: String) -> String? {
+    guard let walletID = service.currentProfile?.id else { return nil }
+    return walletLabels.first(where: { $0.walletID == walletID && $0.type == "tx" && $0.ref == txid })?.label
   }
 
   private func addressLabel(for address: String) -> String? {

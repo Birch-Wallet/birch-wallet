@@ -398,7 +398,7 @@ struct TransactionDetailView: View {
           txid: transaction.id,
           newLabel: trimmed,
           transaction: transaction,
-          utxos: BitcoinService.shared.utxos,
+          utxos: BitcoinService.shared.outputs,
           context: modelContext,
           walletID: walletID
         )
