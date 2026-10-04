@@ -434,7 +434,7 @@ struct WalletInfoView: View {
       UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     .background(Color.hbBackground)
-    .navigationTitle("Wallet Info")
+    .navigationTitle("Wallet Settings")
     .onAppear {
       gapLimitText = "\(wallet.addressGapLimit)"
       electrumHostText = wallet.electrumHost

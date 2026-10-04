@@ -207,7 +207,7 @@ struct TransactionListView: View {
                 Label("Dashboard", systemImage: "chart.bar.xaxis")
               }
               Button(action: { showWalletInfo = true }) {
-                Label("Wallet Info", systemImage: "info.circle")
+                Label("Wallet Settings", systemImage: "info.circle")
               }
               Menu {
                 Button(action: { showImportFilePicker = true }) {
