@@ -57,6 +57,13 @@ struct ElectrumServerSetupSection: View {
               .padding(10)
               .birchCard(.nested)
               .foregroundStyle(Color.hbTextPrimary)
+              .onChange(of: viewModel.electrumPort) { old, new in
+                let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxPort)
+                if accepted != new {
+                  // Not a port number — ignore the keystroke
+                  viewModel.electrumPort = accepted
+                }
+              }
           }
 
           VStack(alignment: .leading, spacing: 6) {
@@ -222,6 +229,13 @@ struct WalletAdvancedSetupSection: View {
             .padding(10)
             .birchCard(.nested)
             .foregroundStyle(Color.hbTextPrimary)
+            .onChange(of: viewModel.addressGapLimit) { old, new in
+              let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxGapLimit)
+              if accepted != new {
+                // Out of range or not a whole number — ignore the keystroke
+                viewModel.addressGapLimit = accepted
+              }
+            }
         }
 
         VStack(alignment: .leading, spacing: 6) {

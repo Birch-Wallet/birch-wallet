@@ -368,7 +368,7 @@ final class BitcoinService {
       }
 
       if needsFullScan {
-        let gapLimit = currentProfile?.addressGapLimit ?? Constants.maxAddressGap
+        let gapLimit = currentProfile?.scanGapLimit ?? Constants.maxAddressGap
         addToLog("Starting full scan (gapLimit: \(gapLimit))")
 
         let inspector = FullScanProgressInspector { [weak self] keychain, index in
@@ -855,7 +855,7 @@ final class BitcoinService {
     guard let wallet else { return [] }
     let bdkKeychain: KeychainKind = keychain == .external ? .external : .internal
     let usedAddresses = buildUsedAddressSet()
-    let gapLimit = currentProfile?.addressGapLimit ?? Constants.maxAddressGap
+    let gapLimit = currentProfile?.scanGapLimit ?? Constants.maxAddressGap
 
     // Scan addresses, always ensuring gapLimit unused addresses after the last used one.
     // We extend the scan window each time we find a used address.

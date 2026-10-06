@@ -91,6 +91,37 @@ struct InputLimitsTests {
     #expect(InputLimits.sum([UInt64.max / 2, UInt64.max / 2, 5]) == UInt64.max)
   }
 
+  // MARK: - Counts (port and gap limit)
+
+  @Test func countAcceptsWholeNumbersWithinRange() {
+    #expect(InputLimits.maxPort == 65535)
+    #expect(InputLimits.sanitizeCount("1", old: "", max: InputLimits.maxPort) == "1")
+    #expect(InputLimits.sanitizeCount("50002", old: "5000", max: InputLimits.maxPort) == "50002")
+    #expect(InputLimits.sanitizeCount("65535", old: "6553", max: InputLimits.maxPort) == "65535")
+    #expect(InputLimits.sanitizeCount("10000", old: "1000", max: InputLimits.maxGapLimit) == "10000")
+    #expect(InputLimits.sanitizeCount("", old: "5", max: InputLimits.maxPort) == "", "The field can be cleared")
+  }
+
+  @Test func countRejectsOutOfRangeAndNonDigits() {
+    #expect(InputLimits.sanitizeCount("65536", old: "6553", max: InputLimits.maxPort) == "6553")
+    #expect(InputLimits.sanitizeCount("500022", old: "50002", max: InputLimits.maxPort) == "50002")
+    #expect(InputLimits.sanitizeCount("10001", old: "1000", max: InputLimits.maxGapLimit) == "1000")
+    #expect(InputLimits.sanitizeCount("0", old: "", max: InputLimits.maxPort) == "")
+    #expect(InputLimits.sanitizeCount("-1", old: "20", max: InputLimits.maxGapLimit) == "20")
+    #expect(InputLimits.sanitizeCount("+5", old: "20", max: InputLimits.maxGapLimit) == "20")
+    #expect(InputLimits.sanitizeCount("1e3", old: "20", max: InputLimits.maxGapLimit) == "20")
+    #expect(InputLimits.sanitizeCount("12.5", old: "20", max: InputLimits.maxGapLimit) == "20")
+    #expect(InputLimits.sanitizeCount("99999999999999999999999", old: "20", max: InputLimits.maxGapLimit) == "20")
+    #expect(InputLimits.sanitizeCount("١٢٣", old: "20", max: InputLimits.maxGapLimit) == "20", "Non-ASCII digits are rejected")
+  }
+
+  /// Returning an `old` that is itself out of range would make a field swap
+  /// between two rejected values without end.
+  @Test func countNeverReturnsAValueOutOfRange() {
+    #expect(InputLimits.sanitizeCount("700001", old: "70000", max: InputLimits.maxPort) == "")
+    #expect(InputLimits.sanitizeCount("abc", old: "-5", max: InputLimits.maxGapLimit) == "")
+  }
+
   // MARK: - Fiat Conversion
 
   @Test func fiatToSatsRejectsNonFiniteAndHugeValues() {
