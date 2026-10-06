@@ -144,6 +144,36 @@ struct URServiceTests {
     #expect(unwrappedZpub.hasPrefix("xpub"), "Should correctly convert Zpub to xpub")
   }
 
+  @Test func extendedPublicKeyDecodingAcceptsOnlySinglePublicKeys() {
+    let tpub = "tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH"
+    let vpub = "Vpub5mKYi6ZW8JMuPDDizjMfw5hwjj4xKSkmUSjVDJjrAghaCw7aSJF4v7M4miDJd6uwZcmxK1LcSCsXB7bY4ELTsV3VbCj2LqHq26b8VUzgDWo"
+    let zpub = "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg"
+    let xpub = "xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz"
+
+    for key in [tpub, vpub, zpub, xpub] {
+      #expect(URService.decodeExtendedPublicKey(key)?.count == 78, "\(key.prefix(4)) should decode")
+    }
+
+    // Extended private keys have the same length and a valid checksum (published test keys)
+    let xprv = "xprv9s21ZrQH143K31xYSDQpPDxsXRTUcvj2iNHm5NUtrGiGG5e2DtALGdso3pGz6ssrdK4PFmM8NSpSBHNqPqm55Qn3LqFtT2emdEXVYsCzC2U"
+    let tprv = "tprv8ZgxMBicQKsPdppqwh6vooJ1Du7JdgkXwbp3tvGdwYE58rdVe2Q7sdjiiH7mcanBgkVX9vgNBNzcbZx35fSBK3B6Z19yK2gwh1WDhqfPmgr"
+    #expect(URService.decodeExtendedPublicKey(xprv) == nil)
+    #expect(URService.decodeExtendedPublicKey(tprv) == nil)
+    #expect(URService.normalizeXpub(tprv, isTestnet: true) == nil)
+
+    // Anything around the key
+    #expect(URService.decodeExtendedPublicKey("\(tpub)/0/*") == nil)
+    #expect(URService.decodeExtendedPublicKey("[73c5da0a/48'/1'/0'/2']\(tpub)") == nil)
+    #expect(URService.decodeExtendedPublicKey(String(tpub.dropLast())) == nil)
+    #expect(URService.decodeExtendedPublicKey("") == nil)
+
+    // canonicalXpub ignores surrounding whitespace and slashes, nothing else
+    #expect(URService.canonicalXpub(" \(vpub)\n", isTestnet: true) == tpub)
+    #expect(URService.canonicalXpub("\(tpub)/", isTestnet: true) == tpub)
+    #expect(URService.canonicalXpub("\(tpub)/0/*", isTestnet: true) == nil)
+    #expect(URService.canonicalXpub("\(tpub),\(tpub)", isTestnet: true) == nil)
+  }
+
   @Test func cryptoOutputDescriptorParsing() {
     // Real SeedSigner crypto-output UR containing a 1-of-2 wsh(sortedmulti(...)) descriptor
     let urString = "UR:CRYPTO-OUTPUT/TAADMETAADMSOEADADAOLFTAADDLOSAOWKAXHDCLAOPDFNLNESAXHSJOFTVWFWHPTDUYPYHSROVLSWVDSRVWKBNNECZTHYMOURGSFDVDVAAAHDCXGMDKHPWMZTLRSOBSMWIOBWFWRPTODKNSEYAMTAHKRKQDISJTGWNSTSSFQDKPZSVTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYDYOTJEGMAXAAAYCYOYJNLKZMASJZGUIHIHIEGUINIOJTIHJPCXEYTAADDLOSAOWKAXHDCLAXIYMYFYWEMKASIOVSFYFDFDVASWONMTSKURSSTDMHVWSKLEAMKOVSGSDSCNSGNDOEAAHDCXBAMHFTFLGSDTBGBGFGGUREENGLFYTSHSCEJNKPHGGLFDFMTEWLENBDBBOXDYEMWTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYGRFPNSJOASJZGUIHIHIEGUINIOJTIHJPCXEHDLSWWZMD"
@@ -291,28 +321,121 @@ struct URServiceTests {
 
   // MARK: - Out-of-range CBOR integers
 
-  /// A crypto-hdkey UR for m/48'/1'/0'/2'. Each override replaces one field
-  /// with a value too large for its type.
-  private func hdKeyUR(
-    depth: UInt64 = 4,
+  /// A crypto-hdkey map for m/48'/1'/0'/2'. Each override replaces one field;
+  /// a nil depth leaves that optional field out, as some signers do.
+  private func hdKeyMap(
+    depth: UInt64? = 4,
     sourceFingerprint: UInt64 = 0x7A13_A7B1,
     parentFingerprint: UInt64 = 0x1234_5678,
     lastIndex: UInt64 = 2
-  ) throws -> UR {
+  ) -> Map {
     var keypath = Map()
     keypath.insert(CBOR.unsigned(1), CBOR.array([
       .unsigned(48), .simple(.true), .unsigned(1), .simple(.true),
       .unsigned(0), .simple(.true), .unsigned(lastIndex), .simple(.true),
     ]))
     keypath.insert(CBOR.unsigned(2), CBOR.unsigned(sourceFingerprint))
-    keypath.insert(CBOR.unsigned(3), CBOR.unsigned(depth))
+    if let depth {
+      keypath.insert(CBOR.unsigned(3), CBOR.unsigned(depth))
+    }
 
     var hdKey = Map()
     hdKey.insert(CBOR.unsigned(3), CBOR.bytes(Data([0x02] + [UInt8](repeating: 0x11, count: 32))))
     hdKey.insert(CBOR.unsigned(4), CBOR.bytes(Data(repeating: 0x22, count: 32)))
     hdKey.insert(CBOR.unsigned(6), CBOR.tagged(Tag(304), CBOR.map(keypath)))
     hdKey.insert(CBOR.unsigned(8), CBOR.unsigned(parentFingerprint))
+    return hdKey
+  }
+
+  /// A crypto-hdkey UR for m/48'/1'/0'/2'. Each override replaces one field
+  /// with a value too large for its type.
+  private func hdKeyUR(
+    depth: UInt64? = 4,
+    sourceFingerprint: UInt64 = 0x7A13_A7B1,
+    parentFingerprint: UInt64 = 0x1234_5678,
+    lastIndex: UInt64 = 2
+  ) throws -> UR {
+    let hdKey = hdKeyMap(
+      depth: depth, sourceFingerprint: sourceFingerprint, parentFingerprint: parentFingerprint, lastIndex: lastIndex
+    )
     return try UR(type: "crypto-hdkey", cbor: CBOR.map(hdKey))
+  }
+
+  // MARK: - Key placement (depth and last step)
+
+  private static let hardened: UInt32 = 0x8000_0000
+
+  @Test func extendedPublicKeyPlacementReadsDepthAndLastStep() throws {
+    // BIP48 P2WSH key at m/48'/1'/0'/2' (descriptor vector #13)
+    let bip48 = try #require(URService.extendedPublicKeyPlacement(
+      "tpubDFS7QGevX3YHQZhsTChSdtxK2Njdoh4BBozoUNQc8qxpReHC2HjoPDpLfqsKvJ9SVzfMinhrGLbjzFxBNQoBvSdyAg8ig3bQE9UYwE6pgVi"
+    ))
+    #expect(bip48.depth == 4)
+    #expect(bip48.childNumber == Self.hardened | 2)
+
+    // The same key as a SLIP132 Vpub reads the same
+    let vpub = try #require(URService.extendedPublicKeyPlacement(
+      "Vpub5kv6Y3xqGFyhZQyCz8LzaSwVzAJLJTvHcUewWAhrLRRRjZeYs53qrfspVEBKZw6rvwGy8Z1ef7e7Vzsu3BLF6MkjFXWnLpmftKQT1Eub5Cf"
+    ))
+    #expect(vpub.depth == 4)
+    #expect(vpub.childNumber == Self.hardened | 2)
+
+    // Account-level key from a single-sig path (m/44'/1'/0', descriptor vector #17)
+    let account = try #require(URService.extendedPublicKeyPlacement(
+      "tpubDDtPnSgWYk8dDnaDwnof4ehcnjuL5VoUt1eW2MoAed1grPHuXPDnkX1fWMvXfcz3NqFxPbhqNZ3QBdYjLz2hABeM9Z2oqMR1Gt2HHYDoCgh"
+    ))
+    #expect(account.depth == 3)
+    #expect(account.childNumber == Self.hardened | 0)
+
+    // Master public key
+    let master = try #require(URService.extendedPublicKeyPlacement(
+      "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg"
+    ))
+    #expect(master.depth == 0)
+    #expect(master.childNumber == 0)
+
+    #expect(URService.extendedPublicKeyPlacement("tpubA") == nil)
+    #expect(URService.extendedPublicKeyPlacement("") == nil)
+  }
+
+  @Test func scannedKeyKeepsTheDepthItsSignerDeclared() throws {
+    let declared = try URService.parseHDKey(from: hdKeyUR(depth: 4))
+    #expect(URService.extendedPublicKeyPlacement(declared.xpub)?.depth == 4)
+
+    // A declared depth is never overridden, even when it disagrees with the path
+    let mismatched = try URService.parseHDKey(from: hdKeyUR(depth: 3))
+    #expect(URService.extendedPublicKeyPlacement(mismatched.xpub)?.depth == 3)
+  }
+
+  /// Depth is optional in a crypto-hdkey. A signer that leaves it out still gave
+  /// the path, so the rebuilt key takes its depth from the path's four steps.
+  @Test func scannedKeyWithoutDepthFieldTakesDepthFromItsPath() throws {
+    let result = try URService.parseHDKey(from: hdKeyUR(depth: nil))
+    #expect(result.derivationPath == "m/48'/1'/0'/2'")
+
+    let placement = try #require(URService.extendedPublicKeyPlacement(result.xpub))
+    #expect(placement.depth == 4)
+    #expect(placement.childNumber == Self.hardened | 2)
+  }
+
+  @Test func scannedDescriptorKeyWithoutDepthFieldTakesDepthFromItsPath() throws {
+    var multisig = Map()
+    multisig.insert(CBOR.unsigned(1), CBOR.unsigned(1))
+    multisig.insert(CBOR.unsigned(2), CBOR.array([.tagged(Tag(303), CBOR.map(hdKeyMap(depth: nil)))]))
+    let ur = try UR(type: "crypto-output", cbor: .tagged(Tag(401), .tagged(Tag(406), CBOR.map(multisig))))
+
+    guard case let .descriptor(descriptor) = URService.processUR(ur) else {
+      Issue.record("Expected a descriptor from the crypto-output")
+      return
+    }
+    #expect(descriptor.hasPrefix("wsh(sortedmulti(1,[7a13a7b1/48'/1'/0'/2']tpub"))
+
+    // The key text sits between the origin's "]" and the "/" of its suffix
+    let afterOrigin = try #require(descriptor.components(separatedBy: "]").last)
+    let xpub = String(afterOrigin.prefix { $0 != "/" })
+    let placement = try #require(URService.extendedPublicKeyPlacement(xpub))
+    #expect(placement.depth == 4)
+    #expect(placement.childNumber == Self.hardened | 2)
   }
 
   @Test func hdKeyInRangeStillParses() throws {

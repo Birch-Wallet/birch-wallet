@@ -6,6 +6,14 @@
     "kind": "receive",
     "receive": "bc1qguff4qkanmmysn8tdv2ccz5lgxtty7famxwtd04rwjeyy0lny5usyzrgsu",
     "change": null,
+    "receiveRange": [
+      "bc1qguff4qkanmmysn8tdv2ccz5lgxtty7famxwtd04rwjeyy0lny5usyzrgsu",
+      "bc1qwwv347h8wnth9pxdw40y9mvqn85vuf5gm52j3jm8yj42hk43g0asc7qtgk",
+      "bc1qqs6wrf3gknu0xq83sd62k6702h5s2d2cnmz6vnrcf2lmk3ss0ekshjfftu",
+      "bc1qkkw8d92sk465j6gdur2rt20hz6pra6namu6wk44yte8mdhwgmm9q5xjhlk",
+      "bc1q2qh32ccqj9swt7ncp6hyyhvuwvf0huupfg3kdsa6qgxj929tmlfscd8f8k"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -16,6 +24,14 @@
     "kind": "receive",
     "receive": "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
     "change": null,
+    "receiveRange": [
+      "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
+      "bc1qp6rfclasvmwys7w7j4svgc2mrujq9m73s5shpw4e799hwkdcqlcsj464fw",
+      "bc1qvxcjrqhrkdkkuujfk3enulmwve5r2x4cm9f4q8g64kg64q7puyvsv8vkcm",
+      "bc1qmhmj2mswyvyj4az32mzujccvd4dgr8s0lfzaum4n4uazeqc7xxvsr7e28n",
+      "bc1qjeu2wa5jwvs90tv9t9xz99njnv3we3ux04fn7glw3vqsk4ewuaaq9kdc9t"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -26,6 +42,20 @@
     "kind": "multipath",
     "receive": "bc1qgj68ez26sqk56pu7a0eg6r8l35dj5zeq29xrc7dnch5q2mh5t25s6z9wd4",
     "change": "bc1q4ne4h67q2jz39qzpj2scg9794xeyyaprxw9yrkumrszzlvd4he0sq78wg0",
+    "receiveRange": [
+      "bc1qgj68ez26sqk56pu7a0eg6r8l35dj5zeq29xrc7dnch5q2mh5t25s6z9wd4",
+      "bc1q2m2qghy96jmyc2xlfy27yedjkfd29fn00d9frj7w43629ylplllq2ervpt",
+      "bc1qf7acn0vaacr63et0eqa6xdxmk42c7546cghksny3ehtlneelxhhqrct7r4",
+      "bc1qywxhlct5upswz26k0frqpn3kee6m2mxmyy9rvwult7e96a405ccswkdnzw",
+      "bc1qzm598ljct8mr7kqkq9lthjccqrafc84e00k7rcgv8hsts4nx729qswfxl8"
+    ],
+    "changeRange": [
+      "bc1q4ne4h67q2jz39qzpj2scg9794xeyyaprxw9yrkumrszzlvd4he0sq78wg0",
+      "bc1q6a882dzkvg7gur3vhyjd9t0x7szv42detfegpm2rfv6p6knvaevs8wn52n",
+      "bc1qfkjhc6fqfgc49w935dd9aksav2ew8vewjw2daxrylf3p6w0p6pyqd64dp8",
+      "bc1ql6v6yengyuu4wxzwtd40el8wqpmkqx2rwcf4vm5qytwyw89pgxfqdgxrxn",
+      "bc1qhpzxuhxj5qa2zclfpr2l4t8rh2v0y7npx4d6kev92ekmlltsd0rs6exnee"
+    ],
     "error": null,
     "note": null
   },
@@ -36,6 +66,8 @@
     "kind": "fixed",
     "receive": "bc1qmjrd3e4ft74xlstuv06pyku72vrqdvqztqh3xlgy9mujqpv2ke6q3anazu",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -46,6 +78,8 @@
     "kind": "fixed",
     "receive": "bc1qyrjns6uczxnmx0mzh26n7xl055nygre483gf45uxhf6hgaup0thqlawezw",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -56,6 +90,20 @@
     "kind": "multipath",
     "receive": "bc1q4taqq6q6l8fvguva6ftvrz3qgdjy6p3w2s0ds0nl6qrjw7t0hfhqgrqcwd",
     "change": "bc1q2gvjkydqvgcgk03wc0jf2um007lhecjsrq9k22gl37jpezj0ywvqq904eh",
+    "receiveRange": [
+      "bc1q4taqq6q6l8fvguva6ftvrz3qgdjy6p3w2s0ds0nl6qrjw7t0hfhqgrqcwd",
+      "bc1q3m9z4nhe7y376urgftnwl3js3mvyladmuzmgejwuhmdg6v47pwtqetcra8",
+      "bc1q4tr53km4ek5ulzntvqrn0r4yu8hjfghms252m7x0hcpkf5jy2uesr5cdcj",
+      "bc1qpfqgwclml7p47kgaf7u0jvn6g2qx630jy26vl77ldftq9xq4hy0qvyked4",
+      "bc1qq7r5w5nl6k53xwq5a9e0zs6vdd2v7pdd2dg6w3gwvcpf9j6f6g3smkwa0m"
+    ],
+    "changeRange": [
+      "bc1q2gvjkydqvgcgk03wc0jf2um007lhecjsrq9k22gl37jpezj0ywvqq904eh",
+      "bc1qc3vhae2ugyy4c7phx0mw29pxyt8t6ggpr0dm52cga2netweu2qasqv3lre",
+      "bc1q7fz4smqfugtlj5660fd8f7zn3gnptx3u4lw3rh7smryemphhrtfq90343s",
+      "bc1q0h4flwu7smc95qa7yss2ra8rjkaw0gw8n9u3degkngx52rw9fxcskcyf0e",
+      "bc1quheuphf9cv7hcm9zvqxa0rkrk6zfgp4ex4upz32qr2aurdx9nnusrhmvdk"
+    ],
     "error": null,
     "note": null
   },
@@ -66,6 +114,14 @@
     "kind": "receive",
     "receive": "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
     "change": null,
+    "receiveRange": [
+      "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
+      "bc1qp6rfclasvmwys7w7j4svgc2mrujq9m73s5shpw4e799hwkdcqlcsj464fw",
+      "bc1qvxcjrqhrkdkkuujfk3enulmwve5r2x4cm9f4q8g64kg64q7puyvsv8vkcm",
+      "bc1qmhmj2mswyvyj4az32mzujccvd4dgr8s0lfzaum4n4uazeqc7xxvsr7e28n",
+      "bc1qjeu2wa5jwvs90tv9t9xz99njnv3we3ux04fn7glw3vqsk4ewuaaq9kdc9t"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -76,6 +132,14 @@
     "kind": "receive",
     "receive": "bc1q7xls687x9cn2wvaan6fmyadr0q2knu7hgdag60369dwsny9ue40s67s7j0",
     "change": null,
+    "receiveRange": [
+      "bc1q7xls687x9cn2wvaan6fmyadr0q2knu7hgdag60369dwsny9ue40s67s7j0",
+      "bc1qdhvcm2y98h7w34dj4250tugcvs6syqz69vgulvypsq5kkxah60xs73g6g8",
+      "bc1qa053p36qx2rtnyr3hq3yjpadj7lpjpk2gnht67uekum5r43g8tqsrkcegc",
+      "bc1qxe55u3ysqmnymkrwafsfx8mxmmhuc4eu3xd0z50vf0h39werxjsqx3upye",
+      "bc1qmkmz8swcsmdf0h05sycf0clhzdq8ft9wdk20f7ctcq7v8uzjarpsfpqrqz"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -86,6 +150,14 @@
     "kind": "receive",
     "receive": "tb1qym0lechjavp3fmfuy5yr3kfqrsyfvegd0jqcfwpvc0anj9xq5arstm8dgk",
     "change": null,
+    "receiveRange": [
+      "tb1qym0lechjavp3fmfuy5yr3kfqrsyfvegd0jqcfwpvc0anj9xq5arstm8dgk",
+      "tb1q4th0g5at54stcnyrnwk43s9a4kuen5v29d5weaqc44kdux634vvqfv4cgd",
+      "tb1qzpza6ec0zculkxh9spw8nf3hayktl87n5prkfdqgpqrjlgpv78psy0ejxf",
+      "tb1q4wp0cyjlrnfea9cz0pm75szjtrnf06ea38ay7vxm0amqrd78h03sr984dz",
+      "tb1qy8yau53hqhekpv2npsu5ahcl7ksqmsjj2cj895hdedpuzdkt94dsz50jfa"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -96,6 +168,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qeveyquyhvqg5j8nzylnucapyxachnr24uks0wylkm3mvwzqtge7sm89apa",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qeveyquyhvqg5j8nzylnucapyxachnr24uks0wylkm3mvwzqtge7sm89apa",
+      "tb1qknmt3c00mvaz54zx2w8krtwgx5rj4pmxm4k3ndyg6rwthqrl6hws6puh48",
+      "tb1qy4vh7qlfgdcty7ql5u6t4h72awzppa30s3w7quxl8uqhz0lhd6rqfkv69k",
+      "tb1qyawx06hske6ec7e7wgdf72pg3pa20lhxge72dd3nk3cadsw4dmjqkhmr0x",
+      "tb1qxy97s5xjrcwj0tycq0j6gpn6287rp59fqaq8lmrvkzyz5tqgs4uq5h2kpl"
+    ],
     "error": null,
     "note": null
   },
@@ -106,6 +186,14 @@
     "kind": "receive",
     "receive": "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
     "change": null,
+    "receiveRange": [
+      "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
+      "tb1qylhrxg42rc88ymvhtjaaxfkn3m2r7d4g38v9klfl8ty204pkafeq92pu7u",
+      "tb1qlktdhpdk28znc2kcc0dfyw4hqkz2q7v5mn5t6a8wqycrgs2u24pqaj2azt",
+      "tb1q8keh5ng6x4d4zmfs29uysqurrckppnlkacdhsyyawdperlq2zmus0l7vjf",
+      "tb1q8rsd9ag9sxy6shg3zchfyj7jxjp6kzglxxmv6d3rvevhvd36sfys5c8qc0"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -116,6 +204,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+      "tb1q9gt5zewm8mtp7fa33q2s8tfkxyref4mdv8g90rkltpmr9rqplf3swrwkql",
+      "tb1q23ks33l8hplq8gdkz9ct5rfhw7dhe5cuf3d39vrkvd4egk55vcnsytuuza",
+      "tb1q6me7xns3mh480t5pzm2qpkum4jjltwu997cjl82a9qure9f785yqd7w7rp",
+      "tb1qtck0k05cmztu99an70gsh59yhy8hf8rprcfghrgdnuw6d8rz8pmsas8zuu"
+    ],
     "error": null,
     "note": null
   },
@@ -126,6 +222,14 @@
     "kind": "receive",
     "receive": "tb1qhxhrpmlrng8zeeunfy4swqphv80uqqlqemm65fygh6y0n8c9s3aqv0rgxc",
     "change": null,
+    "receiveRange": [
+      "tb1qhxhrpmlrng8zeeunfy4swqphv80uqqlqemm65fygh6y0n8c9s3aqv0rgxc",
+      "tb1quz8qddyvqxjewuzgr4z6v4lg6wtgngdrlp53mua6q9dxkxpm7qjqqr3cdq",
+      "tb1qwfyva76a7v57hj87xsht6e478he0pjsxn0d8aldd06y9n8v7zjyswrg0rc",
+      "tb1qle5fukyx9c3myd3jlzy48l9r3dnw2nsqypsjt60nggguc7czsapscq8vkv",
+      "tb1q4fg23n2sx0qek749all0vrf3rhtc9upkxack4qhkkq8anxepgrjs25havh"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -136,6 +240,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1q0y75afghvleaev065fan5qdvrjxewr52y3hwhep5j8j5gq9jxfws36l8zf",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1q0y75afghvleaev065fan5qdvrjxewr52y3hwhep5j8j5gq9jxfws36l8zf",
+      "tb1qqp9cdlqcsnql9hwf6jkgvekwkcwswqq374m49rna3uwvwnxm88csp8uyh2",
+      "tb1qe9mgrkdtcvxy08xhp5c8wlzlrhnvzfjjj833yv4z7cr5jxu5n0lsw52ytw",
+      "tb1qslt7x9t4gw3u9rghpk87u288u4flcu4yj5hwgr3rlqfa69dd58lsns2du8",
+      "tb1qjkwr7yhss8h3cvk3t9zc6m9ap0lk5a5499ad5k5lj9h4sgq7m0fstl5zc2"
+    ],
     "error": null,
     "note": null
   },
@@ -146,6 +258,20 @@
     "kind": "multipath",
     "receive": "tb1qh7hr2u3jf02wusuflxxpr82qluxms0drj206rnt5x9p9yr0ydywsg2rphy",
     "change": "tb1qnhad064jvmuj6f3y6kr58qpdg5y48vjjxrzhpelrhm284sqxkerqh2w6du",
+    "receiveRange": [
+      "tb1qh7hr2u3jf02wusuflxxpr82qluxms0drj206rnt5x9p9yr0ydywsg2rphy",
+      "tb1q8v76ya3fq08ulupygwsnpzcm4sxs30arrhdu3vmtzvcsevvl9tcqfhvh2f",
+      "tb1q9eqsqedjs2chzn7hgetjstajyppxzt5jfmrgsdtzu8hlsh6zkn9qfkzrjr",
+      "tb1qdyqm48p80th07rlratqkg27v0yrhn4egamkmkwq99hw5j46plj9smkm7p9",
+      "tb1qu6659ddsx3j526s0we8tn373yd7t95f9s2yzfaxj7enld7qn7weqjec35s"
+    ],
+    "changeRange": [
+      "tb1qnhad064jvmuj6f3y6kr58qpdg5y48vjjxrzhpelrhm284sqxkerqh2w6du",
+      "tb1qzt33hgvv04txjpg8tffpnmx3fp0qvqek4m50uauqn6duvmf4svrqd3ne8v",
+      "tb1qsypgcumvd68h885fl226yzlthfqjhll8u39sd4zajjzaee0spcwqgg6s77",
+      "tb1qxr2jgwupzpvj3a2tkwznz3e4878rgfc9sknz5wz5w9hrle38nyfs2faw0e",
+      "tb1qd2ndp58gk7acck8wmfh4u9pa6d2c3dt6dgl89k4q9ctf7t4xyeqswca3nq"
+    ],
     "error": null,
     "note": null
   },
@@ -156,6 +282,14 @@
     "kind": "receive",
     "receive": "tb1qh7hr2u3jf02wusuflxxpr82qluxms0drj206rnt5x9p9yr0ydywsg2rphy",
     "change": null,
+    "receiveRange": [
+      "tb1qh7hr2u3jf02wusuflxxpr82qluxms0drj206rnt5x9p9yr0ydywsg2rphy",
+      "tb1q8v76ya3fq08ulupygwsnpzcm4sxs30arrhdu3vmtzvcsevvl9tcqfhvh2f",
+      "tb1q9eqsqedjs2chzn7hgetjstajyppxzt5jfmrgsdtzu8hlsh6zkn9qfkzrjr",
+      "tb1qdyqm48p80th07rlratqkg27v0yrhn4egamkmkwq99hw5j46plj9smkm7p9",
+      "tb1qu6659ddsx3j526s0we8tn373yd7t95f9s2yzfaxj7enld7qn7weqjec35s"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -166,6 +300,14 @@
     "kind": "receive",
     "receive": "tb1q6u8s97fnd6ggad4apqs8vvcgup0d085ttd9v0c6fmpf38tf6q0ys9sanep",
     "change": null,
+    "receiveRange": [
+      "tb1q6u8s97fnd6ggad4apqs8vvcgup0d085ttd9v0c6fmpf38tf6q0ys9sanep",
+      "tb1qagwmv5706xm8da8fh2dldk6rsjcxv06zae9w2nm8yex6rsvanf6se6njy5",
+      "tb1qly5vsd9ea7nhvk5n0u828m9dqfjau39z4j98tf45ly6szywgc5tsuq0pgp",
+      "tb1q6nmlzzzpcp929dw35u6pmzgau0gzlah9z67zuhkq8y7rm796q5rqkcvh2a",
+      "tb1qtpn3t94es367ssh9rnn8kdt3f36nqkjq5ngtt2rn8hrtw09axynq25n8fq"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -176,6 +318,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qrxprz3dsvss8q5nqs62xm0a34q2k02z0rxe7ahmxv3tx5dmcsw6q045wxl",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qrxprz3dsvss8q5nqs62xm0a34q2k02z0rxe7ahmxv3tx5dmcsw6q045wxl",
+      "tb1qn9hd2f8mxqhsjmhtk2agqcphg8akj8fkgg3wxjgsurxxuq8y0g5qt8xufy",
+      "tb1ql9spmxzr6q9l3kkfmcj98mun2f2meznzj2zuy5a77hzavapvwpyqukv0uz",
+      "tb1qpul2x0zg7u67ztnvnqw9zfy5vtscs3ksrrdjjvufpu2cp8m3tx8q2329th",
+      "tb1qewlz84ezf96l7005t96q0tnyfqplh0dt84kc2urj5jehe4a48d8skznjza"
+    ],
     "error": null,
     "note": null
   },
@@ -186,6 +336,14 @@
     "kind": "receive",
     "receive": "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
     "change": null,
+    "receiveRange": [
+      "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
+      "tb1qylhrxg42rc88ymvhtjaaxfkn3m2r7d4g38v9klfl8ty204pkafeq92pu7u",
+      "tb1qlktdhpdk28znc2kcc0dfyw4hqkz2q7v5mn5t6a8wqycrgs2u24pqaj2azt",
+      "tb1q8keh5ng6x4d4zmfs29uysqurrckppnlkacdhsyyawdperlq2zmus0l7vjf",
+      "tb1q8rsd9ag9sxy6shg3zchfyj7jxjp6kzglxxmv6d3rvevhvd36sfys5c8qc0"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -196,6 +354,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+      "tb1q9gt5zewm8mtp7fa33q2s8tfkxyref4mdv8g90rkltpmr9rqplf3swrwkql",
+      "tb1q23ks33l8hplq8gdkz9ct5rfhw7dhe5cuf3d39vrkvd4egk55vcnsytuuza",
+      "tb1q6me7xns3mh480t5pzm2qpkum4jjltwu997cjl82a9qure9f785yqd7w7rp",
+      "tb1qtck0k05cmztu99an70gsh59yhy8hf8rprcfghrgdnuw6d8rz8pmsas8zuu"
+    ],
     "error": null,
     "note": null
   },
@@ -206,6 +372,14 @@
     "kind": "receive",
     "receive": "tb1q6u8s97fnd6ggad4apqs8vvcgup0d085ttd9v0c6fmpf38tf6q0ys9sanep",
     "change": null,
+    "receiveRange": [
+      "tb1q6u8s97fnd6ggad4apqs8vvcgup0d085ttd9v0c6fmpf38tf6q0ys9sanep",
+      "tb1qagwmv5706xm8da8fh2dldk6rsjcxv06zae9w2nm8yex6rsvanf6se6njy5",
+      "tb1qly5vsd9ea7nhvk5n0u828m9dqfjau39z4j98tf45ly6szywgc5tsuq0pgp",
+      "tb1q6nmlzzzpcp929dw35u6pmzgau0gzlah9z67zuhkq8y7rm796q5rqkcvh2a",
+      "tb1qtpn3t94es367ssh9rnn8kdt3f36nqkjq5ngtt2rn8hrtw09axynq25n8fq"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -216,6 +390,8 @@
     "kind": "irregular",
     "receive": "bc1qhynzxgql8wmuxacagke268gr284gl0uvlc9qu4czvnsswhapjj8sm0u695",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "irregular derivation path \u2014 index-0 address recorded under receive"
   },
@@ -226,6 +402,14 @@
     "kind": "receive",
     "receive": "tb1q5wvvjtmpaqpdjt669h2zfd5uvhm47kv8l049xqxpwfu24u9smu8sy72m8k",
     "change": null,
+    "receiveRange": [
+      "tb1q5wvvjtmpaqpdjt669h2zfd5uvhm47kv8l049xqxpwfu24u9smu8sy72m8k",
+      "tb1q3l4w722um80wfwtex63trhtqdv0avkmpjsqt98u27s47q3pmf7es6rc7al",
+      "tb1qqq4qs969rfygpd4n430q2c4kpuyv6xukn0s42r3jhmk3pmqsmkksg5v57a",
+      "tb1qn08qe2v654e5gncup0y42vxmz3nez25mtx58azr43xvddv0mxk5ss8ccs7",
+      "tb1q0e0en205wl56hm5p6mnz6lt06deppvc9uqd5wzn3mnpn8gysu9ds0m54hw"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -236,6 +420,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qyv99qkvwqu33scvvky380rmu4quvzn3as5jf3nu30vaeu0mufhyq0v5rtr",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qyv99qkvwqu33scvvky380rmu4quvzn3as5jf3nu30vaeu0mufhyq0v5rtr",
+      "tb1qvh44xy7dud9au9ukrh7z5k45gy7rfm0dphh7vaufgqvmq2srq6wqupmea4",
+      "tb1qtwyyg6ncxaltwptlunf5e4e62yfsmwj8yjzcydknn2xa7vjt3lxs69ea0n",
+      "tb1q4y7vfzukjgxjr38q2scvz3tr0ra6jl8hf8lvndq7hh7dvksxfvxs7mlafr",
+      "tb1q0d0dxlhqk7jed3jhjflkgad4hpcjcp4uv55em8mex0pa3gmynfysuagt3z"
+    ],
     "error": null,
     "note": null
   },
@@ -246,6 +438,8 @@
     "kind": "fixed",
     "receive": "bc1qxa4asdzt3dhtu5z0lp00wsl25x4fyushsg3med5g06fh3mangxkqgf3se4",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -256,6 +450,8 @@
     "kind": "fixed",
     "receive": "bc1q3kyq8p3h5hxlqrr6wpfne6zvznmewer2jg7vhtle479u363383qs35ptmp",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -266,6 +462,8 @@
     "kind": "fixed",
     "receive": "tb1qyfeft7kmze3nrqrkw6ueq89at64l4e3xpdncs7ym7mzdedxycd2sdwujnp",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -276,6 +474,8 @@
     "kind": "fixed",
     "receive": "bc1q0gczpmfcs8e90jsp2zxycre06p7pgrkyy2hldjfpqy4xxlg7pe8qzkzm95",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -286,6 +486,14 @@
     "kind": "receive",
     "receive": "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
     "change": null,
+    "receiveRange": [
+      "tb1q6ks0wy8060vld8pu0mqw3kvwkqwp9wketyqq9097kkw3tqhn0p2sp8hd2r",
+      "tb1qylhrxg42rc88ymvhtjaaxfkn3m2r7d4g38v9klfl8ty204pkafeq92pu7u",
+      "tb1qlktdhpdk28znc2kcc0dfyw4hqkz2q7v5mn5t6a8wqycrgs2u24pqaj2azt",
+      "tb1q8keh5ng6x4d4zmfs29uysqurrckppnlkacdhsyyawdperlq2zmus0l7vjf",
+      "tb1q8rsd9ag9sxy6shg3zchfyj7jxjp6kzglxxmv6d3rvevhvd36sfys5c8qc0"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -296,6 +504,14 @@
     "kind": "receive",
     "receive": "bc1qt82y7wyhhwpu79mugxnfrf3q8kl55c6kfv0agx58cnvjl80ea47qa0vmtj",
     "change": null,
+    "receiveRange": [
+      "bc1qt82y7wyhhwpu79mugxnfrf3q8kl55c6kfv0agx58cnvjl80ea47qa0vmtj",
+      "bc1qjcz48v2vwmz7ltvp67yvm8k2r88xzc54hyvkjulum2kkf7ls3utq607ecm",
+      "bc1qyaxqq3687uysdqtu6yyec3au8gpzetqj5nru6sc5pnxueukzwwwqkxf0as",
+      "bc1qaagc77l03s45jrxpw55dwsm85hzhq6qncw58ugazly44phm5hlvq5xys2l",
+      "bc1q3wvus2qkyny6umwp30jasf7zxekzkawr938l277zqma6ec0ae4tstu9w5l"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -306,6 +522,8 @@
     "kind": "irregular",
     "receive": "bc1qe3802pzws5jr7352vvaghr2998dwpuggttfpmrg4d3u0en89mfusyqe940",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "irregular derivation path \u2014 index-0 address recorded under receive"
   },
@@ -316,6 +534,8 @@
     "kind": "fixed",
     "receive": "bc1qmjrd3e4ft74xlstuv06pyku72vrqdvqztqh3xlgy9mujqpv2ke6q3anazu",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "fixed (no wildcard) \u2014 single address, no separate change chain"
   },
@@ -326,6 +546,8 @@
     "kind": "irregular",
     "receive": "bc1q2l3ruthmuady9gjpjjknp20nqem8lndh68xe9y0lz0yww8nxgn7s4pmpy9",
     "change": null,
+    "receiveRange": null,
+    "changeRange": null,
     "error": null,
     "note": "irregular derivation path \u2014 index-0 address recorded under receive"
   },
@@ -336,6 +558,14 @@
     "kind": "receive",
     "receive": "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
     "change": null,
+    "receiveRange": [
+      "bc1qvjtfmrxu524qhdevl6yyyasjs7xmnzjlqlu60mrwepact60eyz9s9xjw0c",
+      "bc1qp6rfclasvmwys7w7j4svgc2mrujq9m73s5shpw4e799hwkdcqlcsj464fw",
+      "bc1qvxcjrqhrkdkkuujfk3enulmwve5r2x4cm9f4q8g64kg64q7puyvsv8vkcm",
+      "bc1qmhmj2mswyvyj4az32mzujccvd4dgr8s0lfzaum4n4uazeqc7xxvsr7e28n",
+      "bc1qjeu2wa5jwvs90tv9t9xz99njnv3we3ux04fn7glw3vqsk4ewuaaq9kdc9t"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -346,6 +576,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qqqvqas9p0v5plkjp3kus7an08eryg69z954sq3w4964phpq3h3uqcherfe",
+      "tb1q9gt5zewm8mtp7fa33q2s8tfkxyref4mdv8g90rkltpmr9rqplf3swrwkql",
+      "tb1q23ks33l8hplq8gdkz9ct5rfhw7dhe5cuf3d39vrkvd4egk55vcnsytuuza",
+      "tb1q6me7xns3mh480t5pzm2qpkum4jjltwu997cjl82a9qure9f785yqd7w7rp",
+      "tb1qtck0k05cmztu99an70gsh59yhy8hf8rprcfghrgdnuw6d8rz8pmsas8zuu"
+    ],
     "error": null,
     "note": null
   },
@@ -356,6 +594,14 @@
     "kind": "receive",
     "receive": "bc1qgj68ez26sqk56pu7a0eg6r8l35dj5zeq29xrc7dnch5q2mh5t25s6z9wd4",
     "change": null,
+    "receiveRange": [
+      "bc1qgj68ez26sqk56pu7a0eg6r8l35dj5zeq29xrc7dnch5q2mh5t25s6z9wd4",
+      "bc1q2m2qghy96jmyc2xlfy27yedjkfd29fn00d9frj7w43629ylplllq2ervpt",
+      "bc1qf7acn0vaacr63et0eqa6xdxmk42c7546cghksny3ehtlneelxhhqrct7r4",
+      "bc1qywxhlct5upswz26k0frqpn3kee6m2mxmyy9rvwult7e96a405ccswkdnzw",
+      "bc1qzm598ljct8mr7kqkq9lthjccqrafc84e00k7rcgv8hsts4nx729qswfxl8"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   },
@@ -366,6 +612,14 @@
     "kind": "change",
     "receive": null,
     "change": "bc1q4ne4h67q2jz39qzpj2scg9794xeyyaprxw9yrkumrszzlvd4he0sq78wg0",
+    "receiveRange": null,
+    "changeRange": [
+      "bc1q4ne4h67q2jz39qzpj2scg9794xeyyaprxw9yrkumrszzlvd4he0sq78wg0",
+      "bc1q6a882dzkvg7gur3vhyjd9t0x7szv42detfegpm2rfv6p6knvaevs8wn52n",
+      "bc1qfkjhc6fqfgc49w935dd9aksav2ew8vewjw2daxrylf3p6w0p6pyqd64dp8",
+      "bc1ql6v6yengyuu4wxzwtd40el8wqpmkqx2rwcf4vm5qytwyw89pgxfqdgxrxn",
+      "bc1qhpzxuhxj5qa2zclfpr2l4t8rh2v0y7npx4d6kev92ekmlltsd0rs6exnee"
+    ],
     "error": null,
     "note": null
   },
@@ -376,6 +630,14 @@
     "kind": "change",
     "receive": null,
     "change": "tb1qnhad064jvmuj6f3y6kr58qpdg5y48vjjxrzhpelrhm284sqxkerqh2w6du",
+    "receiveRange": null,
+    "changeRange": [
+      "tb1qnhad064jvmuj6f3y6kr58qpdg5y48vjjxrzhpelrhm284sqxkerqh2w6du",
+      "tb1qzt33hgvv04txjpg8tffpnmx3fp0qvqek4m50uauqn6duvmf4svrqd3ne8v",
+      "tb1qsypgcumvd68h885fl226yzlthfqjhll8u39sd4zajjzaee0spcwqgg6s77",
+      "tb1qxr2jgwupzpvj3a2tkwznz3e4878rgfc9sknz5wz5w9hrle38nyfs2faw0e",
+      "tb1qd2ndp58gk7acck8wmfh4u9pa6d2c3dt6dgl89k4q9ctf7t4xyeqswca3nq"
+    ],
     "error": null,
     "note": null
   },
@@ -386,6 +648,14 @@
     "kind": "receive",
     "receive": "tb1qhxhrpmlrng8zeeunfy4swqphv80uqqlqemm65fygh6y0n8c9s3aqv0rgxc",
     "change": null,
+    "receiveRange": [
+      "tb1qhxhrpmlrng8zeeunfy4swqphv80uqqlqemm65fygh6y0n8c9s3aqv0rgxc",
+      "tb1quz8qddyvqxjewuzgr4z6v4lg6wtgngdrlp53mua6q9dxkxpm7qjqqr3cdq",
+      "tb1qwfyva76a7v57hj87xsht6e478he0pjsxn0d8aldd06y9n8v7zjyswrg0rc",
+      "tb1qle5fukyx9c3myd3jlzy48l9r3dnw2nsqypsjt60nggguc7czsapscq8vkv",
+      "tb1q4fg23n2sx0qek749all0vrf3rhtc9upkxack4qhkkq8anxepgrjs25havh"
+    ],
+    "changeRange": null,
     "error": null,
     "note": null
   }

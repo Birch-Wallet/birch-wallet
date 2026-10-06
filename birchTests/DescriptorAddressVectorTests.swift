@@ -15,6 +15,11 @@ import Testing
 ///   * single `.../1/*`     -> change[0] only
 ///   * no-wildcard / irregular -> single address recorded under `receive`
 ///
+/// `receiveRange` / `changeRange` hold indexes 0-4 for the same chains, from
+/// `bitcoin-cli deriveaddresses "<descriptor>" [0,4]` (Bitcoin Core v31.1.0).
+/// `sortedmulti` re-sorts the derived keys at every index, so index 0 alone
+/// does not show the ordering is right further along the chain.
+///
 /// For every descriptor that Birch's importer accepts, the receive/change
 /// addresses BDK produces must match Bitcoin Core. Descriptors that Birch's
 /// import guards intentionally reject (see `Expectation.reject` below) are
@@ -30,6 +35,8 @@ struct DescriptorAddressVectorTests {
     let kind: String
     let receive: String?
     let change: String?
+    let receiveRange: [String]?
+    let changeRange: [String]?
     let error: String?
     let note: String?
   }
@@ -89,6 +96,14 @@ struct DescriptorAddressVectorTests {
   func birchImportAndDerive(
     descriptor: String, network: BitcoinNetwork
   ) -> (receive: String, change: String)? {
+    guard let ranges = birchImportAndDerive(descriptor: descriptor, network: network, count: 1) else { return nil }
+    return (ranges.receive[0], ranges.change[0])
+  }
+
+  /// As above, for the first `count` indexes of each chain.
+  func birchImportAndDerive(
+    descriptor: String, network: BitcoinNetwork, count: UInt32
+  ) -> (receive: [String], change: [String])? {
     let vm = SetupWizardViewModel()
     vm.network = network
     vm.importedDescriptorText = descriptor
@@ -107,8 +122,8 @@ struct DescriptorAddressVectorTests {
         network: bdkNetwork,
         persister: persister
       )
-      let receive = wallet.peekAddress(keychain: .external, index: 0).address.description
-      let change = wallet.peekAddress(keychain: .internal, index: 0).address.description
+      let receive = (0 ..< count).map { wallet.peekAddress(keychain: .external, index: $0).address.description }
+      let change = (0 ..< count).map { wallet.peekAddress(keychain: .internal, index: $0).address.description }
       return (receive, change)
     } catch {
       return nil
@@ -196,6 +211,57 @@ struct DescriptorAddressVectorTests {
       )
       #expect(result.receive == vector.receive, "Descriptor #\(vector.index) multipath receive[0]")
       #expect(result.change == vector.change, "Descriptor #\(vector.index) multipath change[0]")
+    }
+  }
+
+  /// Indexes 0-4 of every chain Bitcoin Core derived for a supported descriptor.
+  @Test func firstFiveAddressesMatchCore() throws {
+    let supported = try Self.loadVectors().filter { Self.expectations[$0.index] == .match }
+    #expect(supported.count == 13)
+    var receiveChains = 0
+    var changeChains = 0
+
+    for vector in supported {
+      let network = bitcoinNetwork(from: vector.network)
+      let result = try #require(
+        birchImportAndDerive(descriptor: vector.descriptor, network: network, count: 5),
+        "Descriptor #\(vector.index): expected a successful import"
+      )
+      if let expected = vector.receiveRange {
+        #expect(expected.count == 5)
+        #expect(result.receive == expected, "Descriptor #\(vector.index) receive[0...4]")
+        receiveChains += 1
+      }
+      if let expected = vector.changeRange {
+        #expect(expected.count == 5)
+        #expect(result.change == expected, "Descriptor #\(vector.index) change[0...4]")
+        changeChains += 1
+      }
+    }
+
+    // Every supported vector is ranged, so each one must have been compared
+    #expect(receiveChains == 8)
+    #expect(changeChains == 7)
+  }
+
+  /// The Verify step shows the first receive address so it can be compared with
+  /// the signing devices. It must be Bitcoin Core's receive[0].
+  @Test func verifyStepFirstAddressMatchesCore() throws {
+    let withReceive = try Self.loadVectors().filter {
+      Self.expectations[$0.index] == .match && $0.receive != nil
+    }
+    #expect(withReceive.count == 8)
+
+    for vector in withReceive {
+      let vm = SetupWizardViewModel()
+      vm.network = bitcoinNetwork(from: vector.network)
+      vm.importedDescriptorText = vector.descriptor
+      #expect(vm.parseImportedDescriptor(), "Descriptor #\(vector.index): \(vm.errorMessage ?? "")")
+
+      vm.deriveFirstAddress()
+
+      #expect(vm.addressDerivationError == nil, "Descriptor #\(vector.index): \(vm.addressDerivationError ?? "")")
+      #expect(vm.firstReceiveAddress == vector.receive, "Descriptor #\(vector.index) first receive address")
     }
   }
 }

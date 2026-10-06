@@ -196,6 +196,13 @@ enum URService {
     return UInt32(index) | (hardened ? 0x8000_0000 : 0)
   }
 
+  /// The depth to write into a key rebuilt from a QR code: the keypath's own value
+  /// or, when the signer leaves that optional field out, the number of steps in the
+  /// origin path it gave. Components are [index, hardened] pairs.
+  private static func keyDepth(declared: UInt8?, originComponents: [CBOR]) -> UInt8 {
+    declared ?? UInt8(clamping: originComponents.count / 2)
+  }
+
   /// Extract xpub, fingerprint, and derivation path from an HD key CBOR map.
   /// Shared between parseHDKey and parseCryptoAccount.
   private static func extractHDKeyFields(
@@ -205,7 +212,7 @@ enum URService {
     var chainCode = Data()
     var fingerprint = ""
     var derivationPath = ""
-    var depth: UInt8 = 0
+    var depth: UInt8?
     var parentFP: UInt32 = 0
     var pathComponents: [CBOR] = []
 
@@ -283,7 +290,8 @@ enum URService {
 
     let isTestnet = derivationPath.contains("/1'/")
     let xpub = encodeXpub(keyData: keyData, chainCode: chainCode, isTestnet: isTestnet,
-                          depth: depth, parentFingerprint: parentFP, childNumber: childNumber)
+                          depth: keyDepth(declared: depth, originComponents: pathComponents),
+                          parentFingerprint: parentFP, childNumber: childNumber)
 
     return (xpub: xpub, fingerprint: fingerprint, derivationPath: derivationPath)
   }
@@ -394,7 +402,7 @@ enum URService {
     var chainCode = Data()
     var originFingerprint = ""
     var originComponents = ""
-    var originDepth: UInt8 = 0
+    var originDepth: UInt8?
     var originPathComponents: [CBOR] = []
     var childrenComponents = ""
     var parentFingerprintValue: UInt32 = 0
@@ -467,8 +475,8 @@ enum URService {
     let isTestnet = originComponents.contains("1'")
       && (originComponents.hasPrefix("48'") || originComponents.hasPrefix("48'/1'"))
     let xpub = encodeXpub(keyData: keyData, chainCode: chainCode, isTestnet: isTestnet,
-                          depth: originDepth, parentFingerprint: parentFingerprintValue,
-                          childNumber: childNumber)
+                          depth: keyDepth(declared: originDepth, originComponents: originPathComponents),
+                          parentFingerprint: parentFingerprintValue, childNumber: childNumber)
 
     var result = ""
     if !originFingerprint.isEmpty, !originComponents.isEmpty {
@@ -889,13 +897,38 @@ enum URService {
   // P2WSH Zpub version: 0x02aa7ed3
   // P2WSH Vpub version: 0x02575483
 
+  private static let extendedPublicKeyVersions: [[UInt8]] = [
+    [0x04, 0x88, 0xB2, 0x1E], // xpub
+    [0x04, 0x35, 0x87, 0xCF], // tpub
+    [0x02, 0xAA, 0x7E, 0xD3], // Zpub
+    [0x02, 0x57, 0x54, 0x83], // Vpub
+  ]
+
+  /// Decodes an extended public key (xpub, tpub, Zpub, Vpub) to its 78-byte payload.
+  /// Returns nil unless the text is exactly one such key: base58 characters only,
+  /// valid checksum, known version bytes and a compressed public key.
+  static func decodeExtendedPublicKey(_ pubKey: String) -> Data? {
+    guard let decoded = base58CheckDecode(pubKey), decoded.count == 78 else { return nil }
+    let payload = [UInt8](decoded)
+    guard extendedPublicKeyVersions.contains(Array(payload[0 ..< 4])) else { return nil }
+    guard payload[45] == 0x02 || payload[45] == 0x03 else { return nil }
+    return Data(payload)
+  }
+
+  /// Where an extended public key says it sits: how many steps it is from the
+  /// master key, and the last step taken to reach it (hardened steps have the top
+  /// bit set). The earlier steps leave no trace in the key. Returns nil unless the
+  /// text is exactly one extended public key.
+  static func extendedPublicKeyPlacement(_ pubKey: String) -> (depth: UInt8, childNumber: UInt32)? {
+    guard let payload = decodeExtendedPublicKey(pubKey) else { return nil }
+    let bytes = [UInt8](payload)
+    let childNumber = bytes[9 ..< 13].reduce(UInt32(0)) { $0 << 8 | UInt32($1) }
+    return (depth: bytes[4], childNumber: childNumber)
+  }
+
   /// Converts an extended public key to the desired format for the current network.
   static func convertXpub(_ pubKey: String, to format: XpubFormat, isTestnet: Bool) -> String? {
-    guard pubKey.hasPrefix("xpub") || pubKey.hasPrefix("tpub") || pubKey.hasPrefix("Zpub") || pubKey.hasPrefix("Vpub") else {
-      return nil
-    }
-    guard let decoded = base58CheckDecode(pubKey) else { return nil }
-    guard decoded.count == 78 else { return nil }
+    guard let decoded = decodeExtendedPublicKey(pubKey) else { return nil }
 
     var newPayload = Data()
 
@@ -921,6 +954,14 @@ enum URService {
   /// Converts an extended public key (xpub, tpub, Zpub, Vpub) to the standard xpub or tpub for the current network.
   static func normalizeXpub(_ pubKey: String, isTestnet: Bool) -> String? {
     convertXpub(pubKey, to: .standard, isTestnet: isTestnet)
+  }
+
+  /// The standard xpub or tpub for a cosigner key, ignoring surrounding whitespace
+  /// and slashes. Returns nil when what remains is not exactly one extended public
+  /// key, so the result is always safe to place in a descriptor.
+  static func canonicalXpub(_ pubKey: String, isTestnet: Bool) -> String? {
+    let trimmed = pubKey.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "/")))
+    return normalizeXpub(trimmed, isTestnet: isTestnet)
   }
 
   /// Toggles the format between standard (xpub/tpub) and SLIP132 (Zpub/Vpub)

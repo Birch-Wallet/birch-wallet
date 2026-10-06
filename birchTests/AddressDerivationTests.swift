@@ -4,6 +4,13 @@ import Testing
 
 @MainActor
 struct AddressDerivationTests {
+  private static let cosigners: [(xpub: String, fingerprint: String, derivationPath: String)] = [
+    (xpub: "tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ",
+     fingerprint: "73c5da0a", derivationPath: "m/48'/1'/0'/2'"),
+    (xpub: "tpubDF2rnouQaaYrXF4noGTv6rQYmx87cQ4GrUdhpvXkhtChwQPbdGTi8GA88NUaSrwZBwNsTkC9bFkkC8vDyGBVVAQTZ2AS6gs68RQXtXcCvkP",
+     fingerprint: "0f056943", derivationPath: "m/48'/1'/0'/2'"),
+  ]
+
   @Test func addressPrefixTestnet() {
     let network = BitcoinNetwork.testnet4
     #expect(network.addressPrefix == "tb1")
@@ -14,35 +21,29 @@ struct AddressDerivationTests {
     #expect(network.addressPrefix == "bc1")
   }
 
-  @Test func deterministic() {
+  @Test func deterministic() throws {
     // Same descriptor should always produce the same address sequence
     // This test validates the BitcoinService.buildDescriptor produces
     // deterministic output
-    let cosigners: [(xpub: String, fingerprint: String, derivationPath: String)] = [
-      (xpub: "tpubA", fingerprint: "aaaaaaaa", derivationPath: "m/48'/1'/0'/2'"),
-      (xpub: "tpubB", fingerprint: "bbbbbbbb", derivationPath: "m/48'/1'/0'/2'"),
-    ]
+    let cosigners = Self.cosigners
 
-    let desc1 = BitcoinService.buildDescriptor(
+    let desc1 = try BitcoinService.buildDescriptor(
       requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
     )
-    let desc2 = BitcoinService.buildDescriptor(
+    let desc2 = try BitcoinService.buildDescriptor(
       requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
     )
 
     #expect(desc1 == desc2)
   }
 
-  @Test func receiveVsChangeDescriptors() {
-    let cosigners: [(xpub: String, fingerprint: String, derivationPath: String)] = [
-      (xpub: "tpubA", fingerprint: "aaaaaaaa", derivationPath: "m/48'/1'/0'/2'"),
-      (xpub: "tpubB", fingerprint: "bbbbbbbb", derivationPath: "m/48'/1'/0'/2'"),
-    ]
+  @Test func receiveVsChangeDescriptors() throws {
+    let cosigners = Self.cosigners
 
-    let receive = BitcoinService.buildDescriptor(
+    let receive = try BitcoinService.buildDescriptor(
       requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
     )
-    let change = BitcoinService.buildDescriptor(
+    let change = try BitcoinService.buildDescriptor(
       requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true
     )
 
