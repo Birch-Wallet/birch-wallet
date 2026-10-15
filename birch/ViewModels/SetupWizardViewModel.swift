@@ -381,6 +381,14 @@ final class SetupWizardViewModel {
       return false
     }
 
+    // Reading a key takes time, so a list longer than sortedmulti allows is turned
+    // away before any key is read.
+    let keyCount = arguments.count - 1
+    guard keyCount <= Self.maxImportableKeys else {
+      errorMessage = "This descriptor has \(keyCount) keys. A multisig descriptor can have at most \(Self.maxImportableKeys)."
+      return false
+    }
+
     // Every argument after M must be one key in the form Birch supports — a BIP48
     // origin, an xpub/tpub and an optional receive/change suffix — matched in full,
     // so nothing in the descriptor goes unread.
@@ -517,6 +525,9 @@ final class SetupWizardViewModel {
   private static let importableKeySuffixes: Set<String> = [
     "", "/<0;1>/*", "/<1;0>/*", "/{0,1}/*", "/{1,0}/*", "/0/*", "/1/*",
   ]
+
+  /// The most keys a sortedmulti descriptor can have. BDK rejects any more.
+  private static let maxImportableKeys = 20
 
   /// Splits the arguments of a descriptor function on its top-level commas (the
   /// {0,1} chain form has a comma of its own). Returns nil when brackets are unbalanced.

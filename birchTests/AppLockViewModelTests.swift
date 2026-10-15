@@ -31,6 +31,15 @@ struct AppLockViewModelTests {
     MockKeychainHelper.save(Data("\(date.timeIntervalSince1970)".utf8), forKey: Constants.keychainLockoutExpiryKey)
   }
 
+  /// Checks the lockout ends `seconds` after the failed attempt made between
+  /// `start` and `end`. Measuring from those clock readings rather than from now
+  /// keeps a slow test runner from failing the check.
+  private func expectLockout(_ vm: AppLockViewModel, seconds: TimeInterval, start: Date, end: Date) throws {
+    let expiry = try #require(vm.lockoutExpiry)
+    #expect(expiry >= start.addingTimeInterval(seconds))
+    #expect(expiry <= end.addingTimeInterval(seconds))
+  }
+
   // MARK: - Initialization
 
   @Test func initWithNoPIN_hasPINIsFalse() {
@@ -181,47 +190,47 @@ struct AppLockViewModelTests {
   @Test func lockout_60sAfter4Failures() throws {
     let vm = makeVM()
     vm.setPIN("5678")
+    let start = Date()
     for _ in 1 ... 4 {
       _ = vm.verifyPIN("0000")
     }
+    let end = Date()
     #expect(vm.isLockedOut == true)
     #expect(vm.failedAttempts == 4)
-    let expiry = try #require(vm.lockoutExpiry)
-    let delay = expiry.timeIntervalSinceNow
-    #expect(delay > 55 && delay <= 61)
+    try expectLockout(vm, seconds: 60, start: start, end: end)
   }
 
   @Test func lockout_10mAfter5Failures() throws {
     seedPIN("5678")
     seedFailedAttempts(4)
     let vm = makeVM()
+    let start = Date()
     _ = vm.verifyPIN("0000")
+    let end = Date()
     #expect(vm.failedAttempts == 5)
-    let expiry = try #require(vm.lockoutExpiry)
-    let delay = expiry.timeIntervalSinceNow
-    #expect(delay > 595 && delay <= 601)
+    try expectLockout(vm, seconds: 600, start: start, end: end)
   }
 
   @Test func lockout_90mAfter6Failures() throws {
     seedPIN("5678")
     seedFailedAttempts(5)
     let vm = makeVM()
+    let start = Date()
     _ = vm.verifyPIN("0000")
+    let end = Date()
     #expect(vm.failedAttempts == 6)
-    let expiry = try #require(vm.lockoutExpiry)
-    let delay = expiry.timeIntervalSinceNow
-    #expect(delay > 5395 && delay <= 5401)
+    try expectLockout(vm, seconds: 5400, start: start, end: end)
   }
 
   @Test func lockout_24hAfter7Failures() throws {
     seedPIN("5678")
     seedFailedAttempts(6)
     let vm = makeVM()
+    let start = Date()
     _ = vm.verifyPIN("0000")
+    let end = Date()
     #expect(vm.failedAttempts == 7)
-    let expiry = try #require(vm.lockoutExpiry)
-    let delay = expiry.timeIntervalSinceNow
-    #expect(delay > 86395 && delay <= 86401)
+    try expectLockout(vm, seconds: 86400, start: start, end: end)
   }
 
   @Test func lockout_persistsSurvivesReInit() {
@@ -350,10 +359,13 @@ struct AppLockViewModelTests {
   }
 
   @Test func lockoutRemainingText_showsSeconds() {
-    seedLockoutExpiry(Date().addingTimeInterval(30))
+    let start = Date()
+    seedLockoutExpiry(start.addingTimeInterval(30))
     let vm = makeVM()
     let text = vm.lockoutRemainingText
-    #expect(text.contains("30s") || text.contains("29s"))
+    // Whole seconds left, which depends on how long the test has taken so far.
+    let fewest = Int(30 - Date().timeIntervalSince(start))
+    #expect((fewest ... 30).contains { text == "Try again in \($0)s" }, "\(text)")
   }
 
   @Test func lockoutRemainingText_showsMinutes() {

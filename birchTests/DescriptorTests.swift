@@ -509,6 +509,31 @@ struct DescriptorTests {
     }
   }
 
+  /// sortedmulti can have at most 20 keys. Birch turns away a longer list before
+  /// reading any key, and still imports 20, so it refuses only what BDK would.
+  @Test func importAcceptsTwentyKeysAndRejectsMore() throws {
+    let networkKind = BitcoinService.shared.bdkNetworkKind(from: .testnet4)
+    let keys = try (1 ... 21).map { seed in
+      let mnemonic = try Mnemonic.fromEntropy(entropy: Data(repeating: UInt8(seed), count: 16))
+      let account = try DescriptorSecretKey(networkKind: networkKind, mnemonic: mnemonic, password: nil)
+        .derive(path: DerivationPath(path: "m/48'/1'/0'/2'"))
+        .asPublic().description
+      return "\(account.hasSuffix("/*") ? String(account.dropLast(2)) : account)/0/*"
+    }
+
+    let twenty = importOutcome("wsh(sortedmulti(2,\(keys.prefix(20).joined(separator: ","))))")
+    guard case .accepted = twenty else {
+      Issue.record("20 keys should import: \(twenty)")
+      return
+    }
+
+    let vm = SetupWizardViewModel()
+    vm.network = .testnet4
+    vm.importedDescriptorText = "wsh(sortedmulti(2,\(keys.joined(separator: ","))))"
+    #expect(!vm.parseImportedDescriptor())
+    #expect(vm.errorMessage?.contains("at most 20") == true, "\(vm.errorMessage ?? "")")
+  }
+
   /// The descriptor offered as a backup describes the wallet that was stored:
   /// importing the backup again gives the same descriptors and addresses.
   @Test func importedBackupMatchesWallet() {
