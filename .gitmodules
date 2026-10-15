@@ -1,0 +1,6 @@
+[submodule "design"]
+	path = design
+	url = ../birch-design.git
+[submodule "fastlane/screenshots"]
+	path = fastlane/screenshots
+	url = ../birch-screenshots.git
