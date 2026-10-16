@@ -57,26 +57,17 @@ final class birchUITests: XCTestCase {
       testnet4Button.tap()
     }
 
-    // Tap "Import" to parse the descriptor and advance
-    let importButton = app.buttons["Import"]
-    XCTAssertTrue(importButton.waitForExistence(timeout: 3), "Import button should exist")
-    importButton.tap()
-
-    // Step 4: Wallet name screen
-    let nameTitle = app.staticTexts["Name Your Wallet"]
-    XCTAssertTrue(nameTitle.waitForExistence(timeout: 3), "Wallet name screen should appear")
-
-    // Type a wallet name into the text field
+    // Name the wallet in the Wallet Name field on the same screen; Return
+    // dismisses its keyboard
     let nameField = app.textFields["My Wallet"]
     XCTAssertTrue(nameField.waitForExistence(timeout: 3), "Wallet name text field should exist")
     nameField.tap()
-    nameField.typeText("UI Test Wallet")
+    nameField.typeText("UI Test Wallet\n")
 
-    // In descriptor-import mode the button reads "Create Wallet" (not "Next")
-    // and skips the Review screen, going straight to the loaded wallet.
-    let createButton = app.buttons["Create Wallet"]
-    XCTAssertTrue(createButton.waitForExistence(timeout: 3), "Create Wallet button should exist")
-    createButton.tap()
+    // Tap "Import": it reads the descriptor and creates the wallet
+    let importButton = app.buttons["Import"]
+    XCTAssertTrue(importButton.waitForExistence(timeout: 3), "Import button should exist")
+    importButton.tap()
 
     // Verify we land on the main transaction screen (wallet loaded with transactions)
     let balanceExists = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'sats'")).firstMatch

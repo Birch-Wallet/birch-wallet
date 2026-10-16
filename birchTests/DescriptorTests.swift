@@ -148,7 +148,7 @@ struct DescriptorTests {
     vm.requiredSignatures = 2
     vm.totalCosigners = 2
     vm.network = .testnet4
-    vm.initializeCosigners()
+    vm.resizeCosigners()
     vm.cosignerXpubs = [
       "\(cosigners[0].xpub)/0/*,[aabbccdd/48'/1'/0'/2']\(cosigners[2].xpub)",
       cosigners[1].xpub,
@@ -739,7 +739,7 @@ struct DescriptorTests {
     vm.requiredSignatures = 2
     vm.totalCosigners = 3
     vm.network = .testnet4
-    vm.initializeCosigners()
+    vm.resizeCosigners()
     for i in 0 ..< cosigners.count {
       vm.cosignerXpubs[i] = cosigners[i].xpub
       vm.cosignerFingerprints[i] = cosigners[i].fingerprint
@@ -767,7 +767,7 @@ struct DescriptorTests {
     vm1.requiredSignatures = 2
     vm1.totalCosigners = 3
     vm1.network = .testnet4
-    vm1.initializeCosigners()
+    vm1.resizeCosigners()
     for i in 0 ..< cosigners.count {
       vm1.cosignerXpubs[i] = cosigners[i].xpub
       vm1.cosignerFingerprints[i] = cosigners[i].fingerprint
@@ -779,7 +779,7 @@ struct DescriptorTests {
     vm2.requiredSignatures = 2
     vm2.totalCosigners = 3
     vm2.network = .testnet4
-    vm2.initializeCosigners()
+    vm2.resizeCosigners()
     let reversed = [cosigners[2], cosigners[1], cosigners[0]]
     for i in 0 ..< reversed.count {
       vm2.cosignerXpubs[i] = reversed[i].xpub

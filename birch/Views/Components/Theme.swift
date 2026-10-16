@@ -326,13 +326,17 @@ enum CardLevel {
 struct BirchCard: ViewModifier {
   @Environment(\.colorScheme) private var scheme
   var level: CardLevel = .card
+  /// Square top corners, for a card that a tab sits on
+  var squareTop = false
 
   func body(content: Content) -> some View {
     let radius: CGFloat = level == .card ? 12 : 8
     content
       .background(
         level == .card ? Color.hbSurface : Color.hbSurfaceElevated,
-        in: .rect(cornerRadius: radius, style: .continuous)
+        in: squareTop
+          ? AnyShape(UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius, style: .continuous))
+          : AnyShape(.rect(cornerRadius: radius, style: .continuous))
       )
       .shadow(
         color: .black.opacity(scheme == .dark || level == .nested ? 0 : 0.06),
@@ -419,10 +423,12 @@ extension ToolbarContent {
 }
 
 struct HBCardModifier: ViewModifier {
+  var squareTop = false
+
   func body(content: Content) -> some View {
     content
       .padding(16)
-      .birchCard()
+      .modifier(BirchCard(squareTop: squareTop))
   }
 }
 
@@ -455,6 +461,108 @@ struct HBSecondaryButtonModifier: ViewModifier {
   }
 }
 
+/// How the compact primary on a setup step's footer (Next, Import) is drawn
+enum HBCompactButtonState {
+  /// Gold fill, white text
+  case filled
+  /// White on hbBorder, like hbPrimaryButton(isEnabled: false)
+  case disabled
+  /// A 1.5pt gold border and gold text with no fill: the step isn't finished,
+  /// but the button can still be tapped
+  case outlined
+}
+
+/// The compact primary beside Back on a setup step's footer: hbHeadline with
+/// 32pt sides and 14pt above and below. Outlined keeps the same size.
+struct HBCompactPrimaryButtonModifier: ViewModifier {
+  var state: HBCompactButtonState = .filled
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+    content
+      .font(.hbHeadline)
+      .foregroundStyle(state == .outlined ? Color.hbBitcoinOrange : Color.white)
+      .padding(.horizontal, 32)
+      .padding(.vertical, 14)
+      .background {
+        switch state {
+        case .filled: shape.fill(Color.hbBitcoinOrange)
+        case .disabled: shape.fill(Color.hbBorder)
+        case .outlined: shape.strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+        }
+      }
+      .contentShape(shape)
+  }
+}
+
+/// Back on a setup step's footer: the secondary look (hbHeadline in gold on the
+/// card fill) at the compact primary's size.
+struct HBCompactSecondaryButtonModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .font(.hbHeadline)
+      .foregroundStyle(Color.hbBitcoinOrange)
+      .padding(.horizontal, 32)
+      .padding(.vertical, 14)
+      .birchCard()
+  }
+}
+
+/// In-card utilities: equal tonal buttons under a field, sharing an
+/// `HStack(spacing: 8)`. The most useful action takes the gold tint, the rest
+/// are neutral on the nested fill.
+struct HBTonalButton: View {
+  let title: String
+  let systemImage: String
+  var neutral = false
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 8) {
+        Image(systemName: systemImage)
+          .font(.system(size: 15, weight: .semibold))
+        Text(title)
+          .font(.hbBody(15).weight(.semibold))
+      }
+      .foregroundStyle(neutral ? Color.hbTextPrimary : Color.hbBitcoinOrange)
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, minHeight: 44)
+      .background(
+        neutral ? Color.hbSurfaceElevated : Color.hbBitcoinOrange.opacity(0.12),
+        in: .rect(cornerRadius: 12, style: .continuous)
+      )
+      .contentShape(.rect(cornerRadius: 12, style: .continuous))
+    }
+  }
+}
+
+/// A form field that failed validation: a 1.5pt error border on its nested
+/// fill and the reason under it. Nil shows the field as it is.
+struct HBFieldErrorModifier: ViewModifier {
+  let message: String?
+
+  func body(content: Content) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      content
+        .overlay {
+          if message != nil {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .strokeBorder(Color.hbError, lineWidth: 1.5)
+          }
+        }
+      if let message {
+        Text(message)
+          .font(.hbLabel())
+          .foregroundStyle(Color.hbError)
+          .multilineTextAlignment(.leading)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+}
+
 extension View {
   func birchCard(_ level: CardLevel = .card) -> some View {
     modifier(BirchCard(level: level))
@@ -471,8 +579,9 @@ extension View {
       .presentationCornerRadius(12)
   }
 
-  func hbCard() -> some View {
-    modifier(HBCardModifier())
+  /// `squareTop` squares the top corners, for a card that a tab sits on
+  func hbCard(squareTop: Bool = false) -> some View {
+    modifier(HBCardModifier(squareTop: squareTop))
   }
 
   func hbPrimaryButton(isEnabled: Bool = true) -> some View {
@@ -481,6 +590,29 @@ extension View {
 
   func hbSecondaryButton() -> some View {
     modifier(HBSecondaryButtonModifier())
+  }
+
+  /// Next or Import beside Back on a setup step's footer
+  func hbCompactPrimaryButton(_ state: HBCompactButtonState = .filled) -> some View {
+    modifier(HBCompactPrimaryButtonModifier(state: state))
+  }
+
+  /// Back on a setup step's footer, the size of the compact primary beside it
+  func hbCompactSecondaryButton() -> some View {
+    modifier(HBCompactSecondaryButtonModifier())
+  }
+
+  /// Flags a nested form field with `message`, or shows it as it is when nil
+  func hbFieldError(_ message: String?) -> some View {
+    modifier(HBFieldErrorModifier(message: message))
+  }
+}
+
+extension String {
+  /// The string with a zero-width space after each character, so a `Text` can
+  /// break the line at any character instead of only after a slash or comma
+  var charWrapped: String {
+    map(String.init).joined(separator: "\u{200B}")
   }
 }
 

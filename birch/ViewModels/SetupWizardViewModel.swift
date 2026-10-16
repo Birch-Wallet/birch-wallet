@@ -14,8 +14,6 @@ final class SetupWizardViewModel {
     case multisigConfig
     case cosignerImport
     case descriptorImport
-    case walletName
-    case review
     case verify
   }
 
@@ -38,6 +36,12 @@ final class SetupWizardViewModel {
   var cosignerFingerprints: [String] = []
   var cosignerDerivationPaths: [String] = []
   var currentCosignerIndex: Int = 0
+  /// Fields flagged red on Import cosigners, by cosigner. Only Next sets them;
+  /// editing a field clears its flag.
+  var cosignerErrors: [Int: [CosignerField: String]] = [:]
+  /// Cosigners opened on Import cosigners, by Next, a tab or arriving at the step.
+  /// Next opens one of these flagged when it is still incomplete.
+  var visitedCosigners: Set<Int> = []
 
   /// Import
   var importedDescriptorText: String = ""
@@ -84,6 +88,10 @@ final class SetupWizardViewModel {
     !isElectrumHostRequired || !electrumHost.trimmingCharacters(in: .whitespaces).isEmpty
   }
 
+  /// Set when Next or Import finds no host for a network that needs one; shown
+  /// on the Host field and cleared when the host or the network changes
+  var electrumHostError: String?
+
   // Advanced settings
   var blockExplorerHost: String = ""
   var addressGapLimit: String = "20"
@@ -96,21 +104,21 @@ final class SetupWizardViewModel {
   /// Set to true after the wallet has been created during the import flow.
   var walletCreated: Bool = false
 
-  /// Progress
+  /// Progress. Only creating a wallet shows it: Multisig configuration,
+  /// Import cosigners, then Verify wallet.
   var stepCount: Int {
-    creationMode == .createNew ? 6 : 3
+    3
+  }
+
+  var showsProgress: Bool {
+    creationMode == .createNew && [.multisigConfig, .cosignerImport, .verify].contains(currentStep)
   }
 
   var currentStepIndex: Int {
     switch currentStep {
-    case .welcome: 0
-    case .creationChoice: 1
-    case .multisigConfig: 2
-    case .cosignerImport: 3
-    case .descriptorImport: 2
-    case .walletName: creationMode == .createNew ? 4 : 3
-    case .review: stepCount - 1
-    case .verify: stepCount - 1
+    case .welcome, .creationChoice, .descriptorImport, .multisigConfig: 0
+    case .cosignerImport: 1
+    case .verify: 2
     }
   }
 
@@ -120,24 +128,186 @@ final class SetupWizardViewModel {
 
   // MARK: - Cosigner Management
 
-  func initializeCosigners() {
+  /// Which part of a cosigner failed validation
+  enum CosignerField: Hashable {
+    case xpub
+    case fingerprint
+    case path
+  }
+
+  /// What Next does on Import cosigners
+  enum CosignerNextAction: Equatable {
+    /// The open cosigner is incomplete: stay and flag these fields
+    case flag([CosignerField: String])
+    /// Open this cosigner, flagged when it was opened before and left incomplete
+    case open(Int, flagged: Bool)
+    /// Every cosigner is complete: go on to Verify wallet
+    case finish
+  }
+
+  /// Matches the cosigner list to `totalCosigners`, keeping what was entered:
+  /// new cosigners are added empty at the end, and the last ones are dropped
+  /// when there are fewer.
+  func resizeCosigners() {
     let count = totalCosigners
-    cosignerLabels = (0 ..< count).map { "Cosigner \($0 + 1)" }
-    cosignerXpubs = Array(repeating: "", count: count)
-    cosignerFingerprints = Array(repeating: "", count: count)
-    cosignerDerivationPaths = Array(repeating: Constants.derivationPath(for: network), count: count)
-    currentCosignerIndex = 0
+    cosignerLabels = Array(cosignerLabels.prefix(count))
+    cosignerXpubs = Array(cosignerXpubs.prefix(count))
+    cosignerFingerprints = Array(cosignerFingerprints.prefix(count))
+    cosignerDerivationPaths = Array(cosignerDerivationPaths.prefix(count))
+    while cosignerLabels.count < count {
+      cosignerLabels.append("Cosigner \(cosignerLabels.count + 1)")
+    }
+    while cosignerXpubs.count < count {
+      cosignerXpubs.append("")
+    }
+    while cosignerFingerprints.count < count {
+      cosignerFingerprints.append("")
+    }
+    while cosignerDerivationPaths.count < count {
+      cosignerDerivationPaths.append(Constants.derivationPath(for: network))
+    }
+    cosignerErrors = cosignerErrors.filter { $0.key < count }
+    visitedCosigners = visitedCosigners.filter { $0 < count }
+    currentCosignerIndex = min(currentCosignerIndex, max(count - 1, 0))
+  }
+
+  /// The cosigners, by index, that reducing the count to `count` would drop
+  /// although a key or fingerprint has been entered for them
+  func filledCosignersDropped(byReducingTo count: Int) -> [Int] {
+    (0 ..< cosignerXpubs.count).filter { index in
+      index >= count && isCosignerFilled(index)
+    }
+  }
+
+  /// A key or fingerprint has been entered for the cosigner
+  func isCosignerFilled(_ index: Int) -> Bool {
+    let xpub = index < cosignerXpubs.count ? cosignerXpubs[index] : ""
+    let fingerprint = index < cosignerFingerprints.count ? cosignerFingerprints[index] : ""
+    return !xpub.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || !fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  /// A key or fingerprint has been entered for any cosigner
+  var hasEnteredKeys: Bool {
+    cosignerXpubs.indices.contains(where: isCosignerFilled)
+  }
+
+  /// Mainnet keys and paths differ from those of every test network, so moving
+  /// between Mainnet and a test network invalidates the keys entered. Moving
+  /// between test networks does not.
+  static func crossesKeyFormat(from old: BitcoinNetwork, to new: BitcoinNetwork) -> Bool {
+    (old == .mainnet) != (new == .mainnet)
+  }
+
+  /// Changes the network. Crossing between Mainnet and a test network clears
+  /// every cosigner's key and fingerprint and resets its path; labels stay.
+  func changeNetwork(to newNetwork: BitcoinNetwork) {
+    guard newNetwork != network else { return }
+    let crosses = Self.crossesKeyFormat(from: network, to: newNetwork)
+    logger.info("Network: \(network.displayName) -> \(newNetwork.displayName)\(crosses && hasEnteredKeys ? ", clearing cosigner keys" : "")")
+    network = newNetwork
+    electrumHostError = nil
+    if crosses {
+      clearKeysForNetworkChange()
+    }
+  }
+
+  /// Clears every cosigner's key and fingerprint and resets its path to the
+  /// network's, keeping the labels
+  func clearKeysForNetworkChange() {
+    cosignerXpubs = cosignerXpubs.map { _ in "" }
+    cosignerFingerprints = cosignerFingerprints.map { _ in "" }
+    cosignerDerivationPaths = cosignerDerivationPaths.map { _ in Constants.derivationPath(for: network) }
+    cosignerErrors = [:]
+  }
+
+  /// Every field of the cosigner that fails validation, with the reason
+  func cosignerProblems(at index: Int) -> [CosignerField: String] {
+    guard index < cosignerXpubs.count, index < cosignerFingerprints.count, index < cosignerDerivationPaths.count else {
+      return [.xpub: "Xpub is required", .fingerprint: "Fingerprint is required"]
+    }
+    var problems: [CosignerField: String] = [:]
+    problems[.xpub] = validateCosignerXpub(cosignerXpubs[index], at: index)
+    problems[.fingerprint] = validateFingerprint(cosignerFingerprints[index])
+    problems[.path] = validateDerivationPath(cosignerDerivationPaths[index])
+    return problems
+  }
+
+  /// The cosigner's key, fingerprint and path all pass validation
+  func isCosignerComplete(_ index: Int) -> Bool {
+    cosignerProblems(at: index).isEmpty
   }
 
   var allCosignersComplete: Bool {
-    cosignerXpubs.allSatisfy { !$0.isEmpty }
-      && cosignerFingerprints.allSatisfy { !$0.isEmpty }
+    totalCosigners > 0 && cosignerXpubs.count == totalCosigners
+      && (0 ..< totalCosigners).allSatisfy(isCosignerComplete)
   }
 
-  var currentCosignerComplete: Bool {
-    guard currentCosignerIndex < cosignerXpubs.count else { return false }
-    return !cosignerXpubs[currentCosignerIndex].isEmpty
-      && !cosignerFingerprints[currentCosignerIndex].isEmpty
+  /// Opens a cosigner from its tab, without validating
+  func openCosigner(_ index: Int) {
+    guard index >= 0, index < totalCosigners else { return }
+    currentCosignerIndex = index
+    visitedCosigners.insert(index)
+  }
+
+  /// Clears the flags on `field` for every cosigner whose value changed,
+  /// ignoring changes to surrounding whitespace
+  func clearErrors(_ field: CosignerField, editedFrom old: [String], to new: [String]) {
+    for index in new.indices where index < old.count {
+      let before = old[index].trimmingCharacters(in: .whitespacesAndNewlines)
+      let after = new[index].trimmingCharacters(in: .whitespacesAndNewlines)
+      if before != after {
+        clearError(field, at: index)
+      }
+    }
+  }
+
+  func clearError(_ field: CosignerField, at index: Int) {
+    cosignerErrors[index]?[field] = nil
+    if cosignerErrors[index]?.isEmpty == true {
+      cosignerErrors[index] = nil
+    }
+  }
+
+  /// What Next does from the open cosigner: flag it when it is incomplete,
+  /// otherwise open the next incomplete cosigner after it (wrapping round to
+  /// the first), or finish when there is none.
+  func nextCosignerAction() -> CosignerNextAction {
+    let count = totalCosigners
+    let current = currentCosignerIndex
+    let problems = cosignerProblems(at: current)
+    if !problems.isEmpty {
+      return .flag(problems)
+    }
+    for step in 1 ..< max(count, 1) {
+      let index = (current + step) % count
+      if !isCosignerComplete(index) {
+        return .open(index, flagged: visitedCosigners.contains(index))
+      }
+    }
+    return .finish
+  }
+
+  /// Next on Import cosigners: works out what Next does and does it. The view
+  /// scrolls to the first flagged field and announces it.
+  @discardableResult
+  func goToNextCosigner() -> CosignerNextAction {
+    // Drop surrounding whitespace first, so the key that is validated is the key that is stored
+    cosignerXpubs = cosignerXpubs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    let action = nextCosignerAction()
+    switch action {
+    case let .flag(problems):
+      cosignerErrors[currentCosignerIndex] = problems
+      logger.info("Cosigner \(currentCosignerIndex + 1) incomplete: \(problems.values.sorted().joined(separator: "; "))")
+    case let .open(index, flagged):
+      currentCosignerIndex = index
+      visitedCosigners.insert(index)
+      cosignerErrors[index] = flagged ? cosignerProblems(at: index) : nil
+    case .finish:
+      goToNext()
+    }
+    return action
   }
 
   // MARK: - Validation
@@ -257,7 +427,9 @@ final class SetupWizardViewModel {
     externalDescriptor = ""
     internalDescriptor = ""
 
-    guard allCosignersComplete else {
+    guard cosignerXpubs.count == totalCosigners, cosignerFingerprints.count == totalCosigners,
+          cosignerXpubs.allSatisfy({ !$0.isEmpty }), cosignerFingerprints.allSatisfy({ !$0.isEmpty })
+    else {
       errorMessage = "Every cosigner needs an xpub and a fingerprint"
       return false
     }
@@ -611,7 +783,11 @@ final class SetupWizardViewModel {
 
   // MARK: - Navigation
 
-  func goToNext() {
+  /// Moves on from the current step. Returns false when the step stays put
+  /// with an error. On Import descriptor, true means the descriptor is read
+  /// and the wallet is ready to save.
+  @discardableResult
+  func goToNext() -> Bool {
     let fromStep = currentStep
     defer {
       if currentStep != fromStep {
@@ -629,24 +805,26 @@ final class SetupWizardViewModel {
       }
     case .multisigConfig:
       guard isElectrumHostValid else {
-        errorMessage = "An Electrum server host is required for \(network.displayName)"
-        return
+        electrumHostError = "An Electrum server host is required for \(network.displayName)"
+        return false
       }
-      initializeCosigners()
+      resizeCosigners()
+      visitedCosigners.insert(currentCosignerIndex)
       currentStep = .cosignerImport
     case .cosignerImport:
-      guard buildDescriptors() else { return }
-      currentStep = .walletName
+      guard buildDescriptors() else { return false }
+      deriveFirstAddress()
+      currentStep = .verify
     case .descriptorImport:
       importDescriptorError = nil
       guard isElectrumHostValid else {
-        importDescriptorError = "An Electrum server host is required for \(network.displayName)"
-        return
+        electrumHostError = "An Electrum server host is required for \(network.displayName)"
+        return false
       }
       guard parseImportedDescriptor() else {
         importDescriptorError = errorMessage
         errorMessage = nil
-        return
+        return false
       }
       // Validate descriptors with BDK before proceeding
       let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
@@ -657,17 +835,12 @@ final class SetupWizardViewModel {
       } catch {
         logger.error("Imported descriptor invalid: \(error.localizedDescription)")
         importDescriptorError = "Invalid descriptor: \(error.localizedDescription)"
-        return
+        return false
       }
-      currentStep = .walletName
-    case .walletName:
-      deriveFirstAddress()
-      currentStep = .verify
-    case .review:
-      break // unused in current flow
     case .verify:
       break // handled by saveWallet
     }
+    return true
   }
 
   func goBack() {
@@ -677,13 +850,7 @@ final class SetupWizardViewModel {
     case .multisigConfig: currentStep = .creationChoice
     case .cosignerImport: currentStep = .multisigConfig
     case .descriptorImport: currentStep = .creationChoice
-    case .walletName:
-      if creationMode == .createNew {
-        currentStep = .cosignerImport
-      }
-    // Import flow: back button is hidden, wallet already created
-    case .review: currentStep = .walletName
-    case .verify: currentStep = .walletName
+    case .verify: currentStep = .cosignerImport
     }
   }
 

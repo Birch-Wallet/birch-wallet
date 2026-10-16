@@ -2,15 +2,21 @@ import SwiftUI
 
 struct DescriptorImportView: View {
   @Bindable var viewModel: SetupWizardViewModel
+  /// Saves the wallet once the descriptor is read
+  let onImport: () -> Void
   @State private var showScanner = false
   @Environment(\.setupLayout) private var layout
 
+  private static let descriptorFieldID = "descriptor"
+
   var body: some View {
-    Group {
-      if layout == .twoColumn {
-        twoColumnBody
-      } else {
-        singleColumnBody
+    ScrollViewReader { proxy in
+      Group {
+        if layout == .twoColumn {
+          twoColumnBody(proxy: proxy)
+        } else {
+          singleColumnBody(proxy: proxy)
+        }
       }
     }
     .sheet(isPresented: $showScanner) {
@@ -24,7 +30,7 @@ struct DescriptorImportView: View {
     }
   }
 
-  private var singleColumnBody: some View {
+  private func singleColumnBody(proxy: ScrollViewProxy) -> some View {
     ScrollView {
       VStack(spacing: 24) {
         title
@@ -36,21 +42,7 @@ struct DescriptorImportView: View {
         descriptorCard(fillsHeight: false)
           .padding(.horizontal, 24)
 
-        scanButton
-          .padding(.horizontal, 24)
-
-        SetupNetworkPicker(viewModel: viewModel)
-          .padding(.horizontal, 24)
-
-        errors
-          .padding(.horizontal, 24)
-
-        // Electrum server
-        ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
-          .padding(.horizontal, 24)
-
-        // Advanced
-        WalletAdvancedSetupSection(viewModel: viewModel)
+        settings
           .padding(.horizontal, 24)
 
         HStack(spacing: 16) {
@@ -58,14 +50,9 @@ struct DescriptorImportView: View {
 
           Spacer()
 
-          Button(action: { viewModel.goToNext() }) {
+          Button(action: { importDescriptor(proxy: proxy) }) {
             Text("Import")
-              .font(.hbHeadline)
-              .foregroundStyle(.white)
-              .padding(.horizontal, 32)
-              .padding(.vertical, 14)
-              .background(canImport ? Color.hbBitcoinOrange : Color.hbBorder)
-              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+              .hbCompactPrimaryButton(canImport ? .filled : .disabled)
           }
           .disabled(!canImport)
         }
@@ -80,18 +67,15 @@ struct DescriptorImportView: View {
     .scrollDismissesKeyboard(.interactively)
   }
 
-  /// Left: the step, scanning and the settings, with Back at the bottom.
-  /// Right: the descriptor itself, filling the height, with Import below it.
-  private var twoColumnBody: some View {
+  /// Left: the step and the settings, with Back at the bottom. Right: the
+  /// descriptor itself, filling the height, with Import below it.
+  private func twoColumnBody(proxy: ScrollViewProxy) -> some View {
     SetupTwoColumn {
       VStack(alignment: .leading, spacing: 16) {
         title
         subtitle
           .multilineTextAlignment(.leading)
-        scanButton
-        SetupNetworkPicker(viewModel: viewModel)
-        ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
-        WalletAdvancedSetupSection(viewModel: viewModel)
+        settings
         Spacer(minLength: 16)
         backButton
       }
@@ -101,8 +85,7 @@ struct DescriptorImportView: View {
     } trailing: {
       VStack(spacing: 12) {
         descriptorCard(fillsHeight: true)
-        errors
-        Button(action: { viewModel.goToNext() }) {
+        Button(action: { importDescriptor(proxy: proxy) }) {
           Text("Import")
             .hbPrimaryButton(isEnabled: canImport)
         }
@@ -128,78 +111,77 @@ struct DescriptorImportView: View {
       .foregroundStyle(Color.hbTextSecondary)
   }
 
+  @ViewBuilder
+  private var settings: some View {
+    WalletNameNetworkCard(viewModel: viewModel)
+    ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
+    WalletAdvancedSetupSection(viewModel: viewModel)
+  }
+
+  /// The descriptor, then Scan QR and Paste as in-card utilities. A failed
+  /// import or a descriptor for the other network flags the field.
   private func descriptorCard(fillsHeight: Bool) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text("Output Descriptor")
-          .font(.hbLabel())
-          .foregroundStyle(Color.hbTextSecondary)
+      Text("Output Descriptor")
+        .font(.hbLabel())
+        .foregroundStyle(Color.hbTextSecondary)
 
-        Spacer()
+      CharWrappingTextEditor(
+        text: $viewModel.importedDescriptorText,
+        fontSize: 11,
+        placeholder: "wsh(sortedmulti(M,[fp/path]xpub/0/*,...))",
+        minHeight: 120,
+        fillsHeight: fillsHeight
+      )
+      .padding(12)
+      .birchCard(.nested)
+      .hbFieldError(viewModel.importDescriptorError ?? viewModel.descriptorNetworkMismatchError)
+      .id(Self.descriptorFieldID)
+      .onChange(of: viewModel.importedDescriptorText) {
+        viewModel.importDescriptorError = nil
+      }
 
-        Button(action: {
+      HStack(spacing: 8) {
+        HBTonalButton(title: "Scan QR", systemImage: "qrcode.viewfinder") {
+          showScanner = true
+        }
+        HBTonalButton(title: "Paste", systemImage: "doc.on.clipboard", neutral: true) {
           if let text = UIPasteboard.general.string {
             viewModel.importedDescriptorText = text.trimmingCharacters(in: .whitespacesAndNewlines)
           }
-        }) {
-          Label("Paste", systemImage: "doc.on.clipboard")
-            .font(.hbLabel())
-            .foregroundStyle(Color.hbSteelBlue)
         }
       }
-
-      TextEditor(text: $viewModel.importedDescriptorText)
-        .font(.hbMono(11))
-        .frame(minHeight: 120, maxHeight: fillsHeight ? .infinity : nil)
-        .scrollContentBackground(.hidden)
-        .padding(12)
-        .birchCard(.nested)
-        .foregroundStyle(Color.hbTextPrimary)
-        .onChange(of: viewModel.importedDescriptorText) {
-          viewModel.importDescriptorError = nil
-        }
-
-      Text("Expected format: wsh(sortedmulti(M,[fp/path]xpub/0/*,...))")
-        .font(.hbMono(10))
-        .foregroundStyle(Color.hbTextSecondary)
+      .padding(.top, 4)
     }
     .hbCard()
-  }
-
-  private var scanButton: some View {
-    Button(action: { showScanner = true }) {
-      Label("Scan Descriptor QR", systemImage: "qrcode.viewfinder")
-        .hbSecondaryButton()
-    }
-  }
-
-  @ViewBuilder
-  private var errors: some View {
-    if let mismatchError = viewModel.descriptorNetworkMismatchError {
-      Text(mismatchError)
-        .font(.hbLabel(13))
-        .foregroundStyle(Color.hbError)
-        .multilineTextAlignment(.center)
-    }
-
-    if let importError = viewModel.importDescriptorError {
-      Text(importError)
-        .font(.hbBody(13))
-        .foregroundStyle(Color.hbError)
-        .multilineTextAlignment(.leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color.hbError.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
   }
 
   private var backButton: some View {
     Button(action: { viewModel.goBack() }) {
       Text("Back")
-        .font(.hbBody(16))
-        .foregroundStyle(Color.hbTextSecondary)
+        .hbCompactSecondaryButton()
     }
+  }
+
+  /// Saves the wallet, or scrolls to what stopped it and reads out why
+  private func importDescriptor(proxy: ScrollViewProxy) {
+    dismissKeyboard()
+    if viewModel.goToNext() {
+      onImport()
+      return
+    }
+    let flagged: (id: String, message: String)? = if let hostError = viewModel.electrumHostError {
+      (ElectrumServerSetupSection.scrollID, hostError)
+    } else if let importError = viewModel.importDescriptorError {
+      (Self.descriptorFieldID, importError)
+    } else {
+      nil
+    }
+    guard let flagged else { return }
+    withAnimation {
+      proxy.scrollTo(flagged.id, anchor: .top)
+    }
+    AccessibilityNotification.Announcement(flagged.message).post()
   }
 
   private func dismissKeyboard() {

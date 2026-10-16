@@ -4,17 +4,42 @@ struct MultisigConfigView: View {
   @Bindable var viewModel: SetupWizardViewModel
   @State private var showingMSheet = false
   @State private var showingNSheet = false
+  /// The cosigner count on the wheel, applied when the sheet closes
+  @State private var pickedTotal = 0
+  /// A lower count that would drop cosigners with keys entered, waiting for
+  /// the user to agree
+  @State private var pendingTotal: Int?
   @Environment(\.setupLayout) private var layout
 
   var body: some View {
-    if layout == .twoColumn {
-      twoColumnBody
-    } else {
-      singleColumnBody
+    ScrollViewReader { proxy in
+      if layout == .twoColumn {
+        twoColumnBody(proxy: proxy)
+      } else {
+        singleColumnBody(proxy: proxy)
+      }
+    }
+    .alert(
+      removalTitle,
+      isPresented: .init(get: { pendingTotal != nil }, set: {
+        if !$0 {
+          pendingTotal = nil
+        }
+      })
+    ) {
+      Button("Cancel", role: .cancel) { pendingTotal = nil }
+      Button("Remove", role: .destructive) {
+        if let pendingTotal {
+          applyTotal(pendingTotal)
+        }
+        pendingTotal = nil
+      }
+    } message: {
+      Text(removalMessage)
     }
   }
 
-  private var singleColumnBody: some View {
+  private func singleColumnBody(proxy: ScrollViewProxy) -> some View {
     ScrollView {
       VStack(spacing: 28) {
         title
@@ -37,14 +62,9 @@ struct MultisigConfigView: View {
 
           Spacer()
 
-          Button(action: { viewModel.goToNext() }) {
+          Button(action: { goNext(proxy: proxy) }) {
             Text("Next")
-              .font(.hbHeadline)
-              .foregroundStyle(.white)
-              .padding(.horizontal, 32)
-              .padding(.vertical, 14)
-              .background(Color.hbBitcoinOrange)
-              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+              .hbCompactPrimaryButton()
           }
         }
         .padding(.horizontal, 24)
@@ -58,7 +78,7 @@ struct MultisigConfigView: View {
 
   /// Left: the question and the M-of-N answer, with Back at the bottom.
   /// Right: network and server settings, with Next at the bottom.
-  private var twoColumnBody: some View {
+  private func twoColumnBody(proxy: ScrollViewProxy) -> some View {
     SetupTwoColumn {
       VStack(alignment: .leading, spacing: 8) {
         title
@@ -74,7 +94,7 @@ struct MultisigConfigView: View {
       VStack(spacing: 16) {
         settings
         Spacer(minLength: 16)
-        Button(action: { viewModel.goToNext() }) {
+        Button(action: { goNext(proxy: proxy) }) {
           Text("Next")
             .hbPrimaryButton()
         }
@@ -125,7 +145,10 @@ struct MultisigConfigView: View {
         .foregroundStyle(Color.hbTextSecondary)
 
       // N Selector Button
-      Button(action: { showingNSheet = true }) {
+      Button(action: {
+        pickedTotal = viewModel.totalCosigners
+        showingNSheet = true
+      }) {
         HStack(spacing: 4) {
           Text("\(viewModel.totalCosigners)")
             .font(.hbDisplay(48))
@@ -135,16 +158,11 @@ struct MultisigConfigView: View {
             .foregroundStyle(Color.hbTextSecondary)
         }
       }
-      .sheet(isPresented: $showingNSheet) {
+      .sheet(isPresented: $showingNSheet, onDismiss: pickTotal) {
         NumberPickerSheet(
           title: "Total Cosigners",
           range: Constants.minCosigners ... Constants.maxCosigners,
-          selection: $viewModel.totalCosigners,
-          onChange: { newN in
-            if viewModel.requiredSignatures > newN {
-              viewModel.requiredSignatures = newN
-            }
-          }
+          selection: $pickedTotal
         )
         .birchSheet()
       }
@@ -153,7 +171,7 @@ struct MultisigConfigView: View {
 
   @ViewBuilder
   private var settings: some View {
-    SetupNetworkPicker(viewModel: viewModel)
+    WalletNameNetworkCard(viewModel: viewModel)
 
     // Electrum server
     ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
@@ -165,8 +183,58 @@ struct MultisigConfigView: View {
   private var backButton: some View {
     Button(action: { viewModel.goBack() }) {
       Text("Back")
-        .font(.hbBody(16))
-        .foregroundStyle(Color.hbTextSecondary)
+        .hbCompactSecondaryButton()
     }
+  }
+
+  /// Moves on, or scrolls to the flagged Host field and reads out why not
+  private func goNext(proxy: ScrollViewProxy) {
+    guard !viewModel.goToNext(), let hostError = viewModel.electrumHostError else { return }
+    withAnimation {
+      proxy.scrollTo(ElectrumServerSetupSection.scrollID, anchor: .top)
+    }
+    AccessibilityNotification.Announcement(hostError).post()
+  }
+
+  /// The wheel closed: lowering the count past cosigners with keys entered asks first
+  private func pickTotal() {
+    guard pickedTotal != viewModel.totalCosigners, pickedTotal > 0 else { return }
+    if viewModel.filledCosignersDropped(byReducingTo: pickedTotal).isEmpty {
+      applyTotal(pickedTotal)
+    } else {
+      pendingTotal = pickedTotal
+    }
+  }
+
+  private func applyTotal(_ total: Int) {
+    viewModel.totalCosigners = total
+    if viewModel.requiredSignatures > total {
+      viewModel.requiredSignatures = total
+    }
+    // Drop the removed cosigners now, so raising the count again brings back empty ones
+    if !viewModel.cosignerXpubs.isEmpty {
+      viewModel.resizeCosigners()
+    }
+  }
+
+  private var droppedNames: [String] {
+    guard let pendingTotal else { return [] }
+    return viewModel.filledCosignersDropped(byReducingTo: pendingTotal).map { index in
+      let label = viewModel.cosignerLabels[index].trimmingCharacters(in: .whitespaces)
+      return label.isEmpty ? "Cosigner \(index + 1)" : label
+    }
+  }
+
+  private var removalTitle: String {
+    droppedNames.count == 1 ? "Remove \(droppedNames[0])?" : "Remove \(droppedNames.count) Cosigners?"
+  }
+
+  /// "Cosigner 3 has a key entered. Reduce to 2 cosigners and remove it?"
+  private var removalMessage: String {
+    guard let pendingTotal else { return "" }
+    let names = ListFormatter.localizedString(byJoining: droppedNames)
+    let one = droppedNames.count == 1
+    return "\(names) \(one ? "has a key" : "have keys") entered. Reduce to \(pendingTotal) "
+      + "\(pendingTotal == 1 ? "cosigner" : "cosigners") and remove \(one ? "it" : "them")?"
   }
 }

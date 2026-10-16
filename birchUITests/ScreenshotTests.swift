@@ -165,8 +165,7 @@ final class ScreenshotTests: XCTestCase {
     }
 
     // Dismiss the keyboard by tapping the subtitle: the screen's content
-    // resigns focus on tap, but the top of the window is the wizard's progress
-    // header, which doesn't, and the system's "pasted from" banner covers the
+    // resigns focus on tap, and the system's "pasted from" banner covers the
     // title. The shot needs the keyboard gone, because one that is already on
     // screen keeps its dark appearance when the light copy is taken.
     app.staticTexts["Paste or scan a multisig output descriptor"].firstMatch.tap()
@@ -183,30 +182,25 @@ final class ScreenshotTests: XCTestCase {
       testnet4Button.tap()
     }
 
+    // Name the wallet after the shot, so 03 shows the field's placeholder.
+    // Return dismisses the keyboard.
+    let nameField = app.textFields["My Wallet"]
+    XCTAssertTrue(nameField.waitForExistence(timeout: 3), "Wallet name text field should exist")
+    nameField.tap()
+    nameField.typeText("Birch\n")
+    waitForKeyboardToHide()
+
+    // Import reads the descriptor and creates the wallet. Parsing and BDK
+    // validation can take several seconds on slower simulators (e.g. iPhone 11
+    // Pro Max on x86_64), so the wait for the main screen below allows for it.
     let importButton = app.buttons["Import"]
     XCTAssertTrue(importButton.waitForExistence(timeout: 5), "Import button should exist")
     importButton.tap()
 
-    // Descriptor parsing and BDK validation can take several seconds on
-    // slower simulators (e.g. iPhone 11 Pro Max on x86_64).
-    let nameTitle = app.staticTexts["Name Your Wallet"]
-    XCTAssertTrue(nameTitle.waitForExistence(timeout: 30), "Wallet name screen should appear")
-
-    let nameField = app.textFields["My Wallet"]
-    XCTAssertTrue(nameField.waitForExistence(timeout: 3), "Wallet name text field should exist")
-    nameField.tap()
-    nameField.typeText("Birch")
-
-    // In descriptor-import mode the button reads "Create Wallet" (not "Next")
-    // and skips the Review screen, going straight to the loaded wallet.
-    let createButton = app.buttons["Create Wallet"]
-    XCTAssertTrue(createButton.waitForExistence(timeout: 3), "Create Wallet button should exist")
-    createButton.tap()
-
     // Wait for the main Transactions tab, then for the Electrum sync to land
     // (the first transaction row) and the fiat rates (the balance's fiat line).
     let balanceExists = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'sats'")).firstMatch
-    XCTAssertTrue(balanceExists.waitForExistence(timeout: 15), "Main screen should appear after wallet creation")
+    XCTAssertTrue(balanceExists.waitForExistence(timeout: 40), "Main screen should appear after wallet creation")
     XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 45), "Transactions should appear once the wallet syncs")
     XCTAssertTrue(app.staticTexts["balanceFiat"].waitForExistence(timeout: 20), "Balance should show its fiat value")
     settle()
@@ -375,6 +369,14 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(testnet4SegBtn.waitForExistence(timeout: 3), "Testnet4 segment button should exist")
     testnet4SegBtn.tap()
 
+    // Name the wallet after the shots, so 15 and 16 show the placeholder.
+    // Return dismisses the keyboard.
+    let newWalletNameField = app.textFields["My Wallet"]
+    XCTAssertTrue(newWalletNameField.waitForExistence(timeout: 3), "Wallet name text field should exist")
+    newWalletNameField.tap()
+    newWalletNameField.typeText("My New Wallet\n")
+    waitForKeyboardToHide()
+
     // Advance to cosigner import
     let multisigNextBtn = app.buttons["Next"]
     XCTAssertTrue(multisigNextBtn.waitForExistence(timeout: 3), "Next button should exist on multisig config screen")
@@ -392,10 +394,9 @@ final class ScreenshotTests: XCTestCase {
     // Type fingerprint into TextField, ending with a newline to press Return
     // and dismiss its keyboard (the closed iPhone Duo reports the keyboard's
     // Return key off-screen, so it can't be tapped).
-    // Then type xpub directly into the TextEditor (avoids the system clipboard
-    // permission prompt), and dismiss via swipeDown (scrollDismissesKeyboard).
-    // Do NOT press Return in the TextEditor — it inserts a newline that would
-    // corrupt the xpub and fail BDK descriptor parsing.
+    // Then type xpub directly into the key's text view (avoids the system
+    // clipboard permission prompt), and dismiss by tapping the title.
+    // Do NOT press Return in the text view — it inserts a newline.
     let fpField1 = app.textFields["e.g. 73c5da0a"]
     XCTAssertTrue(fpField1.waitForExistence(timeout: 3), "Fingerprint field should exist")
     fpField1.tap()
@@ -405,8 +406,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(xpubEditor1.waitForExistence(timeout: 3), "Xpub text editor should exist")
     xpubEditor1.tap()
     xpubEditor1.typeText("tpubDE2gU1F6b1GXDg2bFjeq6RUnBmAe2moTNG7x47Cga3VnVnm7EJWLdJE73ZL2MEwKTc2dLNeSudXUjexm2xJ5qboosbnEb1SEiGyJtJcqqZK")
-    // Dismiss keyboard by tapping a non-field area
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+    // Dismiss keyboard by tapping the title: the content resigns focus on tap,
+    // and a tap near the top of the screen could land on a cosigner tab
+    app.staticTexts["Import Cosigners"].tap()
     waitForKeyboardToHide()
     settle()
 
@@ -414,10 +416,20 @@ final class ScreenshotTests: XCTestCase {
 
     snapshot("18-CosignerImport-Cosigner1")
 
-    let nextCosignerBtn1 = app.buttons["Next Cosigner"]
-    XCTAssertTrue(nextCosignerBtn1.waitForExistence(timeout: 3), "Next Cosigner button should exist")
-    nextCosignerBtn1.tap()
-    XCTAssertTrue(app.staticTexts["Cosigner 2 of 3"].waitForExistence(timeout: 3), "Should have advanced to Cosigner 2 of 3")
+    // Next opens the next cosigner; the tabs show which one is open
+    let nextBtn = app.buttons["Next"]
+    XCTAssertTrue(nextBtn.waitForExistence(timeout: 3), "Next button should exist")
+    nextBtn.tap()
+    XCTAssertTrue(app.buttons["Cosigner 2 tab"].wait(for: \.isSelected, toEqual: true, timeout: 3), "Should have advanced to cosigner 2")
+
+    // MARK: 20 - Cosigner 2 flagged
+
+    // Next on the empty cosigner 2 flags its key and fingerprint and scrolls to them
+    nextBtn.tap()
+    XCTAssertTrue(app.staticTexts["Xpub is required"].waitForExistence(timeout: 3), "Next should flag the empty key")
+    XCTAssertTrue(app.buttons["Cosigner 2 tab"].isSelected, "Next should stay on the incomplete cosigner")
+    settle()
+    snapshot("20-CosignerImport-Errors")
 
     // MARK: Fill Cosigner 2
 
@@ -430,24 +442,22 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(xpubEditor2.waitForExistence(timeout: 3), "Xpub text editor should exist for cosigner 2")
     xpubEditor2.tap()
     xpubEditor2.typeText("tpubDET5GnMK8Zr7UH63ni72etKd7ZYxVq8NvtSneNBfEDJ7YtnSHUmiPCaBYXzCdR6ZBKWvBMXT3urCVp7sLmG6z8VTpdFRJuW4VL7xjHdLFpY")
-    // Dismiss keyboard by tapping a non-field area. Do not use app.swipeDown()
+    // Dismiss keyboard by tapping the title. Do not use app.swipeDown()
     // here: the setup wizard is inside a sheet, and a full-app swipe-down
     // starts the sheet-dismiss gesture, leaving the sheet in a partially-
-    // dragged state where the subsequent "Next Cosigner" tap fails to advance.
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+    // dragged state where the subsequent "Next" tap fails to advance.
+    app.staticTexts["Import Cosigners"].tap()
     waitForKeyboardToHide()
+    XCTAssertFalse(app.staticTexts["Xpub is required"].exists, "Editing the key should clear its flag")
 
-    let nextCosignerBtn2 = app.buttons["Next Cosigner"]
-    XCTAssertTrue(nextCosignerBtn2.waitForExistence(timeout: 3), "Next Cosigner button should exist for cosigner 2")
-    nextCosignerBtn2.tap()
+    nextBtn.tap()
 
     // MARK: Fill Cosigner 3
 
     // Verify we actually advanced to cosigner 3 before proceeding, so a future
     // regression in the cosigner-2 -> cosigner-3 transition fails here rather
     // than producing a mislabeled screenshot.
-    let cosigner3Header = app.staticTexts["Cosigner 3 of 3"]
-    XCTAssertTrue(cosigner3Header.waitForExistence(timeout: 3), "Should have advanced to Cosigner 3 of 3")
+    XCTAssertTrue(app.buttons["Cosigner 3 tab"].wait(for: \.isSelected, toEqual: true, timeout: 3), "Should have advanced to cosigner 3")
 
     let fpField3 = app.textFields["e.g. 73c5da0a"]
     XCTAssertTrue(fpField3.waitForExistence(timeout: 3), "Fingerprint field should exist for cosigner 3")
@@ -458,8 +468,9 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(xpubEditor3.waitForExistence(timeout: 3), "Xpub text editor should exist for cosigner 3")
     xpubEditor3.tap()
     xpubEditor3.typeText("tpubDF3GwUrMb5WkigsDUpUWUADH55G3Ez771QujmFqeyrNEPD7onkqTwCsCEjNRbSrbD9VYKDfMHfg7bajem5aEX7CyMp2q5fvQzacy75bUesQ")
-    // Dismiss keyboard by tapping a non-field area
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+    // Dismiss keyboard by tapping the title: the content resigns focus on tap,
+    // and a tap near the top of the screen could land on a cosigner tab
+    app.staticTexts["Import Cosigners"].tap()
     waitForKeyboardToHide()
     settle()
 
@@ -467,26 +478,8 @@ final class ScreenshotTests: XCTestCase {
 
     snapshot("19-CosignerImport-Cosigner3")
 
-    let continueBtn = app.buttons["Continue"]
-    XCTAssertTrue(continueBtn.waitForExistence(timeout: 3), "Continue button should exist")
-    continueBtn.tap()
-
-    // MARK: 20 - Wallet Name
-
-    let nameWalletTitle = app.staticTexts["Name Your Wallet"]
-    XCTAssertTrue(nameWalletTitle.waitForExistence(timeout: 10), "Wallet name screen should appear")
-    let newWalletNameField = app.textFields["My Wallet"]
-    XCTAssertTrue(newWalletNameField.waitForExistence(timeout: 3), "Wallet name text field should exist")
-    newWalletNameField.tap()
-    newWalletNameField.typeText("My New Wallet")
-    app.swipeDown()
-    waitForKeyboardToHide()
-    settle()
-    snapshot("20-WalletName")
-
-    let walletNameNextBtn = app.buttons["Next"]
-    XCTAssertTrue(walletNameNextBtn.waitForExistence(timeout: 3), "Next button should exist on wallet name screen")
-    walletNameNextBtn.tap()
+    // Every cosigner is complete, so Next goes on to Verify wallet
+    nextBtn.tap()
 
     // MARK: 21 - Verify Wallet (top — summary + cosigners)
 
