@@ -49,11 +49,13 @@ struct WalletVerifyView: View {
                   .foregroundStyle(Color.hbBitcoinOrange)
               }
 
-              Text(viewModel.cosignerXpubs[index])
+              // The whole key, wrapped at the character onto up to three lines
+              Text(viewModel.cosignerXpubs[index].charWrapped)
                 .font(.hbMono(10))
                 .foregroundStyle(Color.hbTextSecondary)
-                .lineLimit(2)
+                .lineLimit(3)
                 .truncationMode(.middle)
+                .accessibilityLabel(viewModel.cosignerXpubs[index])
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -1,18 +1,57 @@
 import SwiftUI
 
+/// Import cosigners: a folder tab per cosigner on top of the open cosigner's
+/// form. Tabs switch freely; only Next validates.
 struct CosignerImportView: View {
   @Bindable var viewModel: SetupWizardViewModel
-  @State private var validationError: String?
   @State private var showScanner = false
   @Environment(\.setupLayout) private var layout
 
+  private typealias Field = SetupWizardViewModel.CosignerField
+
+  private static let topID = "cosigner-top"
+
   var body: some View {
-    Group {
-      if layout == .twoColumn {
-        twoColumnBody
-      } else {
-        singleColumnBody
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(spacing: 24) {
+          title
+            .id(Self.topID)
+
+          VStack(spacing: 0) {
+            CosignerTabs(viewModel: viewModel)
+              .zIndex(1)
+            form
+              .hbCard(squareTop: true)
+          }
+          .padding(.horizontal, 24)
+
+          // Navigation
+          HStack(spacing: 16) {
+            Button(action: { viewModel.goBack() }) {
+              Text("Back")
+                .hbCompactSecondaryButton()
+            }
+
+            Spacer()
+
+            // Outlined until every cosigner is complete, but never disabled:
+            // Next is what shows the user what is missing
+            Button(action: { goNext(proxy: proxy) }) {
+              Text("Next")
+                .hbCompactPrimaryButton(viewModel.allCosignersComplete ? .filled : .outlined)
+            }
+          }
+          .padding(.horizontal, 24)
+          .padding(.bottom, 32)
+        }
+        .padding(.top, 16)
+        .padding(.top, layout == .column ? 40 : 0)
+        .setupReadableWidth()
+        .contentShape(Rectangle())
+        .onTapGesture(perform: dismissKeyboard)
       }
+      .scrollDismissesKeyboard(.interactively)
     }
     .sheet(isPresented: $showScanner) {
       URScannerSheet(expectedTypes: [.hdKey], onCancel: { showScanner = false }) { result in
@@ -21,94 +60,16 @@ struct CosignerImportView: View {
       }
       .birchSheet()
     }
-  }
-
-  private var singleColumnBody: some View {
-    ScrollView {
-      VStack(spacing: 24) {
-        title
-
-        positionLabel
-
-        // Cosigner cards overview
-        cosignerSlots
-          .padding(.horizontal, 24)
-
-        // Current cosigner form
-        VStack(spacing: 16) {
-          identityFields
-          xpubField(fillsHeight: false)
-          validationMessage
-        }
-        .hbCard()
-        .padding(.horizontal, 24)
-
-        // Navigation
-        HStack(spacing: 16) {
-          backButton
-
-          Spacer()
-
-          Button(action: goNext) {
-            Text(nextTitle)
-              .font(.hbHeadline)
-              .foregroundStyle(.white)
-              .padding(.horizontal, 24)
-              .padding(.vertical, 14)
-              .background(viewModel.currentCosignerComplete ? Color.hbBitcoinOrange : Color.hbBorder)
-              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-          }
-          .disabled(!viewModel.currentCosignerComplete)
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 32)
-      }
-      .padding(.top, 16)
-      .padding(.top, layout == .column ? 40 : 0)
-      .setupReadableWidth()
-      .contentShape(Rectangle())
-      .onTapGesture(perform: dismissKeyboard)
+    // Editing a field clears its flag. Switching cosigners changes no value, so
+    // a cosigner opened flagged keeps its flags.
+    .onChange(of: viewModel.cosignerXpubs) { old, new in
+      viewModel.clearErrors(.xpub, editedFrom: old, to: new)
     }
-    .scrollDismissesKeyboard(.interactively)
-  }
-
-  /// Left: which cosigner this is and who it belongs to, with Back at the
-  /// bottom. Right: the xpub, filling the height, with Next below it.
-  private var twoColumnBody: some View {
-    SetupTwoColumn {
-      VStack(alignment: .leading, spacing: 16) {
-        HStack(alignment: .firstTextBaseline) {
-          title
-          Spacer()
-          positionLabel
-        }
-        cosignerSlots
-        VStack(spacing: 16) {
-          identityFields
-        }
-        .hbCard()
-        Spacer(minLength: 16)
-        backButton
-      }
-      .padding(.vertical, 16)
-      .contentShape(Rectangle())
-      .onTapGesture(perform: dismissKeyboard)
-    } trailing: {
-      VStack(spacing: 12) {
-        VStack(spacing: 16) {
-          xpubField(fillsHeight: true)
-          validationMessage
-        }
-        .hbCard()
-        Button(action: goNext) {
-          Text(nextTitle)
-            .hbPrimaryButton(isEnabled: viewModel.currentCosignerComplete)
-        }
-        .disabled(!viewModel.currentCosignerComplete)
-      }
-      // Start the xpub level with the content under the title.
-      .padding(.top, 56)
-      .padding(.bottom, 16)
+    .onChange(of: viewModel.cosignerFingerprints) { old, new in
+      viewModel.clearErrors(.fingerprint, editedFrom: old, to: new)
+    }
+    .onChange(of: viewModel.cosignerDerivationPaths) { old, new in
+      viewModel.clearErrors(.path, editedFrom: old, to: new)
     }
   }
 
@@ -118,74 +79,41 @@ struct CosignerImportView: View {
       .foregroundStyle(Color.hbTextPrimary)
   }
 
-  private var positionLabel: some View {
-    Text("Cosigner \(viewModel.currentCosignerIndex + 1) of \(viewModel.totalCosigners)")
-      .font(.hbBody(15))
-      .foregroundStyle(Color.hbTextSecondary)
-  }
+  // MARK: - Form
 
-  private var nextTitle: String {
-    viewModel.currentCosignerIndex < viewModel.totalCosigners - 1 ? "Next Cosigner" : "Continue"
-  }
-
-  private var cosignerSlots: some View {
-    HStack(spacing: 8) {
-      ForEach(0 ..< viewModel.totalCosigners, id: \.self) { index in
-        CosignerSlot(
-          index: index,
-          isCurrent: index == viewModel.currentCosignerIndex,
-          isComplete: !viewModel.cosignerXpubs[index].isEmpty
-        )
+  @ViewBuilder
+  private var form: some View {
+    let index = viewModel.currentCosignerIndex
+    if index < viewModel.cosignerXpubs.count, index < viewModel.cosignerFingerprints.count,
+       index < viewModel.cosignerLabels.count, index < viewModel.cosignerDerivationPaths.count
+    {
+      let errors = viewModel.cosignerErrors[index] ?? [:]
+      VStack(spacing: 16) {
+        labelField(index)
+        xpubField(index, error: errors[.xpub])
+        fingerprintField(index, error: errors[.fingerprint])
+        pathField(index, error: errors[.path])
       }
     }
   }
 
-  @ViewBuilder
-  private var identityFields: some View {
-    // Label
+  private func labelField(_ index: Int) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       Text("Label")
         .font(.hbLabel())
         .foregroundStyle(Color.hbTextSecondary)
 
-      TextField("Cosigner name", text: $viewModel.cosignerLabels[viewModel.currentCosignerIndex])
+      TextField("Cosigner name", text: $viewModel.cosignerLabels[index])
         .font(.hbBody())
-        .padding(12)
-        .birchCard(.nested)
-        .foregroundStyle(Color.hbTextPrimary)
-    }
-
-    // Fingerprint
-    VStack(alignment: .leading, spacing: 6) {
-      Text("Master Fingerprint (8 hex chars)")
-        .font(.hbLabel())
-        .foregroundStyle(Color.hbTextSecondary)
-
-      TextField("e.g. 73c5da0a", text: $viewModel.cosignerFingerprints[viewModel.currentCosignerIndex])
-        .font(.hbMono())
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-        .padding(12)
-        .birchCard(.nested)
-        .foregroundStyle(Color.hbTextPrimary)
-    }
-
-    // Derivation path
-    VStack(alignment: .leading, spacing: 6) {
-      Text("Derivation Path")
-        .font(.hbLabel())
-        .foregroundStyle(Color.hbTextSecondary)
-
-      Text(viewModel.cosignerDerivationPaths[viewModel.currentCosignerIndex].isEmpty ? "–" : viewModel.cosignerDerivationPaths[viewModel.currentCosignerIndex])
-        .font(.hbMono())
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
     }
   }
 
-  private func xpubField(fillsHeight: Bool) -> some View {
+  /// The key, with the format toggle beside its label and Scan QR and Paste
+  /// under it as in-card utilities
+  private func xpubField(_ index: Int, error: String?) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
         Text("Extended Public Key")
@@ -199,47 +127,62 @@ struct CosignerImportView: View {
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(Color.green)
         }
-        .padding(.trailing, 12)
-
-        Button(action: pasteFromClipboard) {
-          Label("Paste", systemImage: "doc.on.clipboard")
-            .font(.hbLabel())
-            .foregroundStyle(Color.hbSteelBlue)
-        }
+        .accessibilityLabel("Switch key format")
       }
 
-      TextEditor(text: $viewModel.cosignerXpubs[viewModel.currentCosignerIndex])
-        .font(.hbMono(12))
-        .frame(minHeight: 80, maxHeight: fillsHeight ? .infinity : nil)
-        .scrollContentBackground(.hidden)
+      CharWrappingTextEditor(text: $viewModel.cosignerXpubs[index], fontSize: 12, minHeight: 80)
+        .padding(12)
+        .birchCard(.nested)
+        .hbFieldError(error)
+
+      HStack(spacing: 8) {
+        HBTonalButton(title: "Scan QR", systemImage: "qrcode.viewfinder") {
+          showScanner = true
+        }
+        HBTonalButton(title: "Paste", systemImage: "doc.on.clipboard", neutral: true, action: pasteFromClipboard)
+      }
+      .padding(.top, 6)
+    }
+    .id(Field.xpub)
+  }
+
+  private func fingerprintField(_ index: Int, error: String?) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("Master Fingerprint (8 hex chars)")
+        .font(.hbLabel())
+        .foregroundStyle(Color.hbTextSecondary)
+
+      TextField("e.g. 73c5da0a", text: $viewModel.cosignerFingerprints[index])
+        .font(.hbMono())
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
         .padding(12)
         .birchCard(.nested)
         .foregroundStyle(Color.hbTextPrimary)
-
-      Button(action: { showScanner = true }) {
-        Label("Scan QR Code", systemImage: "qrcode.viewfinder")
-          .font(.hbBody(15))
-          .foregroundStyle(Color.hbBitcoinOrange)
-      }
+        .hbFieldError(error)
     }
+    .id(Field.fingerprint)
   }
 
-  @ViewBuilder
-  private var validationMessage: some View {
-    if let error = validationError {
-      Text(error)
+  private func pathField(_ index: Int, error: String?) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("Derivation Path")
         .font(.hbLabel())
-        .foregroundStyle(Color.hbError)
+        .foregroundStyle(Color.hbTextSecondary)
+
+      let path = viewModel.cosignerDerivationPaths[index]
+      Text(path.isEmpty ? "–" : path)
+        .font(.hbMono())
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .birchCard(.nested)
+        .foregroundStyle(Color.hbTextPrimary)
+        .hbFieldError(error)
     }
+    .id(Field.path)
   }
 
-  private var backButton: some View {
-    Button(action: goBack) {
-      Text(viewModel.currentCosignerIndex > 0 ? "Previous" : "Back")
-        .font(.hbBody(16))
-        .foregroundStyle(Color.hbTextSecondary)
-    }
-  }
+  // MARK: - Actions
 
   private func dismissKeyboard() {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -268,50 +211,42 @@ struct CosignerImportView: View {
     }
   }
 
-  private func goBack() {
-    if viewModel.currentCosignerIndex > 0 {
-      viewModel.currentCosignerIndex -= 1
-    } else {
-      viewModel.goBack()
-    }
-  }
-
-  private func goNext() {
-    // Validate current cosigner
-    let idx = viewModel.currentCosignerIndex
-    // Drop surrounding whitespace first, so the key that is validated is the key that is stored
-    viewModel.cosignerXpubs[idx] = viewModel.cosignerXpubs[idx].trimmingCharacters(in: .whitespacesAndNewlines)
-    if let error = viewModel.validateCosignerXpub(viewModel.cosignerXpubs[idx], at: idx) {
-      validationError = error
-      return
-    }
-    if let error = viewModel.validateFingerprint(viewModel.cosignerFingerprints[idx]) {
-      validationError = error
-      return
-    }
-    if let error = viewModel.validateDerivationPath(viewModel.cosignerDerivationPaths[idx]) {
-      validationError = error
-      return
-    }
-
-    validationError = nil
-
-    if viewModel.currentCosignerIndex < viewModel.totalCosigners - 1 {
-      viewModel.currentCosignerIndex += 1
-    } else {
-      viewModel.goToNext()
+  /// Next: flags the open cosigner when it is incomplete, otherwise opens the
+  /// next incomplete one, or goes on to Verify wallet once all are complete.
+  /// What was flagged is scrolled into view and read out.
+  private func goNext(proxy: ScrollViewProxy) {
+    dismissKeyboard()
+    switch viewModel.goToNextCosigner() {
+    case let .flag(problems):
+      let first = [Field.xpub, .fingerprint, .path].first { problems[$0] != nil }
+      if let first {
+        withAnimation {
+          proxy.scrollTo(first, anchor: .center)
+        }
+        AccessibilityNotification.Announcement(problems[first] ?? "").post()
+      }
+    case let .open(index, flagged):
+      withAnimation {
+        proxy.scrollTo(Self.topID, anchor: .top)
+      }
+      var announcement = "Cosigner \(index + 1) of \(viewModel.totalCosigners)"
+      if flagged, let problem = viewModel.cosignerErrors[index]?[.xpub] ?? viewModel.cosignerErrors[index]?[.fingerprint] {
+        announcement += ". \(problem)"
+      }
+      AccessibilityNotification.Announcement(announcement).post()
+    case .finish:
+      break
     }
   }
 
   private func handleScanResult(_ result: AppURResult) {
+    let idx = viewModel.currentCosignerIndex
     switch result {
     case .hdKey(var xpub, let fingerprint, let derivationPath):
-      let idx = viewModel.currentCosignerIndex
-
       // Validate derivation path network before accepting the scan
       if !derivationPath.isEmpty {
         if let error = viewModel.validateDerivationPath(derivationPath) {
-          validationError = error
+          viewModel.cosignerErrors[idx, default: [:]][.xpub] = error
           return
         }
       }
@@ -330,37 +265,156 @@ struct CosignerImportView: View {
         viewModel.cosignerDerivationPaths[idx] = derivationPath
       }
     default:
-      validationError = "Unexpected QR code type. Expected crypto-hdkey or crypto-account."
+      viewModel.cosignerErrors[idx, default: [:]][.xpub] = "Unexpected QR code type. Expected crypto-hdkey or crypto-account."
     }
   }
 }
 
-private struct CosignerSlot: View {
-  let index: Int
-  let isCurrent: Bool
-  let isComplete: Bool
+// MARK: - Tabs
+
+/// One folder tab per cosigner, on top of the form. The open tab stands taller
+/// and joins the card; a check marks a cosigner whose fields all validate.
+/// Past six cosigners the tabs scroll sideways.
+private struct CosignerTabs: View {
+  @Bindable var viewModel: SetupWizardViewModel
+
+  private static let visibleTabs = 6
 
   var body: some View {
-    VStack(spacing: 4) {
-      ZStack {
-        Color.clear
-          .frame(height: 44)
-          .birchSelected(isCurrent || isComplete, ring: isCurrent)
-
-        if isComplete {
-          Image(systemName: "lock.fill")
-            .font(.system(size: 16))
-            .foregroundStyle(Color.hbBitcoinOrange)
-        } else {
-          Image(systemName: "lock.open")
-            .font(.system(size: 16))
-            .foregroundStyle(Color.hbTextSecondary)
+    if viewModel.totalCosigners > Self.visibleTabs {
+      ScrollViewReader { proxy in
+        ScrollView(.horizontal, showsIndicators: false) {
+          tabs(fixedWidth: true)
+        }
+        // Keep the open tab's shadow, which reaches past the row
+        .scrollClipDisabled()
+        .onAppear {
+          proxy.scrollTo(viewModel.currentCosignerIndex)
+        }
+        .onChange(of: viewModel.currentCosignerIndex) {
+          withAnimation {
+            proxy.scrollTo(viewModel.currentCosignerIndex)
+          }
         }
       }
+    } else {
+      tabs(fixedWidth: false)
+    }
+  }
 
-      Text("\(index + 1)")
-        .font(.hbLabel(11))
-        .foregroundStyle(isCurrent ? Color.hbBitcoinOrange : Color.hbTextSecondary)
+  private func tabs(fixedWidth: Bool) -> some View {
+    HStack(alignment: .bottom, spacing: 4) {
+      ForEach(0 ..< viewModel.totalCosigners, id: \.self) { index in
+        let isOpen = index == viewModel.currentCosignerIndex
+        sized(
+          CosignerTab(
+            number: index + 1,
+            isOpen: isOpen,
+            isComplete: viewModel.isCosignerComplete(index),
+            action: { viewModel.openCosigner(index) }
+          ),
+          fixedWidth: fixedWidth
+        )
+        .zIndex(isOpen ? 1 : 0)
+        .id(index)
+      }
+    }
+  }
+
+  /// Equal shares of the row, or a sixth of it each when the tabs scroll
+  @ViewBuilder
+  private func sized(_ tab: some View, fixedWidth: Bool) -> some View {
+    if fixedWidth {
+      tab.containerRelativeFrame(.horizontal, count: Self.visibleTabs, spacing: 4)
+    } else {
+      tab.frame(maxWidth: .infinity)
+    }
+  }
+}
+
+private struct CosignerTab: View {
+  @Environment(\.colorScheme) private var scheme
+  let number: Int
+  let isOpen: Bool
+  let isComplete: Bool
+  let action: () -> Void
+
+  private var shape: UnevenRoundedRectangle {
+    UnevenRoundedRectangle(topLeadingRadius: 12, topTrailingRadius: 12, style: .continuous)
+  }
+
+  /// Shade for the tabs' shadows: black in dark mode, a warm brown in light
+  private var shadeColor: Color {
+    scheme == .dark ? .black : Color(red: 70 / 255, green: 55 / 255, blue: 30 / 255)
+  }
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 6) {
+        Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 16))
+          .foregroundStyle(isComplete ? Color.hbSuccess : isOpen ? Color.hbTextPrimary : Color.hbTextSecondary)
+        Text("\(number)")
+          .font(.hbBody(17).weight(isOpen ? .semibold : .regular))
+          .monospacedDigit()
+          .foregroundStyle(isOpen ? Color.hbTextPrimary : Color.hbTextSecondary)
+      }
+      .lineLimit(1)
+      .padding(.horizontal, 8)
+      .frame(maxWidth: .infinity)
+      .frame(height: isOpen ? 46 : 42)
+      .background { background }
+      .contentShape(shape)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Cosigner \(number)")
+    .accessibilityValue(isComplete ? "Complete" : "Incomplete")
+    .accessibilityAddTraits(isOpen ? .isSelected : [])
+    .accessibilityIdentifier("Cosigner \(number) tab")
+  }
+
+  @ViewBuilder
+  private var background: some View {
+    if isOpen {
+      // Lit from above: a sheen that fades into the card it joins, and a soft
+      // shadow up and onto its neighbours, cut off at its base so the card
+      // below stays clean
+      let sheen = Color.hbSurface.mix(with: .white, by: scheme == .dark ? 0.1 : 0.55)
+      ZStack {
+        shape
+          .fill(Color.hbSurface)
+          .shadow(color: shadeColor.opacity(scheme == .dark ? 0.5 : 0.16), radius: 5, y: -1)
+          .mask {
+            Rectangle().padding(EdgeInsets(top: -20, leading: -20, bottom: 0, trailing: -20))
+          }
+        shape.fill(
+          LinearGradient(
+            stops: [.init(color: sheen, location: 0), .init(color: Color.hbSurface, location: 0.8)],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
+      }
+    } else {
+      // Behind the card: halfway between card and ground, with the card's
+      // shadow across the base
+      let shade = scheme == .dark ? 0.55 : 0.16
+      shape
+        .fill(Color.hbBackground)
+        .overlay(shape.fill(Color.hbSurface.opacity(0.45)))
+        .overlay(alignment: .bottom) {
+          LinearGradient(
+            stops: [
+              .init(color: shadeColor.opacity(0), location: 0),
+              .init(color: shadeColor.opacity(shade * 0.16), location: 0.5),
+              .init(color: shadeColor.opacity(shade * 0.5), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+          .frame(height: 9)
+        }
+        .clipShape(shape)
     }
   }
 }

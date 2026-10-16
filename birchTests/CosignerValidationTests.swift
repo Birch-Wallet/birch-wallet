@@ -253,7 +253,7 @@ struct CosignerValidationTests {
       vm.network = .testnet4
       vm.requiredSignatures = 2
       vm.totalCosigners = 2
-      vm.initializeCosigners()
+      vm.resizeCosigners()
       vm.cosignerXpubs = [Self.tpub1, Self.tpub2]
       vm.cosignerFingerprints = ["73c5da0a", "0f056943"]
       change(vm)
@@ -263,7 +263,7 @@ struct CosignerValidationTests {
     }
 
     let standard = wizard { _ in }
-    #expect(standard.currentStep == .walletName)
+    #expect(standard.currentStep == .verify)
     #expect(standard.externalDescriptor.contains("[0f056943/48'/1'/0'/2']\(Self.tpub2)/0/*"))
 
     let rejected: [(name: String, vm: SetupWizardViewModel, message: String)] = [

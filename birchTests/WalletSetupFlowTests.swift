@@ -122,12 +122,11 @@ struct WalletSetupFlowTests {
       vm.cosignerXpubs[i] = key.xpub
       vm.cosignerFingerprints[i] = key.fingerprint
     }
-    vm.goToNext()
-    #expect(vm.currentStep == .walletName, "Descriptors were not built: \(vm.errorMessage ?? "")")
-
+    // The wallet is named on Multisig configuration; Import cosigners goes
+    // straight to Verify wallet
     vm.walletName = "Flow Test"
     vm.goToNext()
-    #expect(vm.currentStep == .verify)
+    #expect(vm.currentStep == .verify, "Descriptors were not built: \(vm.errorMessage ?? "")")
     #expect(vm.firstReceiveAddress == core.receive[0])
 
     try await expectSavedWalletLoads(vm, core: core)
@@ -144,11 +143,13 @@ struct WalletSetupFlowTests {
       + Self.keys.map { "[\($0.fingerprint)/48h/1h/0h/2h]\($0.xpub)/<0;1>/*" }.joined(separator: ",")
       + "))"
 
-    vm.currentStep = .descriptorImport
-    vm.goToNext()
-    #expect(vm.currentStep == .walletName, "Import failed: \(vm.importDescriptorError ?? "")")
-
+    // The wallet is named on Import descriptor, and Import saves it
     vm.walletName = "Imported Flow Test"
+    vm.currentStep = .descriptorImport
+    let imported = vm.goToNext()
+    #expect(imported, "Import failed: \(vm.importDescriptorError ?? "")")
+    #expect(vm.currentStep == .descriptorImport)
+
     try await expectSavedWalletLoads(vm, core: core)
   }
 }

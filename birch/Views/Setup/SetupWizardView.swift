@@ -22,8 +22,8 @@ struct SetupWizardView: View {
         GeometryReader { geo in
           let stepLayout = layout(for: windowSize == .zero ? geo.size : windowSize)
           VStack(spacing: 0) {
-            // Progress bar
-            if viewModel.currentStep != .welcome {
+            // Progress bar: creating a wallet only
+            if viewModel.showsProgress {
               ProgressBarView(progress: viewModel.progress, stepCount: viewModel.stepCount)
                 // Two columns: span both columns. Otherwise line up with the
                 // step's content, capped to the readable column on wide layouts.
@@ -45,14 +45,7 @@ struct SetupWizardView: View {
               case .cosignerImport:
                 CosignerImportView(viewModel: viewModel)
               case .descriptorImport:
-                DescriptorImportView(viewModel: viewModel)
-              case .walletName:
-                WalletNameView(
-                  viewModel: viewModel,
-                  onSave: viewModel.creationMode == .importDescriptor ? saveAndFinish : nil
-                )
-              case .review:
-                EmptyView() // unused in current flow
+                DescriptorImportView(viewModel: viewModel, onImport: saveAndFinish)
               case .verify:
                 WalletVerifyView(viewModel: viewModel, onComplete: saveAndFinish)
               }
@@ -91,12 +84,12 @@ struct SetupWizardView: View {
     }
   }
 
-  /// Wallet Name and Verify have no two-column design, so they keep the
+  /// Import cosigners and Verify have no two-column design, so they keep the
   /// readable column when the space is wider than tall.
   private func layout(for size: CGSize) -> SetupLayout {
     let layout = SetupLayout.resolve(size: size)
     switch viewModel.currentStep {
-    case .walletName, .review, .verify:
+    case .cosignerImport, .verify:
       return layout == .twoColumn ? .column : layout
     default:
       return layout

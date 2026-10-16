@@ -652,9 +652,10 @@ struct TransactionListView: View {
   private var transactionContent: some View {
     if viewModel.transactions.isEmpty, viewModel.isLoading || viewModel.syncState.isSyncing {
       ScrollView {
-        ProgressView()
+        // Centered where the 20pt spinner it replaced was
+        SeedlingLoadingView()
           .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .padding(.top, 150)
+          .padding(.top, 100)
       }
     } else if viewModel.transactions.isEmpty {
       ScrollView {

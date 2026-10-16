@@ -4,6 +4,10 @@ struct ElectrumServerSetupSection: View {
   @Bindable var viewModel: SetupWizardViewModel
   var initiallyExpanded: Bool = true
 
+  /// Scroll target for a flagged Host field: the whole section, which is
+  /// there even while it is still expanding to show the field
+  static let scrollID = "electrum-server"
+
   @State private var isExpanded: Bool = true
   @State private var showInsecureSSLAlert = false
   @State private var isTestingConnection = false
@@ -44,6 +48,7 @@ struct ElectrumServerSetupSection: View {
             .padding(10)
             .birchCard(.nested)
             .foregroundStyle(Color.hbTextPrimary)
+            .hbFieldError(viewModel.electrumHostError)
         }
 
         HStack(spacing: 12) {
@@ -146,12 +151,22 @@ struct ElectrumServerSetupSection: View {
       }
     }
     .hbCard()
+    .id(Self.scrollID)
     .onAppear {
-      isExpanded = initiallyExpanded
+      isExpanded = initiallyExpanded || viewModel.electrumHostError != nil
     }
     .onChange(of: viewModel.network) {
       connectionTestResult = nil
       if viewModel.network == .mainnet {
+        withAnimation(.spring(duration: 0.25, bounce: 0.15)) { isExpanded = true }
+      }
+    }
+    .onChange(of: viewModel.electrumHost) {
+      viewModel.electrumHostError = nil
+    }
+    .onChange(of: viewModel.electrumHostError) {
+      // A flagged Host field has to be in sight
+      if viewModel.electrumHostError != nil, !isExpanded {
         withAnimation(.spring(duration: 0.25, bounce: 0.15)) { isExpanded = true }
       }
     }
@@ -256,22 +271,76 @@ struct WalletAdvancedSetupSection: View {
   }
 }
 
-struct SetupNetworkPicker: View {
+/// The optional wallet name and the network, in one card at the top of the
+/// settings on Multisig configuration and Import descriptor. Left empty, the
+/// wallet is saved as "My Wallet".
+struct WalletNameNetworkCard: View {
   @Bindable var viewModel: SetupWizardViewModel
+  /// A move between Mainnet and a test network waiting for the user to agree
+  /// to clear the cosigner keys entered
+  @State private var pendingNetwork: BitcoinNetwork?
 
   var body: some View {
-    VStack(spacing: 8) {
-      Text("Bitcoin Network")
-        .font(.hbLabel())
-        .foregroundStyle(Color.hbTextSecondary)
+    VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Wallet Name")
+          .font(.hbLabel())
+          .foregroundStyle(Color.hbTextSecondary)
 
-      Picker("Bitcoin Network", selection: $viewModel.network) {
-        ForEach(BitcoinNetwork.allCases) { network in
-          Text(network.displayName).tag(network)
-        }
+        TextField("My Wallet", text: $viewModel.walletName)
+          .font(.hbBody())
+          .padding(12)
+          .birchCard(.nested)
+          .foregroundStyle(Color.hbTextPrimary)
       }
-      .pickerStyle(.segmented)
+
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Bitcoin Network")
+          .font(.hbLabel())
+          .foregroundStyle(Color.hbTextSecondary)
+
+        Picker("Bitcoin Network", selection: networkSelection) {
+          ForEach(BitcoinNetwork.allCases) { network in
+            Text(network.displayName).tag(network)
+          }
+        }
+        .pickerStyle(.segmented)
+      }
     }
     .hbCard()
+    .alert(
+      "Change to \(pendingNetwork?.displayName ?? "")?",
+      isPresented: .init(get: { pendingNetwork != nil }, set: {
+        if !$0 {
+          pendingNetwork = nil
+        }
+      })
+    ) {
+      Button("Cancel", role: .cancel) { pendingNetwork = nil }
+      Button("Change and Clear Keys", role: .destructive) {
+        if let pendingNetwork {
+          viewModel.changeNetwork(to: pendingNetwork)
+        }
+        pendingNetwork = nil
+      }
+    } message: {
+      Text("Mainnet and test networks use different keys, so changing clears the keys and fingerprints entered for every cosigner. Labels are kept.")
+    }
+  }
+
+  /// Moving between Mainnet and a test network after keys are entered asks first
+  private var networkSelection: Binding<BitcoinNetwork> {
+    Binding(
+      get: { viewModel.network },
+      set: { newNetwork in
+        if viewModel.creationMode == .createNew, viewModel.hasEnteredKeys,
+           SetupWizardViewModel.crossesKeyFormat(from: viewModel.network, to: newNetwork)
+        {
+          pendingNetwork = newNetwork
+        } else {
+          viewModel.changeNetwork(to: newNetwork)
+        }
+      }
+    )
   }
 }
