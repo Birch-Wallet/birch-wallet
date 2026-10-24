@@ -75,6 +75,12 @@ struct BBQRDisplayView: View {
 
   private func startTimer() {
     guard frames.count > 1 else { return }
+    #if DEBUG
+      // The screenshot tour holds the first frame, so the code is the same every run.
+      if ScreenshotFixtures.isActive {
+        return
+      }
+    #endif
     let interval = 1.0 / framesPerSecond
     let timer = Timer(timeInterval: interval, repeats: true) { _ in
       currentIndex = (currentIndex + 1) % frames.count

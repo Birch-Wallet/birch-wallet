@@ -193,6 +193,15 @@ final class FiatPriceService {
   }
 
   func fetchRates() async {
+    #if DEBUG
+      // The screenshot tour shows the same price every run.
+      if ScreenshotFixtures.isActive {
+        rates = ScreenshotFixtures.fiatRates
+        lastFetched = Date()
+        lastFetchError = nil
+        return
+      }
+    #endif
     guard !isFetching else { return }
     isFetching = true
     defer { isFetching = false }

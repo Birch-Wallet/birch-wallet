@@ -894,6 +894,12 @@ final class SetupWizardViewModel {
       electrumAllowInsecureSSL: electrumAllowInsecureSSL,
       blockExplorerHost: blockExplorerHost.trimmingCharacters(in: .whitespaces)
     )
+    #if DEBUG
+      // The screenshot tour's wallets keep their identicons from run to run.
+      if ScreenshotFixtures.isActive {
+        profile.id = ScreenshotFixtures.walletID(for: externalDescriptor)
+      }
+    #endif
 
     modelContext.insert(profile)
 

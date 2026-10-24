@@ -25,7 +25,10 @@ final class ScreenshotTests: XCTestCase {
     // Fiat display on from launch (Constants.fiatEnabledKey; the argument
     // domain survives -UITesting's UserDefaults wipe), so the tour needn't
     // toggle it in Settings first.
-    app.launchArguments += ["-UITesting", "-DisableAnimations", "-fiatEnabled", "YES"]
+    // -ScreenshotFixtures keeps the data the same every run: the price, the
+    // fee rates, the clock, the identicons, the chain tip and the transaction
+    // (see ScreenshotFixtures.swift).
+    app.launchArguments += ["-UITesting", "-DisableAnimations", "-fiatEnabled", "YES", "-ScreenshotFixtures"]
   }
 
   override func tearDownWithError() throws {
@@ -164,10 +167,9 @@ final class ScreenshotTests: XCTestCase {
       textEditor.typeText(testDescriptor)
     }
 
-    // Dismiss the keyboard by tapping the subtitle: the screen's content
-    // resigns focus on tap, and the system's "pasted from" banner covers the
-    // title. The shot needs the keyboard gone, because one that is already on
-    // screen keeps its dark appearance when the light copy is taken.
+    // Dismiss the keyboard by tapping the subtitle, so 03 shows the filled
+    // screen without it: the screen's content resigns focus on tap, and the
+    // system's "pasted from" banner covers the title.
     app.staticTexts["Paste or scan a multisig output descriptor"].firstMatch.tap()
     XCTAssertTrue(waitForKeyboardToHide(), "Keyboard should be dismissed before 03")
     // The system's "pasted from" banner is still fading out; let it clear.

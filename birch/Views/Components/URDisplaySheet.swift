@@ -49,6 +49,12 @@ struct URDisplaySheet: View {
       }
     }
     .onAppear {
+      #if DEBUG
+        // The screenshot tour holds the first frame, so the code is the same every run.
+        if ScreenshotFixtures.isActive {
+          return
+        }
+      #endif
       displayState.run()
     }
     .onDisappear {

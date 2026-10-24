@@ -7,9 +7,10 @@ PRODUCTS_DIR   = "#{DERIVED_DATA}/Build/Products"
 SCREENSHOT_SRC = File.expand_path("~/Library/Caches/tools.fastlane/screenshots")
 
 # The xctestrun manifest produced by `build-for-testing`.
-# Glob because the filename embeds the SDK version.
+# Glob because the filename embeds the SDK version; the newest, because each
+# SDK the project was ever built with leaves its own manifest behind.
 def xctestrun_path
-  Dir.glob("#{PRODUCTS_DIR}/*.xctestrun").first ||
+  Dir.glob("#{PRODUCTS_DIR}/*.xctestrun").max_by { |f| File.mtime(f) } ||
     UI.user_error!("No .xctestrun found — run the build step first")
 end
 
@@ -18,23 +19,32 @@ end
 # missing), because the same name exists on several runtimes and targeting by
 # name can pick the wrong one.
 DEVICES = {
-  "iPhone 17 Pro Max"     => { runtime: "27.0" },
-  "iPhone 17 Pro"         => { runtime: "27.0" },
-  "iPhone 11 Pro Max"     => { runtime: "27.0" },
-  "iPhone 13 mini"        => { runtime: "27.0" },
-  "iPad Pro 13-inch (M5)" => { runtime: "27.0" },
-  # The foldable. The iOS 27.1 runtime supports only this device. It is
-  # captured closed (cover screen) and open (inner screen); the posture is set
-  # with the `hinge` CLI because simctl has no fold command.
-  "iPhone Duo"            => { runtime: "27.1", postures: ["closed", "open"] },
+  "iPhone 17 Pro Max"     => { runtime: "27.2" },
+  "iPhone 17 Pro"         => { runtime: "27.2" },
+  "iPhone 11 Pro Max"     => { runtime: "27.2" },
+  "iPhone 13 mini"        => { runtime: "27.2" },
+  "iPad Pro 13-inch (M5)" => { runtime: "27.2" },
+  # The foldable. It runs on its own iOS 27.2 runtime (iOS-27-2-iPhone19-4)
+  # because the general 27.2 runtime doesn't support it. It is captured closed
+  # (cover screen) and open (inner screen); the posture is set with the
+  # `hinge` CLI because simctl has no fold command.
+  "iPhone Duo"            => { runtime: "27.2", postures: ["closed", "open"] },
 }
 
-def runtime_identifier(runtime)
-  "com.apple.CoreSimulator.SimRuntime.iOS-#{runtime.tr('.', '-')}"
+# The installed runtime of that iOS version that supports the device. Looked
+# up rather than built from the version, because a device can get its own
+# runtime for a version (the Duo's iOS-27-2-iPhone19-4 next to iOS-27-2).
+def runtime_identifier(name, runtime)
+  runtimes = JSON.parse(`xcrun simctl list runtimes available -j`)["runtimes"]
+  match = runtimes.find do |r|
+    r["platform"] == "iOS" && r["version"] == runtime &&
+      r["supportedDeviceTypes"].any? { |t| t["name"] == name }
+  end
+  match ? match["identifier"] : UI.user_error!("No installed iOS #{runtime} runtime supports '#{name}'")
 end
 
 def resolve_udid(name, runtime)
-  runtime_id = runtime_identifier(runtime)
+  runtime_id = runtime_identifier(name, runtime)
   devices = JSON.parse(`xcrun simctl list devices available -j`)["devices"][runtime_id] || []
   match = devices.find { |d| d["name"] == name }
   return match["udid"] if match
@@ -47,16 +57,35 @@ def resolve_udid(name, runtime)
   udid
 end
 
-# Folds or unfolds the Duo and confirms the angle. `hinge get` occasionally
-# fails right after a state change, so retry a few times.
+# Folds or unfolds the Duo and confirms the switch, retrying a few times.
+# Opening right after the closed pass sometimes leaves the cover screen
+# active, and sending the same angle again doesn't change anything, so a
+# retry folds the other way first.
 def set_posture(udid, posture)
-  command, angle = posture == "open" ? ["open", 180.0] : ["close", 0.0]
-  3.times do
-    system("hinge", "-d", udid, command, out: File::NULL, err: File::NULL)
+  open = posture == "open"
+  3.times do |attempt|
+    if attempt > 0
+      UI.message("Retrying the #{posture} posture on #{udid}")
+      system("hinge", "-d", udid, open ? "close" : "open", out: File::NULL, err: File::NULL)
+      sleep(2)
+    end
+    system("hinge", "-d", udid, open ? "open" : "close", out: File::NULL, err: File::NULL)
     sleep(2)
-    return if `hinge -d #{udid} get 2>/dev/null`.strip.to_f == angle
+    return if duo_open?(udid) == open
   end
   UI.user_error!("Could not set the #{posture} posture on #{udid}")
+end
+
+# Whether the Duo is unfolded: its larger inner screen is the active display
+# (the cover screen is active when closed). `hinge get` can't read the angle on
+# Xcode 27.2, whose devicectl dropped the `motion hinge-angle` command it uses.
+# nil if the displays can't be read.
+def duo_open?(udid)
+  json = `xcrun devicectl device info displays -d #{udid} -t 15 -q -j - 2>/dev/null`
+  displays = JSON.parse(json).dig("result", "displays") or return nil
+  displays.max_by { |d| d["nativeSize"].inject(:*) }["active"]
+rescue JSON::ParserError
+  nil
 end
 
 # The open Duo's inner display: the largest built-in display simctl reports.
@@ -75,9 +104,9 @@ end
 # SNAPSHOT_HOST_CAPTURE is set: XCUIScreen can't see the open Duo's inner
 # display, so each shot is taken here with `simctl io --display`. Requests
 # land in the appearance subfolder the shot belongs to.
-def run_tour_with_host_capture(command, udid, name)
+def run_tour_with_host_capture(env, command, udid, name)
   display = inner_display(udid)
-  pid = Process.spawn({ "TEST_RUNNER_SNAPSHOT_HOST_CAPTURE" => "1" }, command)
+  pid = Process.spawn(env.merge("TEST_RUNNER_SNAPSHOT_HOST_CAPTURE" => "1"), command)
   loop do
     Dir.glob("#{SCREENSHOT_SRC}/*/#{name}-*.request").each do |request|
       partial = request.sub(/\.request\z/, ".partial")
@@ -91,7 +120,16 @@ def run_tour_with_host_capture(command, udid, name)
   $?.success?
 end
 
+# One tour per appearance, set on the simulator before the tour starts.
+# Switching mid-tour (XCUIDevice.appearance) left the status bar in the old
+# appearance on some light captures: about 1 in 15 on iOS 27.0, 1 in 3 on 27.2.
 APPEARANCES = ["dark", "light"].freeze
+
+# The status bar's clock: 9:41 AM on Friday, October 16, 2026, local time,
+# the moment the app's clock is frozen at during the tour
+# (ScreenshotFixtures.now). An ISO date also sets the date the iPad shows;
+# simctl rejects one without fractional seconds.
+STATUS_BAR_TIME = Time.local(2026, 10, 16, 9, 41).strftime("%Y-%m-%dT%H:%M:%S.000%:z")
 
 # Each pass's xcodebuild output and result bundle, kept out of the console
 # because passes run side by side.
@@ -158,8 +196,9 @@ def frame_in_parallel
   FileUtils.rm_rf(staging)
 end
 
-# Runs every device's tour, `parallel` simulators at a time. The Duo runs its
-# two postures back to back on one simulator, so it starts first.
+# Runs every device's tours, `parallel` simulators at a time. A device runs
+# its passes back to back on one simulator, and the Duo has the most (two
+# appearances in each posture), so it starts first.
 def run_screenshot_passes(devices, parallel)
   FileUtils.rm_rf(SCREENSHOT_SRC)
   FileUtils.mkdir_p(SCREENSHOT_SRC)
@@ -182,82 +221,98 @@ def run_screenshot_passes(devices, parallel)
   workers.each(&:join)
 end
 
-# One device: boot it, then run the tour once per posture (once for most
-# devices) and collect that pass's dark and light captures.
+# One device: run the tour once per appearance (and, for the Duo, per
+# posture), booting the simulator for each pass, and collect that pass's
+# captures.
 def run_device_passes(name, config)
   udid = resolve_udid(name, config[:runtime])
 
   (config[:postures] || [nil]).each do |posture|
-    label = posture ? "#{name} (#{posture.capitalize})" : name
-    UI.message("▶ #{label}: starting")
+    # The name the captures are saved under: the Duo's carry the posture.
+    device_label = posture ? "#{name} (#{posture.capitalize})" : name
 
-    # Boot and wait until it's usable.
-    system("xcrun", "simctl", "boot", udid, out: File::NULL, err: File::NULL)
-    system("xcrun", "simctl", "bootstatus", udid, "-b", out: File::NULL)
-
-    set_posture(udid, posture) if posture
-
-    # A clean status bar: 9:41, full battery, full signal. The tour sets
-    # the appearance itself for each capture.
-    system("xcrun simctl status_bar #{udid} override " \
-           "--time 09:41 --dataNetwork wifi --wifiMode active --wifiBars 3 " \
-           "--cellularMode active --operatorName '' --cellularBars 4 " \
-           "--batteryState charged --batteryLevel 100", out: File::NULL, err: File::NULL)
-
-    # Clear this device's leftovers so passes don't mix (the Duo's two
-    # postures share a simulator name).
-    FileUtils.rm_f(Dir.glob("#{SCREENSHOT_SRC}/*/#{name}-*"))
-
-    # Run the test with the explicit xctestrun manifest.
-    # This installs all DependentProductPaths (including birch.app)
-    # automatically — works around the Xcode 26 bug where
-    # `xcodebuild build test` / `test-without-building -scheme` fail to
-    # install the host app.
-    log = "#{PASS_LOGS}/#{label}.log"
-    result = "#{PASS_LOGS}/#{label}.xcresult"
-    FileUtils.rm_rf(result)
-    command = "xcodebuild test-without-building " \
-              "-xctestrun '#{xctestrun_path}' " \
-              "-destination 'id=#{udid}' " \
-              "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
-              "-parallel-testing-enabled NO " \
-              "-resultBundlePath '#{result}' " \
-              "> '#{log}' 2>&1"
-    started = Time.now
-    passed = if posture == "open"
-               run_tour_with_host_capture(command, udid, name)
-             else
-               system(command)
-             end
-    seconds = Time.now - started
-    PASS_TIMES_LOCK.synchronize { PASS_TIMES[label] = [seconds, passed] }
-    if passed
-      UI.success("✓ #{label}: tour took #{seconds.round}s")
-    else
-      UI.error("✗ #{label}: tour failed after #{seconds.round}s. Log: #{log}")
-      File.foreach(log).grep(/error: -\[|failed \(/).first(5).each { |line| UI.error("  #{line.strip}") }
-    end
-
-    # Collect screenshots into the output directory. SnapshotHelper names
-    # files after the simulator, so tag the Duo's with its posture.
     APPEARANCES.each do |mode|
+      label = "#{device_label}, #{mode}"
+      UI.message("▶ #{label}: starting")
+
+      # Boot and wait until it's usable.
+      system("xcrun", "simctl", "boot", udid, out: File::NULL, err: File::NULL)
+      system("xcrun", "simctl", "bootstatus", udid, "-b", out: File::NULL)
+
+      set_posture(udid, posture) if posture
+
+      # The pass's appearance, set before the app launches. The tour never
+      # changes it.
+      system("xcrun", "simctl", "ui", udid, "appearance", mode, out: File::NULL) ||
+        UI.user_error!("#{label}: couldn't set the #{mode} appearance")
+
+      # A clean status bar: 9:41, full battery, full signal. The date (the
+      # iPad shows it) is the moment the app's clock is frozen at
+      # (ScreenshotFixtures.now). The time goes in a call of its own: given
+      # with --batteryState in one call, simctl shows the wrong weekday
+      # (Mon Oct 16 instead of Fri).
+      (system("xcrun simctl status_bar #{udid} override " \
+              "--dataNetwork wifi --wifiMode active --wifiBars 3 " \
+              "--cellularMode active --operatorName '' --cellularBars 4 " \
+              "--batteryState charged --batteryLevel 100", out: File::NULL) &&
+        system("xcrun", "simctl", "status_bar", udid, "override", "--time", STATUS_BAR_TIME, out: File::NULL)) ||
+        UI.user_error!("#{label}: couldn't override the status bar")
+
+      # Clear this device's leftovers so passes don't mix (the Duo's two
+      # postures share a simulator name).
+      FileUtils.rm_f(Dir.glob("#{SCREENSHOT_SRC}/*/#{name}-*"))
+
+      # Run the test with the explicit xctestrun manifest.
+      # This installs all DependentProductPaths (including birch.app)
+      # automatically — works around the Xcode 26 bug where
+      # `xcodebuild build test` / `test-without-building -scheme` fail to
+      # install the host app.
+      log = "#{PASS_LOGS}/#{label}.log"
+      result = "#{PASS_LOGS}/#{label}.xcresult"
+      FileUtils.rm_rf(result)
+      command = "xcodebuild test-without-building " \
+                "-xctestrun '#{xctestrun_path}' " \
+                "-destination 'id=#{udid}' " \
+                "-only-testing:birchUITests/ScreenshotTests/testScreenshotTour " \
+                "-parallel-testing-enabled NO " \
+                "-resultBundlePath '#{result}' " \
+                "> '#{log}' 2>&1"
+      # Tells SnapshotHelper which appearance folder the captures go in.
+      env = { "TEST_RUNNER_SNAPSHOT_APPEARANCE" => mode }
+      started = Time.now
+      passed = if posture == "open"
+                 run_tour_with_host_capture(env, command, udid, name)
+               else
+                 system(env, command)
+               end
+      seconds = Time.now - started
+      PASS_TIMES_LOCK.synchronize { PASS_TIMES[label] = [seconds, passed] }
+      if passed
+        UI.success("✓ #{label}: tour took #{seconds.round}s")
+      else
+        UI.error("✗ #{label}: tour failed after #{seconds.round}s. Log: #{log}")
+        File.foreach(log).grep(/error: -\[|failed \(/).first(5).each { |line| UI.error("  #{line.strip}") }
+      end
+
+      # Collect screenshots into the output directory. SnapshotHelper names
+      # files after the simulator, so tag the Duo's with its posture.
       output_dir = File.expand_path("screenshots/#{mode}/en-US", __dir__)
       FileUtils.mkdir_p(output_dir)
       Dir.glob("#{SCREENSHOT_SRC}/#{mode}/#{name}-*.png").each do |src|
         dest = File.basename(src)
-        dest = dest.sub(/\A#{Regexp.escape(name)}-/, "#{label}-") if posture
+        dest = dest.sub(/\A#{Regexp.escape(name)}-/, "#{device_label}-") if posture
         FileUtils.cp(src, File.join(output_dir, dest))
       end
-    end
 
-    # Reset status bar and shut down
-    system("xcrun", "simctl", "status_bar", udid, "clear", out: File::NULL, err: File::NULL)
-    system("xcrun", "simctl", "shutdown", udid, out: File::NULL, err: File::NULL)
+      # Reset status bar and shut down
+      system("xcrun", "simctl", "status_bar", udid, "clear", out: File::NULL, err: File::NULL)
+      system("xcrun", "simctl", "shutdown", udid, out: File::NULL, err: File::NULL)
+    end
   end
 end
 
 platform :ios do
-  desc "Capture App Store + marketing screenshots (dark and light in one tour per device)"
+  desc "Capture App Store + marketing screenshots (a dark and a light tour per device)"
   #   fastlane screenshots                                   # every device
   #   fastlane screenshots only:"iPhone Duo"                 # rerun one device, keep the rest
   #   fastlane screenshots only:"iPhone 17 Pro,iPhone Duo"   # several devices
@@ -272,8 +327,9 @@ platform :ios do
       devices = DEVICES.select { |name, _| only.include?(name) }
     end
     frame = options[:frame].to_s != "false"
-    # Four at a time measured fastest (11.5 min vs 14.7 with three): the Duo's
-    # two back-to-back passes become the longest chain.
+    # Four at a time measured fastest (11.5 min vs 14.7 with three, when each
+    # device ran one tour): the Duo's back-to-back passes become the longest
+    # chain.
     parallel = [(options[:parallel] || 4).to_i, 1].max
     lane_started = Time.now
 
@@ -313,10 +369,10 @@ platform :ios do
        "-parallel-testing-enabled NO " \
        "| xcpretty")
 
-    # ── 2. One tour per device: SnapshotHelper captures every shot in dark
-    #       and then light, so a single pass covers both appearances. Up to
-    #       `parallel` devices run at once; the tour waits on the Electrum
-    #       sync rather than sleeping, so a slower shared sync is fine ─────
+    # ── 2. Two tours per device, one per appearance (four for the Duo,
+    #       in each posture). Up to `parallel` devices run at once; the tour
+    #       waits on the Electrum sync rather than sleeping, so a slower
+    #       shared sync is fine ─────────────────────────────────────────────
     UI.header("Tours on #{devices.size} device(s), #{parallel} at a time")
     run_screenshot_passes(devices, parallel)
 
