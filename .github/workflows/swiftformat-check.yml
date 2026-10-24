@@ -15,11 +15,11 @@ env:
 jobs:
   swiftformat:
     name: Check code formatting with SwiftFormat
-    runs-on: macos-26
+    runs-on: xcode-27
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Clone outside the workspace: anything under the working directory would
       # otherwise be picked up by `--lint .` below.

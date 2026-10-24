@@ -380,9 +380,8 @@ platform :ios do
     next unless frame
 
     # ── 4. Prep captures for frameit ────────────────────────────────────
-    # frameit gem 2.232.2 hardcodes its device list. scripts/patch-frameit.rb
-    # extends it with iPhone 16/17 support (PR #29921), so iPhone 17 Pro and
-    # Pro Max now go through frameit at their native resolution.
+    # frameit frames iPhone 17 Pro and Pro Max natively (fastlane 2.238.0 and
+    # later), at their native resolution.
     #
     #   * iPhone 13 mini: frameit's bundled 13 Mini frame PNG has a ~3-pixel
     #     misalignment between the placement offset and the actual screen

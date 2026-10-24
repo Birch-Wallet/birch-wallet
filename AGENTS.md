@@ -7,7 +7,7 @@ This file provides guidance to AI coding agents working with code in this reposi
 Birch is an iOS Bitcoin multisig coordinator wallet (watch-only). Private keys never touch the device — signing is done on air-gapped hardware wallets via animated QR codes (UR/BBQR). Built with SwiftUI, BDK (BitcoinDevKit), and SwiftData.
 
 - **Deployment target:** iOS 18.6+
-- **Xcode:** 27.1+ (the iPhone Duo fold API needs the iOS 27.1 SDK; CI pins it via `.xcode-version`)
+- **Xcode:** 27.2 (`.xcode-version` pins it for CI and reproducible builds; the iPhone Duo fold API needs at least the iOS 27.1 SDK)
 - **Swift:** 5.0
 
 ## Commands
@@ -90,7 +90,7 @@ After cloning, run `git submodule update --init` (or clone with `--recurse-submo
 
 - **Unit tests** (`birchTests`) use Swift Testing (`@Test`, `#expect`). Mocks are in `birchTests/Mocks/` (`MockBitcoinService` implements `BitcoinServiceProtocol`), and fixture files in `birchTests/Fixtures/`.
 - **UI tests** (`birchUITests`) use XCTest: `testSetupWalletViaDescriptorImport`, and `testScreenshotTour`, the walk the screenshot lane drives.
-- **CI** (`.github/workflows/`) runs on pull requests to `main` and on pushes to it: the unit tests, a build with the static analyzer, `swiftformat --lint .`, a reproducible-build check, and CodeQL. It pins Xcode with `.xcode-version` (27.1). The UI tests and the screenshot lane don't run in CI.
+- **CI** (`.github/workflows/`) runs on pull requests to `main` and on pushes to it: the unit tests, a build with the static analyzer, `swiftformat --lint .`, a reproducible-build check, and CodeQL. It pins Xcode with `.xcode-version` (27.2). The runner image has no iOS 27.2 simulators, so CI runs the unit tests on its iPhone 18 Pro with iOS 27.0. The UI tests and the screenshot lane don't run in CI.
 
 ## Architecture
 
