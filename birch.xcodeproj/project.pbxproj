@@ -49,6 +49,14 @@
 			);
 			target = 3C9ACE232F5DED94009B00D0 /* birch */;
 		};
+		CC0000010000000000000007 /* Exceptions for "birchTests" folder in "birchTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Fixtures/gen_address_ranges.py,
+				Fixtures/gen_address_vectors.py,
+			);
+			target = 3C9ACE332F5DED95009B00D0 /* birchTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -62,6 +70,9 @@
 		};
 		3C9ACE372F5DED95009B00D0 /* birchTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CC0000010000000000000007 /* Exceptions for "birchTests" folder in "birchTests" target */,
+			);
 			path = birchTests;
 			sourceTree = "<group>";
 		};
@@ -218,7 +229,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 2630;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					3C9ACE232F5DED94009B00D0 = {
 						CreatedOnToolsVersion = 16.2;
@@ -326,7 +337,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CC0000010000000000000002 /* Debug.xcconfig */;
 			buildSettings = {
-				DEVELOPMENT_TEAM = ZW85AH743B;
 			};
 			name = Debug;
 		};
@@ -334,7 +344,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = CC0000010000000000000003 /* Release.xcconfig */;
 			buildSettings = {
-				DEVELOPMENT_TEAM = ZW85AH743B;
 			};
 			name = Release;
 		};
@@ -368,7 +377,6 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -387,7 +395,6 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = CNXH3K5L72;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.derivation48.birchwallet;
 				PRODUCT_NAME = "$(TARGET_NAME)";

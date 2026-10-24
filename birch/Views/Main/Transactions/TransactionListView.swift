@@ -315,6 +315,7 @@ struct TransactionListView: View {
                 Text("Last refreshed \(lastSynced.relativeString)")
                   .font(.hbLabel(11))
                   .foregroundStyle(Color.hbTextSecondary)
+                  .accessibilityIdentifier("lastRefreshed")
               }
             }
           }

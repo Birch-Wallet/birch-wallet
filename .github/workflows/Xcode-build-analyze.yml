@@ -16,13 +16,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Pin Xcode version
         run: |
           XCODE_VERSION=$(cat .xcode-version)
-          # The xcode-27 image installs some releases under a _beta name
-          # (Xcode_27.1_beta.app holds the 27.1 release build), so try both.
+          # The xcode-27 image has installed some releases only under a _beta
+          # name (Xcode_<version>_beta.app), so try that too.
           for APP in "/Applications/Xcode_${XCODE_VERSION}.app" "/Applications/Xcode_${XCODE_VERSION}_beta.app"; do
             if [ -d "$APP" ]; then
               sudo xcode-select -s "$APP/Contents/Developer"

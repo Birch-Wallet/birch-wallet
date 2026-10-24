@@ -43,7 +43,7 @@ Birch is an iOS Bitcoin multisig coordinator written in Swift. It operates as a 
 
 ### Requirements
 
-- Xcode 26.2+
+- Xcode 27.2+
 - iOS 18.6+ deployment target
 - Swift 5.0
 
@@ -85,7 +85,7 @@ Birch supports **functionally equivalent** reproducible builds. Given the same s
 
 #### Prerequisites
 
-- Exact Xcode version matching `.xcode-version` (currently 26.4)
+- Exact Xcode version matching `.xcode-version` (currently 27.2)
 - macOS with the matching SDK
 
 #### Producing a verifiable build
@@ -127,34 +127,25 @@ Birch uses [`fastlane snapshot`](https://docs.fastlane.tools/actions/snapshot/) 
    ```bash
    brew install imagemagick
    ```
-4. Patch the installed fastlane gem with iPhone 16/17 device support (from
-   [fastlane PR #29921](https://github.com/fastlane/fastlane/pull/29921)):
-   ```bash
-   bundle exec ruby scripts/patch-frameit.rb
-   ```
-   This is idempotent — safe to re-run. If you upgrade fastlane, the script
-   aborts with a clear error so you can review the patch for the new version.
-
-   > As of fastlane **2.238.0** (the version pinned in `Gemfile.lock`), PR #29921
-   > is merged upstream: frameit ships `IPHONE_17_PRO` / `IPHONE_17_PRO_MAX` and the
-   > iPhone 17 rounded-corner mask natively. The script detects this and exits as a
-   > no-op, so this step is only needed if you downgrade fastlane below 2.238.0.
-
-   On a fresh machine, also download the device frame PNGs before running
-   the patch (they live at `~/.fastlane/frameit/latest/` and are not in the repo):
+4. Download frameit's device frame PNGs. They live at `~/.fastlane/frameit/latest/` and are not in the repo:
    ```bash
    bundle exec fastlane frameit download_frames
    ```
-
-5. Make sure the required simulators are downloaded. The screenshot lane targets:
+5. Install the [`hinge`](https://github.com/artemnovichkov/hinge) CLI, which folds and unfolds the iPhone Duo simulator:
+   ```bash
+   brew install artemnovichkov/tap/hinge
+   ```
+6. Make sure the required simulators are downloaded, all on iOS 27.2. The iPhone Duo has its own iOS 27.2 runtime. The screenshot lane targets:
    - **iPhone 17 Pro Max** (6.9")
    - **iPhone 17 Pro** (6.3")
    - **iPhone 11 Pro Max** (6.5")
    - **iPhone 13 mini** (5.4")
+   - **iPad Pro 13-inch (M5)**
+   - **iPhone Duo**, closed and open
 
    You can trigger a download by booting them once in Xcode (**Window → Devices and Simulators → Simulators → +**) or via the command line:
    ```bash
-   xcrun simctl list devices | grep -E "iPhone 17 Pro Max|iPhone 17 Pro|iPhone 11 Pro Max|iPhone 13 mini"
+   xcrun simctl list devices | grep -E "iPhone 17 Pro Max|iPhone 17 Pro|iPhone 11 Pro Max|iPhone 13 mini|iPad Pro 13-inch \(M5\)|iPhone Duo"
    ```
 
 ### Running
@@ -204,7 +195,7 @@ fastlane/screenshots/
 - **Change which screens are captured:** edit `testScreenshotTour` in `birchUITests/ScreenshotTests.swift` and add or remove `snapshot("NN-Name")` calls.
 - **Skip framing:** remove the `frameit(...)` lines and the ImageMagick composite block (steps 4–7) from `fastlane/Fastfile` if you only need the bare PNGs.
 
-> **Known workaround** (contained in `fastlane/Fastfile`): `frameit` gem 2.232.2's bundled iPhone 13 Mini frame PNG has a ~3-pixel placement-offset bug that leaves a visible edge gap, so 13 mini is composited directly with ImageMagick instead. iPhone 16/17 device support is patched in via `scripts/patch-frameit.rb` (see setup step 4 above).
+> **Known workaround** (contained in `fastlane/Fastfile`): frameit's bundled iPhone 13 Mini frame PNG has a ~3-pixel placement-offset bug that leaves a visible edge gap, so 13 mini is composited directly with ImageMagick instead.
 
 ## Links
 

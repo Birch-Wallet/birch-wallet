@@ -16,7 +16,8 @@ import Testing
 ///   * no-wildcard / irregular -> single address recorded under `receive`
 ///
 /// `receiveRange` / `changeRange` hold indexes 0-4 for the same chains, from
-/// `bitcoin-cli deriveaddresses "<descriptor>" [0,4]` (Bitcoin Core v31.1.0).
+/// `bitcoin-cli deriveaddresses "<descriptor>" [0,4]` (Bitcoin Core v31.1.0),
+/// added by `Fixtures/gen_address_ranges.py`.
 /// `sortedmulti` re-sorts the derived keys at every index, so index 0 alone
 /// does not show the ordering is right further along the chain.
 ///
