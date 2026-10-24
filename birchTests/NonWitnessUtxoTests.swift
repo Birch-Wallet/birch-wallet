@@ -27,7 +27,7 @@ struct NonWitnessUtxoTests {
       descriptor: Descriptor(descriptor: external, networkKind: kind),
       changeDescriptor: Descriptor(descriptor: internalDescriptor, networkKind: kind),
       network: BitcoinService.shared.bdkNetwork(from: .testnet4),
-      persister: Persister.newInMemory()
+      persister: Persister.newInMemory(),
     )
     let script = wallet.peekAddress(keychain: .external, index: 0).address.scriptPubkey().toBytes()
 
@@ -89,14 +89,14 @@ struct NonWitnessUtxoTests {
     n < 0xFD ? Data([UInt8(n)]) : Data([0xFD, UInt8(n & 0xFF), UInt8(n >> 8)])
   }
 
-  @Test func creationIncludesNonWitnessUtxo() throws {
+  @Test func `creation includes non witness utxo`() throws {
     let (wallet, outpoint) = try fundedWallet()
     let psbt = try birchPSBT(wallet, spending: outpoint)
     #expect(psbt.input()[0].nonWitnessUtxo != nil)
     #expect(psbt.input()[0].witnessUtxo != nil)
   }
 
-  @Test func combineWithCompactReturnedPSBTKeepsNonWitnessUtxo() throws {
+  @Test func `combine with compact returned PSBT keeps non witness utxo`() throws {
     let (wallet, outpoint) = try fundedWallet()
     let original = try birchPSBT(wallet, spending: outpoint)
     let originalBytes = try #require(Data(base64Encoded: original.serialize()))
@@ -109,7 +109,7 @@ struct NonWitnessUtxoTests {
     #expect(combined.input()[0].nonWitnessUtxo != nil)
   }
 
-  @Test func combineWithSeedSignerTrimmedPSBTKeepsNonWitnessUtxo() throws {
+  @Test func `combine with seed signer trimmed PSBT keeps non witness utxo`() throws {
     let (wallet, outpoint) = try fundedWallet()
     let original = try birchPSBT(wallet, spending: outpoint)
 

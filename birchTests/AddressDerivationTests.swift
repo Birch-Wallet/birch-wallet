@@ -11,12 +11,12 @@ struct AddressDerivationTests {
      fingerprint: "0f056943", derivationPath: "m/48'/1'/0'/2'"),
   ]
 
-  @Test func addressPrefixTestnet() {
+  @Test func `address prefix testnet`() {
     let network = BitcoinNetwork.testnet4
     #expect(network.addressPrefix == "tb1")
   }
 
-  @Test func addressPrefixMainnet() {
+  @Test func `address prefix mainnet`() {
     let network = BitcoinNetwork.mainnet
     #expect(network.addressPrefix == "bc1")
   }
@@ -28,23 +28,23 @@ struct AddressDerivationTests {
     let cosigners = Self.cosigners
 
     let desc1 = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
     )
     let desc2 = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
     )
 
     #expect(desc1 == desc2)
   }
 
-  @Test func receiveVsChangeDescriptors() throws {
+  @Test func `receive vs change descriptors`() throws {
     let cosigners = Self.cosigners
 
     let receive = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
     )
     let change = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true,
     )
 
     #expect(receive != change)

@@ -6,7 +6,7 @@ import Testing
 struct InputLimitsTests {
   // MARK: - Sats
 
-  @Test func satsAcceptsUpToTheCap() {
+  @Test func `sats accepts up to the cap`() {
     #expect(InputLimits.maxAmountSats == 100_000_000_000_000)
     #expect(InputLimits.sanitizeSats("100000000000000", old: "1") == "100000000000000")
     #expect(InputLimits.sanitizeSats("100000000000001", old: "10000000000000") == "10000000000000")
@@ -14,7 +14,7 @@ struct InputLimitsTests {
     #expect(InputLimits.sanitizeSats("", old: "5") == "")
   }
 
-  @Test func satsRejectsOverflowAndNonDigits() {
+  @Test func `sats rejects overflow and non digits`() {
     #expect(InputLimits.sanitizeSats("18446744073709551615", old: "7") == "7")
     #expect(InputLimits.sanitizeSats("99999999999999999999999", old: "7") == "7")
     #expect(InputLimits.sanitizeSats("-5", old: "7") == "7")
@@ -27,7 +27,7 @@ struct InputLimitsTests {
 
   // MARK: - Decimal (fiat and fee rate)
 
-  @Test func decimalNormalisesCommaAndLimitsDecimals() {
+  @Test func `decimal normalises comma and limits decimals`() {
     let max = InputLimits.maxFiatAmount
     #expect(InputLimits.sanitizeDecimal("12,5", old: "12", max: max, fractionDigits: 2) == "12.5")
     #expect(InputLimits.sanitizeDecimal("12.50", old: "12.5", max: max, fractionDigits: 2) == "12.50")
@@ -38,7 +38,7 @@ struct InputLimitsTests {
     #expect(InputLimits.sanitizeDecimal("", old: "3", max: max, fractionDigits: 2) == "")
   }
 
-  @Test func decimalRejectsOverMaxAndJunk() {
+  @Test func `decimal rejects over max and junk`() {
     let max = InputLimits.maxFiatAmount
     #expect(InputLimits.sanitizeDecimal("1000000000000", old: "1", max: max, fractionDigits: 2) == "1000000000000")
     #expect(InputLimits.sanitizeDecimal("1000000000000.01", old: "1000000000000.0", max: max, fractionDigits: 2)
@@ -52,7 +52,7 @@ struct InputLimitsTests {
     #expect(InputLimits.sanitizeDecimal(String(repeating: "9", count: 40), old: "1", max: max, fractionDigits: 2) == "1")
   }
 
-  @Test func feeRateFieldCap() {
+  @Test func `fee rate field cap`() {
     let max = Decimal(InputLimits.maxFeeRate)
     let digits = InputLimits.feeRateFractionDigits
     #expect(InputLimits.sanitizeDecimal("10000", old: "1000", max: max, fractionDigits: digits) == "10000")
@@ -62,7 +62,7 @@ struct InputLimitsTests {
             "A comma-locale decimal must not become 125")
   }
 
-  @Test func parseFeeRateBounds() {
+  @Test func `parse fee rate bounds`() {
     #expect(InputLimits.parseFeeRate("0") == nil)
     #expect(InputLimits.parseFeeRate("") == nil)
     #expect(InputLimits.parseFeeRate("-1") == nil)
@@ -75,7 +75,7 @@ struct InputLimitsTests {
     #expect(InputLimits.parseFeeRate(String(repeating: "9", count: 400)) == nil)
   }
 
-  @Test func estimatedFeeNeverTraps() {
+  @Test func `estimated fee never traps`() {
     #expect(InputLimits.estimatedFee(vsize: 200, rate: 2) == 400)
     #expect(InputLimits.estimatedFee(vsize: 200, rate: .infinity) == 2_000_000)
     #expect(InputLimits.estimatedFee(vsize: 200, rate: 1e300) == 2_000_000)
@@ -84,7 +84,7 @@ struct InputLimitsTests {
     #expect(InputLimits.estimatedFee(vsize: -1, rate: 5) == 0)
   }
 
-  @Test func sumSaturates() {
+  @Test func `sum saturates`() {
     #expect(InputLimits.sum([1, 2, 3]) == 6)
     #expect(InputLimits.sum([]) == 0)
     #expect(InputLimits.sum([UInt64.max, 1]) == UInt64.max)
@@ -93,7 +93,7 @@ struct InputLimitsTests {
 
   // MARK: - Counts (port and gap limit)
 
-  @Test func countAcceptsWholeNumbersWithinRange() {
+  @Test func `count accepts whole numbers within range`() {
     #expect(InputLimits.maxPort == 65535)
     #expect(InputLimits.sanitizeCount("1", old: "", max: InputLimits.maxPort) == "1")
     #expect(InputLimits.sanitizeCount("50002", old: "5000", max: InputLimits.maxPort) == "50002")
@@ -102,7 +102,7 @@ struct InputLimitsTests {
     #expect(InputLimits.sanitizeCount("", old: "5", max: InputLimits.maxPort) == "", "The field can be cleared")
   }
 
-  @Test func countRejectsOutOfRangeAndNonDigits() {
+  @Test func `count rejects out of range and non digits`() {
     #expect(InputLimits.sanitizeCount("65536", old: "6553", max: InputLimits.maxPort) == "6553")
     #expect(InputLimits.sanitizeCount("500022", old: "50002", max: InputLimits.maxPort) == "50002")
     #expect(InputLimits.sanitizeCount("10001", old: "1000", max: InputLimits.maxGapLimit) == "1000")
@@ -117,14 +117,14 @@ struct InputLimitsTests {
 
   /// Returning an `old` that is itself out of range would make a field swap
   /// between two rejected values without end.
-  @Test func countNeverReturnsAValueOutOfRange() {
+  @Test func `count never returns A value out of range`() {
     #expect(InputLimits.sanitizeCount("700001", old: "70000", max: InputLimits.maxPort) == "")
     #expect(InputLimits.sanitizeCount("abc", old: "-5", max: InputLimits.maxGapLimit) == "")
   }
 
   // MARK: - Fiat Conversion
 
-  @Test func fiatToSatsRejectsNonFiniteAndHugeValues() {
+  @Test func `fiat to sats rejects non finite and huge values`() {
     #expect(FiatPriceService.sats(fromFiat: 64, rate: 128) == 50_000_000)
     #expect(FiatPriceService.sats(fromFiat: 0, rate: 100_000) == 0)
     #expect(FiatPriceService.sats(fromFiat: -5, rate: 100_000) == 0)
@@ -140,7 +140,7 @@ struct InputLimitsTests {
 
   // MARK: - Labels
 
-  @Test func truncatedLabelKeepsWholeCharacters() {
+  @Test func `truncated label keeps whole characters`() {
     let ascii = String(repeating: "a", count: 254)
     let thumbs = ascii + "👍🏽" + "zzz"
     #expect(thumbs.truncatedLabel == ascii + "👍🏽")
@@ -155,7 +155,7 @@ struct InputLimitsTests {
     #expect("short".truncatedLabel == "short")
   }
 
-  @Test @MainActor func bip329ImportTruncatesLongLabels() throws {
+  @Test @MainActor func `bip 329 import truncates long labels`() throws {
     let schema = Schema([WalletLabel.self, FrozenUTXO.self, WalletProfile.self, CosignerInfo.self])
     let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
     let context = ModelContext(container)

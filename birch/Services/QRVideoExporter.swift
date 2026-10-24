@@ -18,7 +18,7 @@ enum QRVideoExporter {
     maxFragmentLen: Int = 160,
     fps: Double = 4.0,
     loopCount: Int = 3,
-    qrSize: Int = 800
+    qrSize: Int = 800,
   ) async throws -> URL {
     logger.info("Exporting QR MP4 '\(fileName)' from \(ur.type) UR (maxFragmentLen \(maxFragmentLen), \(fps) fps, \(loopCount) loops)")
 
@@ -74,7 +74,7 @@ enum QRVideoExporter {
         kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
         kCVPixelBufferWidthKey as String: qrSize,
         kCVPixelBufferHeightKey as String: qrSize,
-      ]
+      ],
     )
 
     writer.add(input)
@@ -169,10 +169,8 @@ enum QRVideoExporter {
       bitsPerComponent: 8,
       bytesPerRow: bytesPerRow,
       space: colorSpace,
-      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-    ) else { return nil }
-
-    guard let cgImage = image.cgImage else { return nil }
+      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue,
+    ), let cgImage = image.cgImage else { return nil }
 
     cgContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 

@@ -79,7 +79,7 @@ struct SendFlowView: View {
           if !$0 {
             viewModel.errorMessage = nil
           }
-        }
+        },
       )) {
         Button("OK") { viewModel.errorMessage = nil }
       } message: {
@@ -124,7 +124,7 @@ struct SendFlowView: View {
     .fileImporter(
       isPresented: $viewModel.showImportPSBTFile,
       allowedContentTypes: [.data, .plainText],
-      allowsMultipleSelection: false
+      allowsMultipleSelection: false,
     ) { result in
       switch result {
       case let .success(urls):
@@ -152,8 +152,7 @@ struct SendFlowView: View {
   }
 
   private func checkForResumablePSBT() {
-    guard !hasCheckedResume, !resumeDismissed else { return }
-    guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
+    guard !hasCheckedResume, !resumeDismissed, let walletID = BitcoinService.shared.currentProfile?.id else { return }
     hasCheckedResume = true
 
     resumeCandidate = SavedPSBT.resumeCandidate(in: allSavedPSBTs, walletID: walletID)

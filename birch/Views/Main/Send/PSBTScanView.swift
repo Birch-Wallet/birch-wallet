@@ -20,7 +20,7 @@ struct PSBTScanView: View {
       SignatureProgressView(
         collected: viewModel.signaturesCollected,
         required: viewModel.requiredSignatures,
-        signerStatus: viewModel.signerStatus
+        signerStatus: viewModel.signerStatus,
       )
 
       // QR Scanner
@@ -68,7 +68,7 @@ struct PSBTScanView: View {
     .fileImporter(
       isPresented: $showImportFile,
       allowedContentTypes: [.data, .plainText],
-      allowsMultipleSelection: false
+      allowsMultipleSelection: false,
     ) { result in
       if case let .success(urls) = result, let url = urls.first {
         guard url.startAccessingSecurityScopedResource() else { return }

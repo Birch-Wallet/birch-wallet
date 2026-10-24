@@ -50,11 +50,11 @@ struct WalletSetupFlowTests {
   /// Saves the wizard's wallet, loads it the way the app does, and checks the
   /// addresses it hands out against Bitcoin Core.
   private func expectSavedWalletLoads(
-    _ vm: SetupWizardViewModel, core: (receive: [String], change: [String])
+    _ vm: SetupWizardViewModel, core: (receive: [String], change: [String]),
   ) async throws {
     let schema = Schema([WalletProfile.self, CosignerInfo.self])
     let container = try ModelContainer(
-      for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]
+      for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)],
     )
     let context = ModelContext(container)
 
@@ -104,7 +104,7 @@ struct WalletSetupFlowTests {
 
   // MARK: - Tests
 
-  @Test func newWalletSavesAndLoadsToCoreAddresses() async throws {
+  @Test func `new wallet saves and loads to core addresses`() async throws {
     let core = try Self.coreAddresses()
 
     let vm = SetupWizardViewModel()
@@ -132,7 +132,7 @@ struct WalletSetupFlowTests {
     try await expectSavedWalletLoads(vm, core: core)
   }
 
-  @Test func importedWalletSavesAndLoadsToCoreAddresses() async throws {
+  @Test func `imported wallet saves and loads to core addresses`() async throws {
     let core = try Self.coreAddresses()
 
     let vm = SetupWizardViewModel()

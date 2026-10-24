@@ -96,7 +96,7 @@ struct WalletCreationChoiceView: View {
         icon: "plus.circle.fill",
         title: "Create New Wallet",
         subtitle: "Setup M-of-N multisig by importing cosigner xpubs from one or more air-gapped signing devices",
-        isSelected: viewModel.creationMode == .createNew
+        isSelected: viewModel.creationMode == .createNew,
       ) {
         viewModel.creationMode = .createNew
         viewModel.goToNext()
@@ -106,7 +106,7 @@ struct WalletCreationChoiceView: View {
         icon: "square.and.arrow.down.fill",
         title: "Import Descriptor",
         subtitle: "Import an existing wallet via output descriptor from a printed backup or another coordinator",
-        isSelected: viewModel.creationMode == .importDescriptor
+        isSelected: viewModel.creationMode == .importDescriptor,
       ) {
         viewModel.creationMode = .importDescriptor
         viewModel.goToNext()

@@ -54,7 +54,7 @@ struct TransactionRowView: View {
         .foregroundStyle(amountColor)
         .frame(width: 32, height: 32)
         .background(
-          (transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbTextSecondary).opacity(0.1)
+          (transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbTextSecondary).opacity(0.1),
         )
         .clipShape(Circle())
 

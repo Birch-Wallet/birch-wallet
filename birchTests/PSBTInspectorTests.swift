@@ -18,7 +18,7 @@ struct PSBTInspectorTests {
       compactEnabled: compact,
       cosigners: [],
       requiredSignatures: 2,
-      networkName: nil
+      networkName: nil,
     )
   }
 
@@ -44,7 +44,7 @@ struct PSBTInspectorTests {
   // MARK: - Parser
 
   @Test(arguments: fixtures)
-  func recordsAccountForEveryByte(fixture: String) throws {
+  func `records account for every byte`(fixture: String) throws {
     let data = try loadFixture(fixture)
     let parsed = try PSBTParser.parse(data)
     let separators = 1 + parsed.inputCount + parsed.outputCount
@@ -56,7 +56,7 @@ struct PSBTInspectorTests {
     }
   }
 
-  @Test func parsesMinimalPSBT() throws {
+  @Test func `parses minimal PSBT`() throws {
     let data = Data(Self.magic + Self.txRecord + [0x00, 0x00, 0x00])
     let parsed = try PSBTParser.parse(data)
     #expect(parsed.records.count == 1)
@@ -69,33 +69,33 @@ struct PSBTInspectorTests {
     #expect(output.emptyNote?.contains("10,000 sats") == true)
   }
 
-  @Test func rejectsBadMagic() {
+  @Test func `rejects bad magic`() {
     var bytes = Self.magic + Self.txRecord + [0x00, 0x00, 0x00]
     bytes[0] = 0x71
     #expect(throws: PSBTParseError.self) { try PSBTParser.parse(Data(bytes)) }
   }
 
-  @Test func rejectsTruncatedFile() throws {
+  @Test func `rejects truncated file`() throws {
     let data = try loadFixture("test_psbt_2in_one_sig")
     let error = #expect(throws: PSBTParseError.self) { try PSBTParser.parse(data.dropLast()) }
     #expect(error?.offset != nil)
   }
 
-  @Test func rejectsDuplicateKeys() {
+  @Test func `rejects duplicate keys`() {
     let data = Data(Self.magic + Self.txRecord + Self.txRecord + [0x00, 0x00, 0x00])
     let error = #expect(throws: PSBTParseError.self) { try PSBTParser.parse(data) }
     #expect(error?.reason.contains("Duplicate") == true)
     #expect(error?.offset == 5 + Self.txRecord.count)
   }
 
-  @Test func rejectsUnsupportedVersion() {
+  @Test func `rejects unsupported version`() {
     let version: [UInt8] = [0x01, 0xFB, 0x04, 0x01, 0x00, 0x00, 0x00]
     let data = Data(Self.magic + Self.txRecord + version + [0x00, 0x00, 0x00])
     let error = #expect(throws: PSBTParseError.self) { try PSBTParser.parse(data) }
     #expect(error?.reason.contains("Unsupported PSBT version 1") == true)
   }
 
-  @Test func keepsUnknownAndProprietaryRecords() throws {
+  @Test func `keeps unknown and proprietary records`() throws {
     let unknown: [UInt8] = [0x01, 0x42, 0x02, 0xDE, 0xAD]
     let proprietary: [UInt8] = [0x03, 0xFC, 0x01, 0x61, 0x01, 0x00]
     let data = Data(Self.magic + Self.txRecord + [0x00] + unknown + proprietary + [0x00, 0x00])
@@ -107,7 +107,7 @@ struct PSBTInspectorTests {
 
   // MARK: - Model
 
-  @Test func inQRLensMatchesCompactor() throws {
+  @Test func `in QR lens matches compactor`() throws {
     let data = try loadFixture("test_psbt_nonwitness")
     let inspector = try model(data)
     let compacted = PSBTCompactor.compact(data)
@@ -123,14 +123,14 @@ struct PSBTInspectorTests {
     #expect(inspector.qrPayloadBytes == compacted.count)
   }
 
-  @Test func compactOffKeepsEverythingInQR() throws {
+  @Test func `compact off keeps everything in QR`() throws {
     let data = try loadFixture("test_psbt_nonwitness")
     let inspector = try model(data, compact: false)
     #expect(inspector.fields.allSatisfy { $0.tags.contains(.inQR) })
   }
 
   @Test(arguments: fixtures)
-  func unsignedTxBreakdownSumsToRecord(fixture: String) throws {
+  func `unsigned tx breakdown sums to record`(fixture: String) throws {
     let inspector = try model(loadFixture(fixture))
     let field = try #require(inspector.fields.first { $0.section == .global && $0.keyType == 0x00 })
     let parts = try #require(field.parts)
@@ -138,7 +138,7 @@ struct PSBTInspectorTests {
   }
 
   @Test(arguments: fixtures)
-  func repeatedRecordsCollapseIntoOneRow(fixture: String) throws {
+  func `repeated records collapse into one row`(fixture: String) throws {
     let data = try loadFixture(fixture)
     let inspector = try model(data)
     #expect(inspector.fields.reduce(0) { $0 + $1.count } == inspector.parsed.records.count)
@@ -151,7 +151,7 @@ struct PSBTInspectorTests {
   }
 
   @Test(arguments: fixtures)
-  func derivationBreakdownSumsToOneEntry(fixture: String) throws {
+  func `derivation breakdown sums to one entry`(fixture: String) throws {
     let inspector = try model(loadFixture(fixture))
     for field in inspector.fields where field.keyType == 0x06 && field.section != .global {
       let parts = try #require(field.parts)
@@ -161,7 +161,7 @@ struct PSBTInspectorTests {
 
   /// Byte counts for a real 10-input, 1-output multisig PSBT, cross-checked against
   /// an independent BIP-174 decoder
-  @Test func realPSBTByteCounts() throws {
+  @Test func `real PSBT byte counts`() throws {
     let data = try loadFixture("test_psbt_10in_partial")
     let inspector = try model(data)
     #expect(inspector.parsed.totalBytes == 13854)
@@ -190,7 +190,7 @@ struct PSBTInspectorTests {
 
   /// Only the fields a P2WSH signer truly cannot sign without are "Required to sign",
   /// and only output proof fields are "Verifies change"
-  @Test func signingRoleTagsAreAccurate() throws {
+  @Test func `signing role tags are accurate`() throws {
     let inspector = try model(loadFixture("test_psbt_10in_partial"))
     let byLocation = Dictionary(grouping: inspector.fields, by: \.section)
 
@@ -214,7 +214,7 @@ struct PSBTInspectorTests {
     #expect(optional.allSatisfy { !$0.tags.contains(.requiredToSign) })
   }
 
-  @Test func signingLensReflectsSignatures() throws {
+  @Test func `signing lens reflects signatures`() throws {
     let unsigned = try model(loadFixture("test_psbt_2in_unsigned"))
     #expect(!unsigned.parsed.records.contains { $0.keyType == 0x02 && $0.map != .global })
     #expect(unsigned.note(for: .signing).hasPrefix("No signatures yet"))
@@ -233,7 +233,7 @@ struct PSBTInspectorTests {
   }
 
   @Test(arguments: fixtures)
-  func realSignaturesAllCount(fixture: String) throws {
+  func `real signatures all count`(fixture: String) throws {
     let parsed = try PSBTParser.parse(loadFixture(fixture))
     for i in 0 ..< parsed.inputCount {
       let (counted, foreign) = parsed.partialSignatures(input: i)
@@ -242,7 +242,7 @@ struct PSBTInspectorTests {
     }
   }
 
-  @Test func witnessScriptPubkeysAreExtracted() throws {
+  @Test func `witness script pubkeys are extracted`() throws {
     let parsed = try PSBTParser.parse(loadFixture("test_psbt_10in_partial"))
     let script = try #require(parsed.records(in: .input(0)).first { $0.keyType == 0x05 })
     let summary = try #require(PSBTParser.multisigSummary(script.value))
@@ -255,7 +255,7 @@ struct PSBTInspectorTests {
 
   /// A signature keyed by a pubkey outside the input's witness script must not count
   /// toward the threshold, even though it is a well-formed partial_sig record
-  @Test func foreignSignatureDoesNotCount() throws {
+  @Test func `foreign signature does not count`() throws {
     var bytes = try [UInt8](loadFixture("test_psbt_2in_one_sig"))
     let original = try PSBTParser.parse(Data(bytes))
     let sig = try #require(original.records.first { $0.keyType == 0x02 && $0.map != .global })
@@ -284,7 +284,7 @@ struct PSBTInspectorTests {
 
   /// The regular-width layout splits sections into two reading-order columns of
   /// near-equal expanded height, instead of a fixed Global + Input 0 left column
-  @Test func regularColumnsBalance() throws {
+  @Test func `regular columns balance`() throws {
     let tenInputs = try model(loadFixture("test_psbt_10in_partial"))
     #expect(tenInputs.sections.count == 12)
     #expect(PSBTInspectorView.columnSplit(tenInputs.sections, scale: 0.14, maxRowHeight: 360) == 6)
@@ -293,7 +293,7 @@ struct PSBTInspectorTests {
     #expect(PSBTInspectorView.columnSplit(twoInputs.sections, scale: 0.14, maxRowHeight: 360) == 2)
   }
 
-  @Test func witnessUtxoCopyOnlyMentionsCompactWhenItDrops() throws {
+  @Test func `witness utxo copy only mentions compact when it drops`() throws {
     let data = try loadFixture("test_psbt_nonwitness")
     let claim = "compact QR drops non_witness_utxo"
     func witnessUtxo(_ psbt: Data, compact: Bool) throws -> PSBTField {

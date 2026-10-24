@@ -42,32 +42,32 @@ struct AppLockViewModelTests {
 
   // MARK: - Initialization
 
-  @Test func initWithNoPIN_hasPINIsFalse() {
+  @Test func `init with no PIN has PIN is false`() {
     let vm = makeVM()
     #expect(vm.hasPIN == false)
   }
 
-  @Test func initWithExistingPIN_hasPINIsTrue() {
+  @Test func `init with existing PIN has PIN is true`() {
     seedPIN("1234")
     let vm = makeVM()
     #expect(vm.hasPIN == true)
     #expect(vm.storedPINLength == 4)
   }
 
-  @Test func initWithPersistedFailedAttempts_restoresCount() {
+  @Test func `init with persisted failed attempts restores count`() {
     seedFailedAttempts(5)
     let vm = makeVM()
     #expect(vm.failedAttempts == 5)
   }
 
-  @Test func initWithExpiredLockout_clearsLockout() {
+  @Test func `init with expired lockout clears lockout`() {
     seedLockoutExpiry(Date().addingTimeInterval(-100))
     let vm = makeVM()
     #expect(vm.lockoutExpiry == nil)
     #expect(vm.isLockedOut == false)
   }
 
-  @Test func initWithActiveLockout_restoresLockout() {
+  @Test func `init with active lockout restores lockout`() {
     seedLockoutExpiry(Date().addingTimeInterval(300))
     let vm = makeVM()
     #expect(vm.lockoutExpiry != nil)
@@ -76,7 +76,7 @@ struct AppLockViewModelTests {
 
   // MARK: - PIN Management
 
-  @Test func setPIN_storesHashAndLength() {
+  @Test func `set PIN stores hash and length`() {
     let vm = makeVM()
     vm.setPIN("1234")
     #expect(vm.hasPIN == true)
@@ -85,7 +85,7 @@ struct AppLockViewModelTests {
     #expect(MockKeychainHelper.load(forKey: Constants.keychainPINLengthKey) == Data("4".utf8))
   }
 
-  @Test func setPIN_resetsFailedAttempts() {
+  @Test func `set PIN resets failed attempts`() {
     let vm = makeVM()
     vm.setPIN("9999")
     _ = vm.verifyPIN("0000")
@@ -95,7 +95,7 @@ struct AppLockViewModelTests {
     #expect(vm.failedAttempts == 0)
   }
 
-  @Test func removePIN_clearsKeychainAndState() {
+  @Test func `remove PIN clears keychain and state`() {
     let vm = makeVM()
     vm.setPIN("1234")
     #expect(vm.hasPIN == true)
@@ -108,7 +108,7 @@ struct AppLockViewModelTests {
     #expect(MockKeychainHelper.load(forKey: Constants.keychainLockoutExpiryKey) == nil)
   }
 
-  @Test func setPIN_removePIN_setPIN_togglesCorrectly() {
+  @Test func `set PIN remove PIN set PIN toggles correctly`() {
     let vm = makeVM()
     vm.setPIN("1234")
     #expect(vm.hasPIN == true)
@@ -123,7 +123,7 @@ struct AppLockViewModelTests {
 
   // MARK: - PIN Verification
 
-  @Test func verifyPIN_correctPIN_returnsTrue() {
+  @Test func `verify PIN correct PIN returns true`() {
     let vm = makeVM()
     vm.setPIN("5678")
     vm.needsPINEntry = true
@@ -134,7 +134,7 @@ struct AppLockViewModelTests {
     #expect(vm.failedAttempts == 0)
   }
 
-  @Test func verifyPIN_wrongPIN_returnsFalse() {
+  @Test func `verify PIN wrong PIN returns false`() {
     let vm = makeVM()
     vm.setPIN("5678")
     let result = vm.verifyPIN("0000")
@@ -142,13 +142,13 @@ struct AppLockViewModelTests {
     #expect(vm.failedAttempts == 1)
   }
 
-  @Test func verifyPIN_noStoredPIN_returnsFalse() {
+  @Test func `verify PIN no stored PIN returns false`() {
     let vm = makeVM()
     let result = vm.verifyPIN("1234")
     #expect(result == false)
   }
 
-  @Test func verifyPIN_correctPIN_resetsFailedAttempts() {
+  @Test func `verify PIN correct PIN resets failed attempts`() {
     let vm = makeVM()
     vm.setPIN("5678")
     _ = vm.verifyPIN("0000")
@@ -161,7 +161,7 @@ struct AppLockViewModelTests {
     #expect(vm.lockoutExpiry == nil)
   }
 
-  @Test func verifyPIN_whileLockedOut_returnsFalse() {
+  @Test func `verify PIN while locked out returns false`() {
     let vm = makeVM()
     vm.setPIN("5678")
     _ = vm.verifyPIN("0000")
@@ -176,7 +176,7 @@ struct AppLockViewModelTests {
 
   // MARK: - Lockout Progression
 
-  @Test func lockout_noLockoutFor1to3Failures() {
+  @Test func `lockout no lockout for 1 to 3 failures`() {
     let vm = makeVM()
     vm.setPIN("5678")
     _ = vm.verifyPIN("0000")
@@ -187,7 +187,7 @@ struct AppLockViewModelTests {
     #expect(vm.isLockedOut == false)
   }
 
-  @Test func lockout_60sAfter4Failures() throws {
+  @Test func `lockout 60 s after 4 failures`() throws {
     let vm = makeVM()
     vm.setPIN("5678")
     let start = Date()
@@ -200,7 +200,7 @@ struct AppLockViewModelTests {
     try expectLockout(vm, seconds: 60, start: start, end: end)
   }
 
-  @Test func lockout_10mAfter5Failures() throws {
+  @Test func `lockout 10 m after 5 failures`() throws {
     seedPIN("5678")
     seedFailedAttempts(4)
     let vm = makeVM()
@@ -211,7 +211,7 @@ struct AppLockViewModelTests {
     try expectLockout(vm, seconds: 600, start: start, end: end)
   }
 
-  @Test func lockout_90mAfter6Failures() throws {
+  @Test func `lockout 90 m after 6 failures`() throws {
     seedPIN("5678")
     seedFailedAttempts(5)
     let vm = makeVM()
@@ -222,7 +222,7 @@ struct AppLockViewModelTests {
     try expectLockout(vm, seconds: 5400, start: start, end: end)
   }
 
-  @Test func lockout_24hAfter7Failures() throws {
+  @Test func `lockout 24 h after 7 failures`() throws {
     seedPIN("5678")
     seedFailedAttempts(6)
     let vm = makeVM()
@@ -233,7 +233,7 @@ struct AppLockViewModelTests {
     try expectLockout(vm, seconds: 86400, start: start, end: end)
   }
 
-  @Test func lockout_persistsSurvivesReInit() {
+  @Test func `lockout persists survives re init`() {
     let vm = makeVM()
     vm.setPIN("5678")
     for _ in 1 ... 4 {
@@ -246,7 +246,7 @@ struct AppLockViewModelTests {
     #expect(vm2.isLockedOut == true)
   }
 
-  @Test func failedAttempts10_reachesWipeThreshold() {
+  @Test func `failed attempts 10 reaches wipe threshold`() {
     seedPIN("5678")
     seedFailedAttempts(9)
     let vm = makeVM()
@@ -257,7 +257,7 @@ struct AppLockViewModelTests {
 
   // MARK: - Background / Foreground
 
-  @Test func handleBackground_calledTwice_noOverwrite() {
+  @Test func `handle background called twice no overwrite`() {
     let vm = makeVM()
     vm.isLocked = false
     let earlyTime = Date().addingTimeInterval(-120)
@@ -267,7 +267,7 @@ struct AppLockViewModelTests {
     #expect(vm.isLocked == true)
   }
 
-  @Test func handleForeground_underTimeout_staysUnlocked() {
+  @Test func `handle foreground under timeout stays unlocked`() {
     let vm = makeVM()
     vm.isLocked = false
     vm.handleBackground(at: Date())
@@ -275,7 +275,7 @@ struct AppLockViewModelTests {
     #expect(vm.isLocked == false)
   }
 
-  @Test func handleForeground_overTimeout_reLocks() {
+  @Test func `handle foreground over timeout re locks`() {
     let vm = makeVM()
     vm.isLocked = false
     vm.handleBackground(at: Date().addingTimeInterval(-120))
@@ -283,7 +283,7 @@ struct AppLockViewModelTests {
     #expect(vm.isLocked == true)
   }
 
-  @Test func handleForeground_rereadsPINState() {
+  @Test func `handle foreground rereads PIN state`() {
     let vm = makeVM()
     #expect(vm.hasPIN == false)
     seedPIN("1234")
@@ -292,7 +292,7 @@ struct AppLockViewModelTests {
     #expect(vm.storedPINLength == 4)
   }
 
-  @Test func handleForeground_rereadsPINLength_afterRemoval() {
+  @Test func `handle foreground rereads PIN length after removal`() {
     seedPIN("1234")
     let vm = makeVM()
     #expect(vm.hasPIN == true)
@@ -304,7 +304,7 @@ struct AppLockViewModelTests {
     #expect(vm.storedPINLength == 6)
   }
 
-  @Test func handleForeground_noPriorBackground_noRelock() {
+  @Test func `handle foreground no prior background no relock`() {
     let vm = makeVM()
     vm.isLocked = false
     vm.handleForeground(timeout: 60)
@@ -313,7 +313,7 @@ struct AppLockViewModelTests {
 
   // MARK: - Cross-Instance Sync
 
-  @Test func crossInstance_setPINOnOne_foregroundReadsOnOther() {
+  @Test func `cross instance set PIN on one foreground reads on other`() {
     let vmA = makeVM()
     let vmB = makeVM()
     vmA.setPIN("1234")
@@ -324,7 +324,7 @@ struct AppLockViewModelTests {
     #expect(vmB.storedPINLength == 4)
   }
 
-  @Test func crossInstance_removePINOnOne_foregroundReadsOnOther() {
+  @Test func `cross instance remove PIN on one foreground reads on other`() {
     seedPIN("5678")
     let vmA = makeVM()
     let vmB = makeVM()
@@ -338,7 +338,7 @@ struct AppLockViewModelTests {
     #expect(vmB.storedPINLength == 6)
   }
 
-  @Test func crossInstance_setPIN_thenTimeout_showsCorrectPINLength() {
+  @Test func `cross instance set PIN then timeout shows correct PIN length`() {
     let vmSettings = makeVM()
     let vmLock = makeVM()
     vmLock.isLocked = false
@@ -353,12 +353,12 @@ struct AppLockViewModelTests {
 
   // MARK: - Lockout Text
 
-  @Test func lockoutRemainingText_noLockout_empty() {
+  @Test func `lockout remaining text no lockout empty`() {
     let vm = makeVM()
     #expect(vm.lockoutRemainingText == "")
   }
 
-  @Test func lockoutRemainingText_showsSeconds() {
+  @Test func `lockout remaining text shows seconds`() {
     let start = Date()
     seedLockoutExpiry(start.addingTimeInterval(30))
     let vm = makeVM()
@@ -368,14 +368,14 @@ struct AppLockViewModelTests {
     #expect((fewest ... 30).contains { text == "Try again in \($0)s" }, "\(text)")
   }
 
-  @Test func lockoutRemainingText_showsMinutes() {
+  @Test func `lockout remaining text shows minutes`() {
     seedLockoutExpiry(Date().addingTimeInterval(300))
     let vm = makeVM()
     let text = vm.lockoutRemainingText
     #expect(text.contains("5m") || text.contains("4m"))
   }
 
-  @Test func lockoutRemainingText_showsHoursAndMinutes() {
+  @Test func `lockout remaining text shows hours and minutes`() {
     seedLockoutExpiry(Date().addingTimeInterval(7260))
     let vm = makeVM()
     let text = vm.lockoutRemainingText
@@ -384,7 +384,7 @@ struct AppLockViewModelTests {
 
   // MARK: - Face ID Retry State Reset
 
-  @Test func faceIDRetry_clearsState() {
+  @Test func `face ID retry clears state`() {
     let vm = makeVM()
     vm.needsPINEntry = true
     vm.pinInput = "12"

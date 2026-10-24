@@ -13,7 +13,7 @@ struct PSBTCompactorTests {
       + "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
       + "21"
       + "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-      + "52ae"
+      + "52ae",
   )
 
   /// Marker bytes unique to the embedded previous transactions (fake input txids)
@@ -24,14 +24,14 @@ struct PSBTCompactorTests {
     let bundle = Bundle(for: CompactorBundleToken.self)
     guard let path = bundle.path(forResource: name, ofType: "txt"),
           let base64 = try? String(contentsOfFile: path, encoding: .utf8)
-          .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     else { return nil }
     return Data(base64Encoded: base64)
   }
 
   // MARK: - Compact-PSBT validity
 
-  @Test func stripsNonWitnessUtxos() throws {
+  @Test func `strips non witness utxos`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -45,7 +45,7 @@ struct PSBTCompactorTests {
     #expect(stripped.range(of: prevTx2Marker) == nil, "prev tx 2 must be stripped")
   }
 
-  @Test func stripsGlobalXpubs() throws {
+  @Test func `strips global xpubs`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -55,7 +55,7 @@ struct PSBTCompactorTests {
     #expect(stripped.range(of: xpubVersionMarker) == nil, "global xpubs must be stripped")
   }
 
-  @Test func strippedPSBTIsStillValid() throws {
+  @Test func `stripped PSBT is still valid`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -72,7 +72,7 @@ struct PSBTCompactorTests {
     #expect(try strippedPsbt.fee() == 500)
   }
 
-  @Test func seedSignerRequiredFieldsSurvive() throws {
+  @Test func `seed signer required fields survive`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -90,20 +90,20 @@ struct PSBTCompactorTests {
     #expect(stripped.range(of: Data(hex: "11223344")) != nil)
   }
 
-  @Test func strippingIsIdempotent() throws {
+  @Test func `stripping is idempotent`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let once = PSBTCompactor.compact(original)
     let twice = PSBTCompactor.compact(once)
     #expect(once == twice)
   }
 
-  @Test func alreadyCompactPSBTUnchanged() throws {
+  @Test func `already compact PSBT unchanged`() throws {
     // The existing unsigned fixture has witness_utxo only — nothing to strip
     let data = try #require(loadFixture("test_psbt_unsigned"))
     #expect(PSBTCompactor.compact(data) == data)
   }
 
-  @Test func failSafeOnInvalidInput() {
+  @Test func `fail safe on invalid input`() {
     #expect(PSBTCompactor.compact(Data()) == Data())
 
     let garbage = Data((0 ..< 100).map { UInt8($0) })
@@ -113,7 +113,7 @@ struct PSBTCompactorTests {
     #expect(PSBTCompactor.compact(magicOnly) == magicOnly)
   }
 
-  @Test func dropsOnlyExactSpecKeyShapes() {
+  @Test func `drops only exact spec key shapes`() {
     /// Synthetic PSBT containing look-alike entries that share a dropped entry's
     /// key TYPE but not its spec-defined key LENGTH — these must pass through:
     ///  - global: type 0x01 with a 4-byte key body (real PSBT_GLOBAL_XPUB keys are 79 bytes)
@@ -152,7 +152,7 @@ struct PSBTCompactorTests {
     #expect(original.count - compacted.count == 63)
   }
 
-  @Test func psbtV2PassesThroughUnchanged() {
+  @Test func `psbt V 2 passes through unchanged`() {
     /// BIP-370 (PSBT v2) removes the global unsigned tx, which the compactor
     /// needs for the input count. Without it the walk aborts and the ENTIRE
     /// original PSBT is returned — no partial stripping (not even the global
@@ -175,7 +175,7 @@ struct PSBTCompactorTests {
     #expect(PSBTCompactor.compact(v2psbt) == v2psbt)
   }
 
-  @Test func failSafeOnTruncatedPSBT() throws {
+  @Test func `fail safe on truncated PSBT`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let truncated = original.prefix(original.count / 2)
     #expect(PSBTCompactor.compact(Data(truncated)) == Data(truncated))
@@ -183,7 +183,7 @@ struct PSBTCompactorTests {
 
   // MARK: - QR/UR output validity
 
-  @Test func strippedPSBTEncodesToValidUR() throws {
+  @Test func `stripped PSBT encodes to valid UR`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -192,7 +192,7 @@ struct PSBTCompactorTests {
     #expect(try URService.decodePSBT(from: ur) == stripped)
   }
 
-  @Test func strippedPSBTMultiPartURRoundTrip() throws {
+  @Test func `stripped PSBT multi part UR round trip`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 
@@ -212,7 +212,7 @@ struct PSBTCompactorTests {
     #expect(decoded == stripped)
   }
 
-  @Test func compactionReducesFrameCount() throws {
+  @Test func `compaction reduces frame count`() throws {
     let original = try #require(loadFixture("test_psbt_nonwitness"))
     let stripped = PSBTCompactor.compact(original)
 

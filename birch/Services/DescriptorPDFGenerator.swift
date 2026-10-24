@@ -35,7 +35,7 @@ enum DescriptorPDFGenerator {
       with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude),
       options: .usesLineFragmentOrigin,
       attributes: textAttrs,
-      context: nil
+      context: nil,
     )
 
     return renderer.pdfData { context in
@@ -54,11 +54,11 @@ enum DescriptorPDFGenerator {
         with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude),
         options: .usesLineFragmentOrigin,
         attributes: titleAttrs,
-        context: nil
+        context: nil,
       )
       (titleStr as NSString).draw(
         in: CGRect(x: margin, y: y, width: contentWidth, height: titleSize.height),
-        withAttributes: titleAttrs
+        withAttributes: titleAttrs,
       )
       y += titleSize.height + 10
 
@@ -81,7 +81,7 @@ enum DescriptorPDFGenerator {
         // Fits on the first page
         (descriptor as NSString).draw(
           in: CGRect(x: margin, y: y, width: contentWidth, height: firstPageRemaining),
-          withAttributes: textAttrs
+          withAttributes: textAttrs,
         )
       } else {
         // Use NSTextContainer/NSLayoutManager for precise page breaking

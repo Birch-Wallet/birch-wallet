@@ -66,7 +66,7 @@ struct BroadcastResultView: View {
         SignatureProgressView(
           collected: viewModel.signaturesCollected,
           required: viewModel.requiredSignatures,
-          signerStatus: viewModel.signerStatus
+          signerStatus: viewModel.signerStatus,
         )
 
         Image(systemName: "antenna.radiowaves.left.and.right")
@@ -239,7 +239,7 @@ struct BroadcastResultView: View {
             changeAddress: changeAddress,
             changeVout: changeVout,
             context: modelContext,
-            walletID: walletID
+            walletID: walletID,
           )
         } catch {
           AppLog(.labels).error("Failed to propagate change label: \(error.localizedDescription)")

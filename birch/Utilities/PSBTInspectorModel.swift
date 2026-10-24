@@ -143,7 +143,7 @@ struct PSBTInspectorModel: Sendable {
     compactEnabled: Bool,
     cosigners: [(label: String, fingerprint: String)],
     requiredSignatures: Int?,
-    networkName: String?
+    networkName: String?,
   ) throws -> PSBTInspectorModel {
     let parsed = try PSBTParser.parse(psbtBytes)
 
@@ -178,7 +178,7 @@ struct PSBTInspectorModel: Sendable {
       requiredSignatures: m,
       totalKeys: n,
       cosigners: cosigners,
-      compactDrops: compactEnabled && !dropped.isEmpty
+      compactDrops: compactEnabled && !dropped.isEmpty,
     )
 
     var sections: [PSBTSection] = []
@@ -233,7 +233,7 @@ struct PSBTInspectorModel: Sendable {
           tags: tags,
           partsLabel: copy.partsLabel,
           parts: copy.parts,
-          records: group
+          records: group,
         )
       }
 
@@ -241,7 +241,7 @@ struct PSBTInspectorModel: Sendable {
         location: location,
         label: sectionLabel(location),
         fields: fields,
-        emptyNote: fields.isEmpty ? PSBTFieldCopy.emptySectionNote(location: location, context: context) : nil
+        emptyNote: fields.isEmpty ? PSBTFieldCopy.emptySectionNote(location: location, context: context) : nil,
       ))
     }
 
@@ -263,7 +263,7 @@ struct PSBTInspectorModel: Sendable {
       isFinalized: isFinalized,
       absentFieldNames: absent,
       signatureCounts: signatureCounts,
-      finalizedInputs: finalizedInputs
+      finalizedInputs: finalizedInputs,
     )
   }
 

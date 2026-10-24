@@ -53,7 +53,7 @@ final class SavedPSBT {
     inputCount: Int,
     manualUTXOSelection: Bool,
     selectedUTXOIds: String,
-    inputOutpoints: String
+    inputOutpoints: String,
   ) {
     id = UUID()
     self.walletID = walletID

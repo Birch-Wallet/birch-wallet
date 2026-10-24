@@ -128,38 +128,38 @@ struct WalletDashboardView: View {
             DashboardMetricCard(
               icon: "arrow.left.arrow.right.circle",
               label: "Transactions",
-              value: "\(transactions.count)"
+              value: "\(transactions.count)",
             )
             DashboardMetricCard(
               icon: "bitcoinsign.circle",
               label: "UTXOs",
-              value: "\(utxos.count)"
+              value: "\(utxos.count)",
             )
             DashboardMetricCard(
               icon: "arrow.down.circle",
               label: "Received",
-              value: "\(receivedCount)"
+              value: "\(receivedCount)",
             )
             DashboardMetricCard(
               icon: "arrow.up.circle",
               label: "Sent",
-              value: "\(sentCount)"
+              value: "\(sentCount)",
             )
             DashboardMetricCard(
               icon: "equal.circle",
               label: "Avg UTXO Size",
-              value: isPrivate ? Constants.privacyText() : avgUTXOSize.formattedSats
+              value: isPrivate ? Constants.privacyText() : avgUTXOSize.formattedSats,
             )
             DashboardMetricCard(
               icon: "creditcard",
               label: "Total Fees Paid",
-              value: isPrivate ? Constants.privacyText() : (totalFeesPaid > 0 ? totalFeesPaid.formattedFeeSats : "—")
+              value: isPrivate ? Constants.privacyText() : (totalFeesPaid > 0 ? totalFeesPaid.formattedFeeSats : "—"),
             )
             if let age = avgUTXOAge {
               DashboardMetricCard(
                 icon: "hourglass",
                 label: "Avg UTXO Age",
-                value: formatAge(age)
+                value: formatAge(age),
               )
             }
           }

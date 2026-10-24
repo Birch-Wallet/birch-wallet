@@ -217,7 +217,7 @@ private struct AppearanceSettingsRow: View {
       "Theme",
       selection: $themeRaw,
       options: AppTheme.allCases.map(\.rawValue),
-      optionTitle: { AppTheme(rawValue: $0)?.displayName ?? $0 }
+      optionTitle: { AppTheme(rawValue: $0)?.displayName ?? $0 },
     )
     .onChange(of: themeRaw) { _, new in
       guard let t = AppTheme(rawValue: new) else { return }
@@ -344,7 +344,7 @@ private struct DenominationSettingsRow: View {
       "Bitcoin Unit",
       selection: $denomination,
       options: Denomination.allCases.map(\.rawValue),
-      optionTitle: { Denomination(rawValue: $0)?.label ?? $0 }
+      optionTitle: { Denomination(rawValue: $0)?.label ?? $0 },
     )
     .accessibilityIdentifier("bitcoinUnitPicker")
     .onChange(of: denomination) { _, new in
@@ -363,7 +363,7 @@ private struct FeeSettingsRow: View {
       "Fee Source",
       selection: $feeSourceRaw,
       options: FeeSource.allCases.map(\.rawValue),
-      optionTitle: { FeeSource(rawValue: $0)?.displayName ?? $0 }
+      optionTitle: { FeeSource(rawValue: $0)?.displayName ?? $0 },
     )
     .onChange(of: feeSourceRaw) { _, new in
       logger.info("Fee source changed to \(new)")
@@ -386,7 +386,7 @@ private struct FiatSettingsRow: View {
         set: { new in
           logger.info("Fiat display \(new ? "enabled" : "disabled")")
           fiatEnabled = new
-        }
+        },
       )) {
         VStack(alignment: .leading, spacing: 2) {
           Text("Show Fiat Price")
@@ -406,7 +406,7 @@ private struct FiatSettingsRow: View {
           "Price Source",
           selection: $fiatSourceRaw,
           options: FiatSource.allCases.map(\.rawValue),
-          optionTitle: { FiatSource(rawValue: $0)?.displayName ?? $0 }
+          optionTitle: { FiatSource(rawValue: $0)?.displayName ?? $0 },
         )
         .onChange(of: fiatSourceRaw) {
           logger.info("Fiat source changed to \(fiatSourceRaw)")
@@ -422,7 +422,7 @@ private struct FiatSettingsRow: View {
           "Currency",
           selection: $fiatCurrency,
           options: FiatPriceService.availableCurrencies.map(\.code),
-          optionTitle: { $0 }
+          optionTitle: { $0 },
         )
       }
     }
@@ -471,7 +471,7 @@ private struct AppLockSettingsSection: View {
             lockVM.removePIN()
             appLockEnabled = false
           }
-        }
+        },
       )) {
         VStack(alignment: .leading, spacing: 2) {
           Text("App Lock")
@@ -503,7 +503,7 @@ private struct AppLockSettingsSection: View {
           "Lock After",
           selection: $lockTimeout,
           options: Self.timeoutOptions.map(\.1),
-          optionTitle: { seconds in Self.timeoutOptions.first { $0.1 == seconds }?.0 ?? "\(seconds / 60) minutes" }
+          optionTitle: { seconds in Self.timeoutOptions.first { $0.1 == seconds }?.0 ?? "\(seconds / 60) minutes" },
         )
         .onChange(of: lockTimeout) { _, new in
           logger.info("Lock timeout changed to \(new)s")
@@ -596,7 +596,7 @@ private struct SetPINSheet: View {
               confirmPIN = ""
               step = .confirm
             },
-            hint: "Choose a PIN between 4 and 8 digits"
+            hint: "Choose a PIN between 4 and 8 digits",
           )
         case .confirm:
           PINPadView(
@@ -617,7 +617,7 @@ private struct SetPINSheet: View {
                 confirmPIN = ""
                 step = .create
               }
-            }
+            },
           )
         }
 
@@ -671,7 +671,7 @@ private struct RemovePINSheet: View {
               pin = ""
               startLockoutTimerIfNeeded()
             }
-          }
+          },
         )
 
         Spacer()

@@ -449,10 +449,10 @@ final class SetupWizardViewModel {
 
     do {
       let external = try BitcoinService.buildDescriptor(
-        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: false
+        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: false,
       )
       let change = try BitcoinService.buildDescriptor(
-        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: true
+        requiredSignatures: requiredSignatures, cosigners: cosignerData, network: network, isChange: true,
       )
       externalDescriptor = external
       internalDescriptor = change
@@ -470,7 +470,7 @@ final class SetupWizardViewModel {
     let combined = try? BitcoinService.buildCombinedDescriptor(
       requiredSignatures: requiredSignatures,
       cosigners: cosignerData,
-      network: network
+      network: network,
     )
     return combined ?? ""
   }
@@ -483,7 +483,7 @@ final class SetupWizardViewModel {
       descriptor: Descriptor(descriptor: external, networkKind: bdkNetworkKind),
       changeDescriptor: Descriptor(descriptor: change, networkKind: bdkNetworkKind),
       network: BitcoinService.shared.bdkNetwork(from: network),
-      persister: Persister.newInMemory()
+      persister: Persister.newInMemory(),
     )
     return [KeychainKind.external, .internal].flatMap { keychain in
       (0 ..< count).map { tempWallet.peekAddress(keychain: keychain, index: $0).address.description }
@@ -630,10 +630,10 @@ final class SetupWizardViewModel {
     let canonicalInternal: String
     do {
       canonicalExternal = try BitcoinService.buildDescriptor(
-        requiredSignatures: m, cosigners: keys, network: network, isChange: false
+        requiredSignatures: m, cosigners: keys, network: network, isChange: false,
       )
       canonicalInternal = try BitcoinService.buildDescriptor(
-        requiredSignatures: m, cosigners: keys, network: network, isChange: true
+        requiredSignatures: m, cosigners: keys, network: network, isChange: true,
       )
 
       let imported = Self.splitImportedDescriptor(text)
@@ -737,26 +737,26 @@ final class SetupWizardViewModel {
     if text.contains("<0;1>/*") {
       return (
         text.replacingOccurrences(of: "<0;1>/*", with: "0/*"),
-        text.replacingOccurrences(of: "<0;1>/*", with: "1/*")
+        text.replacingOccurrences(of: "<0;1>/*", with: "1/*"),
       )
     }
     if text.contains("<1;0>/*") {
       return (
         text.replacingOccurrences(of: "<1;0>/*", with: "0/*"),
-        text.replacingOccurrences(of: "<1;0>/*", with: "1/*")
+        text.replacingOccurrences(of: "<1;0>/*", with: "1/*"),
       )
     }
     // Pre-BIP389 Specter DIY format: {0,1}/* → split into /0/* and /1/*
     if text.contains("{0,1}/*") {
       return (
         text.replacingOccurrences(of: "{0,1}/*", with: "0/*"),
-        text.replacingOccurrences(of: "{0,1}/*", with: "1/*")
+        text.replacingOccurrences(of: "{0,1}/*", with: "1/*"),
       )
     }
     if text.contains("{1,0}/*") {
       return (
         text.replacingOccurrences(of: "{1,0}/*", with: "0/*"),
-        text.replacingOccurrences(of: "{1,0}/*", with: "1/*")
+        text.replacingOccurrences(of: "{1,0}/*", with: "1/*"),
       )
     }
     // Standard single-path descriptor (external)
@@ -777,7 +777,7 @@ final class SetupWizardViewModel {
     let range = NSRange(location: 0, length: (text as NSString).length)
     return (
       xpubRegex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1/0/*"),
-      xpubRegex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1/1/*")
+      xpubRegex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1/1/*"),
     )
   }
 
@@ -892,7 +892,7 @@ final class SetupWizardViewModel {
       electrumPort: Int(electrumPort) ?? 0,
       electrumSSL: electrumSSL,
       electrumAllowInsecureSSL: electrumAllowInsecureSSL,
-      blockExplorerHost: blockExplorerHost.trimmingCharacters(in: .whitespaces)
+      blockExplorerHost: blockExplorerHost.trimmingCharacters(in: .whitespaces),
     )
     #if DEBUG
       // The screenshot tour's wallets keep their identicons from run to run.
@@ -910,7 +910,7 @@ final class SetupWizardViewModel {
         xpub: cosignerXpubs[i],
         fingerprint: cosignerFingerprints[i],
         derivationPath: cosignerDerivationPaths[i],
-        orderIndex: i
+        orderIndex: i,
       )
       cosigner.wallet = profile
       modelContext.insert(cosigner)
@@ -924,7 +924,7 @@ final class SetupWizardViewModel {
       try modelContext.save()
       logger.info(
         "Saved new \(requiredSignatures)-of-\(totalCosigners) wallet '\(profile.name)' (\(profile.id)) "
-          + "on \(network.displayName) via \(creationMode == .createNew ? "new wallet" : "descriptor import")"
+          + "on \(network.displayName) via \(creationMode == .createNew ? "new wallet" : "descriptor import")",
       )
     } catch {
       // Rollback UserDefaults if save fails

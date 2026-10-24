@@ -4,7 +4,7 @@ import Testing
 import URKit
 
 struct URServiceTests {
-  @Test func psbtURRoundTrip() throws {
+  @Test func `psbt UR round trip`() throws {
     // Create some test PSBT bytes (psbt magic bytes)
     let psbtBytes = Data([0x70, 0x73, 0x62, 0x74, 0xFF, 0x01, 0x00, 0x52])
 
@@ -15,13 +15,13 @@ struct URServiceTests {
     #expect(decoded == psbtBytes)
   }
 
-  @Test func psbtURType() throws {
+  @Test func `psbt UR type`() throws {
     let data = Data([0x01, 0x02, 0x03])
     let ur = try URService.encodePSBT(data)
     #expect(ur.type == "crypto-psbt")
   }
 
-  @Test func rejectWrongURType() throws {
+  @Test func `reject wrong UR type`() throws {
     // Create a UR with wrong type
     let data = Data([0x01, 0x02, 0x03])
     let ur = try URService.encodePSBT(data)
@@ -35,7 +35,7 @@ struct URServiceTests {
     }
   }
 
-  @Test func processUnknownURType() {
+  @Test func `process unknown UR type`() {
     // Test handling of unknown UR types via processUR
     // This verifies the switch/case default handling
     // Since we can't easily create arbitrary UR types without valid CBOR,
@@ -51,7 +51,7 @@ struct URServiceTests {
     }
   }
 
-  @Test func largePayloadEncoding() throws {
+  @Test func `large payload encoding`() throws {
     // Test with a larger payload that might require fountain codes
     let largeData = Data(repeating: 0xAB, count: 1000)
     let ur = try URService.encodePSBT(largeData)
@@ -62,7 +62,7 @@ struct URServiceTests {
 
   // MARK: - crypto-account tests
 
-  @Test func cryptoAccountSinglePartMainnet() {
+  @Test func `crypto account single part mainnet`() {
     // Real SeedSigner mainnet crypto-account UR (single QR)
     let urString = "UR:CRYPTO-ACCOUNT/OEADCYKNBWOSPAAOLYTAADMETAADDLOXAXHDCLAXAXVEKKNYCFGRPKIHZSTICAKILFBAHDEERFMOCXLRFLHGIHCTGEWPVYGWJZSGKBNYAAHDCXRLSWDRDTHTUOQZMSJYEMAAHSRNJPHGFDLOADOLFNGECAKNIHMUTOCMHKADBKEYHGAMTAADDYOTADLOCSDYYKAEYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYVOFWEOBKNDQZEOAT"
 
@@ -82,7 +82,7 @@ struct URServiceTests {
     #expect(xpub.hasPrefix("xpub"), "mainnet xpub should start with 'xpub'")
   }
 
-  @Test func cryptoAccountMultiPartTestnet() {
+  @Test func `crypto account multi part testnet`() {
     // Real SeedSigner testnet crypto-account UR (animated multi-segment fountain code)
     let parts = [
       "UR:CRYPTO-ACCOUNT/1-2/LPADAOCSKECYLPRLOXFMHDFMOEADCYKNBWOSPAAOLYTAADMETAADDLONAXHDCLAXIYMYFYWEMKASIOVSFYFDFDVASWONMTSKURSSTDMHVWSKLEAMKOVSGSDSCNSGNDOEAAHDCXBAMHFTFLGSDTBGFRMSSSLN",
@@ -106,7 +106,7 @@ struct URServiceTests {
     #expect(xpub.hasPrefix("tpub"), "testnet xpub should start with 'tpub'")
   }
 
-  @Test func xpubNormalization() throws {
+  @Test func `xpub normalization`() throws {
     // Real mainnet xpub from crypto-account
     let urString = "UR:CRYPTO-ACCOUNT/OEADCYKNBWOSPAAOLYTAADMETAADDLOXAXHDCLAXAXVEKKNYCFGRPKIHZSTICAKILFBAHDEERFMOCXLRFLHGIHCTGEWPVYGWJZSGKBNYAAHDCXRLSWDRDTHTUOQZMSJYEMAAHSRNJPHGFDLOADOLFNGECAKNIHMUTOCMHKADBKEYHGAMTAADDYOTADLOCSDYYKAEYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYVOFWEOBKNDQZEOAT"
     let result = URService.processURString(urString)
@@ -144,7 +144,7 @@ struct URServiceTests {
     #expect(unwrappedZpub.hasPrefix("xpub"), "Should correctly convert Zpub to xpub")
   }
 
-  @Test func extendedPublicKeyDecodingAcceptsOnlySinglePublicKeys() {
+  @Test func `extended public key decoding accepts only single public keys`() {
     let tpub = "tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH"
     let vpub = "Vpub5mKYi6ZW8JMuPDDizjMfw5hwjj4xKSkmUSjVDJjrAghaCw7aSJF4v7M4miDJd6uwZcmxK1LcSCsXB7bY4ELTsV3VbCj2LqHq26b8VUzgDWo"
     let zpub = "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg"
@@ -174,7 +174,7 @@ struct URServiceTests {
     #expect(URService.canonicalXpub("\(tpub),\(tpub)", isTestnet: true) == nil)
   }
 
-  @Test func cryptoOutputDescriptorParsing() {
+  @Test func `crypto output descriptor parsing`() {
     // Real SeedSigner crypto-output UR containing a 1-of-2 wsh(sortedmulti(...)) descriptor
     let urString = "UR:CRYPTO-OUTPUT/TAADMETAADMSOEADADAOLFTAADDLOSAOWKAXHDCLAOPDFNLNESAXHSJOFTVWFWHPTDUYPYHSROVLSWVDSRVWKBNNECZTHYMOURGSFDVDVAAAHDCXGMDKHPWMZTLRSOBSMWIOBWFWRPTODKNSEYAMTAHKRKQDISJTGWNSTSSFQDKPZSVTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYDYOTJEGMAXAAAYCYOYJNLKZMASJZGUIHIHIEGUINIOJTIHJPCXEYTAADDLOSAOWKAXHDCLAXIYMYFYWEMKASIOVSFYFDFDVASWONMTSKURSSTDMHVWSKLEAMKOVSGSDSCNSGNDOEAAHDCXBAMHFTFLGSDTBGBGFGGUREENGLFYTSHSCEJNKPHGGLFDFMTEWLENBDBBOXDYEMWTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYGRFPNSJOASJZGUIHIHIEGUINIOJTIHJPCXEHDLSWWZMD"
 
@@ -193,7 +193,7 @@ struct URServiceTests {
     #expect(!desc.contains("//"), "Should not contain double slashes")
   }
 
-  @Test func cryptoOutputMultipathSplitting() {
+  @Test func `crypto output multipath splitting`() {
     // Verify that splitting BIP-389 multipath descriptors doesn't produce double slashes
     let urString = "UR:CRYPTO-OUTPUT/TAADMETAADMSOEADADAOLFTAADDLOSAOWKAXHDCLAOPDFNLNESAXHSJOFTVWFWHPTDUYPYHSROVLSWVDSRVWKBNNECZTHYMOURGSFDVDVAAAHDCXGMDKHPWMZTLRSOBSMWIOBWFWRPTODKNSEYAMTAHKRKQDISJTGWNSTSSFQDKPZSVTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYDYOTJEGMAXAAAYCYOYJNLKZMASJZGUIHIHIEGUINIOJTIHJPCXEYTAADDLOSAOWKAXHDCLAXIYMYFYWEMKASIOVSFYFDFDVASWONMTSKURSSTDMHVWSKLEAMKOVSGSDSCNSGNDOEAAHDCXBAMHFTFLGSDTBGBGFGGUREENGLFYTSHSCEJNKPHGGLFDFMTEWLENBDBBOXDYEMWTAHTAADEHOEADAEAOADAMTAADDYOTADLOCSDYYKADYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYGRFPNSJOASJZGUIHIHIEGUINIOJTIHJPCXEHDLSWWZMD"
 
@@ -224,7 +224,7 @@ struct URServiceTests {
     return desc
   }
 
-  @Test func encodeCryptoOutputRoundTrip() throws {
+  @Test func `encode crypto output round trip`() throws {
     guard let originalDesc = realDescriptor() else {
       Issue.record("Failed to decode test UR to descriptor")
       return
@@ -237,7 +237,7 @@ struct URServiceTests {
     #expect(reDecoded == originalDesc, "Round-trip failed.\nOriginal: \(originalDesc)\nRe-decoded: \(reDecoded)")
   }
 
-  @Test func encodeCryptoOutputURType() throws {
+  @Test func `encode crypto output UR type`() throws {
     guard let desc = realDescriptor() else {
       Issue.record("Failed to decode test UR")
       return
@@ -246,7 +246,7 @@ struct URServiceTests {
     #expect(ur.type == "crypto-output")
   }
 
-  @Test func encodeCryptoOutputStripsChecksum() throws {
+  @Test func `encode crypto output strips checksum`() throws {
     guard let desc = realDescriptor() else {
       Issue.record("Failed to decode test UR")
       return
@@ -260,7 +260,7 @@ struct URServiceTests {
     #expect(ur1.cbor.cborData == ur2.cbor.cborData, "Checksum should be stripped before encoding")
   }
 
-  @Test func encodeCryptoOutputPreservesKeys() throws {
+  @Test func `encode crypto output preserves keys`() throws {
     guard let desc = realDescriptor() else {
       Issue.record("Failed to decode test UR")
       return
@@ -275,7 +275,7 @@ struct URServiceTests {
     #expect(decoded.contains("tpub"), "Should contain tpub keys")
   }
 
-  @Test func encodeCryptoOutputPreservesMultipath() throws {
+  @Test func `encode crypto output preserves multipath`() throws {
     guard let desc = realDescriptor() else {
       Issue.record("Failed to decode test UR")
       return
@@ -289,7 +289,7 @@ struct URServiceTests {
     #expect(decoded.contains("<0;1>/*"), "Multipath should be implicitly preserved (omitted in CBOR, restored on parse)")
   }
 
-  @Test func encodeCryptoOutputProcessURRoundTrip() throws {
+  @Test func `encode crypto output process UR round trip`() throws {
     guard let desc = realDescriptor() else {
       Issue.record("Failed to decode test UR")
       return
@@ -305,7 +305,7 @@ struct URServiceTests {
     #expect(decoded.hasPrefix("wsh(sortedmulti("), "processUR should decode to valid descriptor")
   }
 
-  @Test func cryptoAccountExtractsP2WSHKey() {
+  @Test func `crypto account extracts P 2 WSH key`() {
     // Verify the parser prefers the BIP48 P2WSH key (derivation ending in /2')
     let urString = "UR:CRYPTO-ACCOUNT/OEADCYKNBWOSPAAOLYTAADMETAADDLOXAXHDCLAXAXVEKKNYCFGRPKIHZSTICAKILFBAHDEERFMOCXLRFLHGIHCTGEWPVYGWJZSGKBNYAAHDCXRLSWDRDTHTUOQZMSJYEMAAHSRNJPHGFDLOADOLFNGECAKNIHMUTOCMHKADBKEYHGAMTAADDYOTADLOCSDYYKAEYKAEYKAOYKAOCYKNBWOSPAAXAAAYCYVOFWEOBKNDQZEOAT"
 
@@ -327,7 +327,7 @@ struct URServiceTests {
     depth: UInt64? = 4,
     sourceFingerprint: UInt64 = 0x7A13_A7B1,
     parentFingerprint: UInt64 = 0x1234_5678,
-    lastIndex: UInt64 = 2
+    lastIndex: UInt64 = 2,
   ) -> Map {
     var keypath = Map()
     keypath.insert(CBOR.unsigned(1), CBOR.array([
@@ -353,10 +353,10 @@ struct URServiceTests {
     depth: UInt64? = 4,
     sourceFingerprint: UInt64 = 0x7A13_A7B1,
     parentFingerprint: UInt64 = 0x1234_5678,
-    lastIndex: UInt64 = 2
+    lastIndex: UInt64 = 2,
   ) throws -> UR {
     let hdKey = hdKeyMap(
-      depth: depth, sourceFingerprint: sourceFingerprint, parentFingerprint: parentFingerprint, lastIndex: lastIndex
+      depth: depth, sourceFingerprint: sourceFingerprint, parentFingerprint: parentFingerprint, lastIndex: lastIndex,
     )
     return try UR(type: "crypto-hdkey", cbor: CBOR.map(hdKey))
   }
@@ -365,31 +365,31 @@ struct URServiceTests {
 
   private static let hardened: UInt32 = 0x8000_0000
 
-  @Test func extendedPublicKeyPlacementReadsDepthAndLastStep() throws {
+  @Test func `extended public key placement reads depth and last step`() throws {
     // BIP48 P2WSH key at m/48'/1'/0'/2' (descriptor vector #13)
     let bip48 = try #require(URService.extendedPublicKeyPlacement(
-      "tpubDFS7QGevX3YHQZhsTChSdtxK2Njdoh4BBozoUNQc8qxpReHC2HjoPDpLfqsKvJ9SVzfMinhrGLbjzFxBNQoBvSdyAg8ig3bQE9UYwE6pgVi"
+      "tpubDFS7QGevX3YHQZhsTChSdtxK2Njdoh4BBozoUNQc8qxpReHC2HjoPDpLfqsKvJ9SVzfMinhrGLbjzFxBNQoBvSdyAg8ig3bQE9UYwE6pgVi",
     ))
     #expect(bip48.depth == 4)
     #expect(bip48.childNumber == Self.hardened | 2)
 
     // The same key as a SLIP132 Vpub reads the same
     let vpub = try #require(URService.extendedPublicKeyPlacement(
-      "Vpub5kv6Y3xqGFyhZQyCz8LzaSwVzAJLJTvHcUewWAhrLRRRjZeYs53qrfspVEBKZw6rvwGy8Z1ef7e7Vzsu3BLF6MkjFXWnLpmftKQT1Eub5Cf"
+      "Vpub5kv6Y3xqGFyhZQyCz8LzaSwVzAJLJTvHcUewWAhrLRRRjZeYs53qrfspVEBKZw6rvwGy8Z1ef7e7Vzsu3BLF6MkjFXWnLpmftKQT1Eub5Cf",
     ))
     #expect(vpub.depth == 4)
     #expect(vpub.childNumber == Self.hardened | 2)
 
     // Account-level key from a single-sig path (m/44'/1'/0', descriptor vector #17)
     let account = try #require(URService.extendedPublicKeyPlacement(
-      "tpubDDtPnSgWYk8dDnaDwnof4ehcnjuL5VoUt1eW2MoAed1grPHuXPDnkX1fWMvXfcz3NqFxPbhqNZ3QBdYjLz2hABeM9Z2oqMR1Gt2HHYDoCgh"
+      "tpubDDtPnSgWYk8dDnaDwnof4ehcnjuL5VoUt1eW2MoAed1grPHuXPDnkX1fWMvXfcz3NqFxPbhqNZ3QBdYjLz2hABeM9Z2oqMR1Gt2HHYDoCgh",
     ))
     #expect(account.depth == 3)
     #expect(account.childNumber == Self.hardened | 0)
 
     // Master public key
     let master = try #require(URService.extendedPublicKeyPlacement(
-      "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg"
+      "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg",
     ))
     #expect(master.depth == 0)
     #expect(master.childNumber == 0)
@@ -398,7 +398,7 @@ struct URServiceTests {
     #expect(URService.extendedPublicKeyPlacement("") == nil)
   }
 
-  @Test func scannedKeyKeepsTheDepthItsSignerDeclared() throws {
+  @Test func `scanned key keeps the depth its signer declared`() throws {
     let declared = try URService.parseHDKey(from: hdKeyUR(depth: 4))
     #expect(URService.extendedPublicKeyPlacement(declared.xpub)?.depth == 4)
 
@@ -409,7 +409,7 @@ struct URServiceTests {
 
   /// Depth is optional in a crypto-hdkey. A signer that leaves it out still gave
   /// the path, so the rebuilt key takes its depth from the path's four steps.
-  @Test func scannedKeyWithoutDepthFieldTakesDepthFromItsPath() throws {
+  @Test func `scanned key without depth field takes depth from its path`() throws {
     let result = try URService.parseHDKey(from: hdKeyUR(depth: nil))
     #expect(result.derivationPath == "m/48'/1'/0'/2'")
 
@@ -418,7 +418,7 @@ struct URServiceTests {
     #expect(placement.childNumber == Self.hardened | 2)
   }
 
-  @Test func scannedDescriptorKeyWithoutDepthFieldTakesDepthFromItsPath() throws {
+  @Test func `scanned descriptor key without depth field takes depth from its path`() throws {
     var multisig = Map()
     multisig.insert(CBOR.unsigned(1), CBOR.unsigned(1))
     multisig.insert(CBOR.unsigned(2), CBOR.array([.tagged(Tag(303), CBOR.map(hdKeyMap(depth: nil)))]))
@@ -438,34 +438,34 @@ struct URServiceTests {
     #expect(placement.childNumber == Self.hardened | 2)
   }
 
-  @Test func hdKeyInRangeStillParses() throws {
+  @Test func `hd key in range still parses`() throws {
     let result = try URService.parseHDKey(from: hdKeyUR())
     #expect(result.fingerprint == "7a13a7b1")
     #expect(result.derivationPath == "m/48'/1'/0'/2'")
     #expect(!result.xpub.isEmpty)
   }
 
-  @Test func hdKeyRejectsOutOfRangeDepth() throws {
+  @Test func `hd key rejects out of range depth`() throws {
     let ur = try hdKeyUR(depth: 300)
     #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
   }
 
-  @Test func hdKeyRejectsOutOfRangeParentFingerprint() throws {
+  @Test func `hd key rejects out of range parent fingerprint`() throws {
     let ur = try hdKeyUR(parentFingerprint: 1 << 40)
     #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
   }
 
-  @Test func hdKeyRejectsOutOfRangeSourceFingerprint() throws {
+  @Test func `hd key rejects out of range source fingerprint`() throws {
     let ur = try hdKeyUR(sourceFingerprint: 1 << 40)
     #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
   }
 
-  @Test func hdKeyRejectsChildIndexWithHardenedBitSet() throws {
+  @Test func `hd key rejects child index with hardened bit set`() throws {
     let ur = try hdKeyUR(lastIndex: 1 << 31)
     #expect(throws: AppError.self) { try URService.parseHDKey(from: ur) }
   }
 
-  @Test func processURReportsBadKeyInsteadOfCrashing() throws {
+  @Test func `process UR reports bad key instead of crashing`() throws {
     let result = try URService.processUR(hdKeyUR(depth: UInt64.max))
     if case .hdKey = result {
       Issue.record("An out-of-range depth must not produce a key")

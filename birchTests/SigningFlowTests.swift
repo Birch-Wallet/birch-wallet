@@ -19,7 +19,7 @@ struct SigningFlowTests {
       fee: 500,
       changeAmount: 1000,
       changeAddress: "tb1qchange",
-      inputCount: 1
+      inputCount: 1,
     )
   }
 
@@ -33,7 +33,7 @@ struct SigningFlowTests {
 
   // MARK: - Verification of merged PSBTs
 
-  @Test func handleSignedPSBTRejectsMergeThatFailsVerification() async {
+  @Test func `handle signed PSBT rejects merge that fails verification`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -56,7 +56,7 @@ struct SigningFlowTests {
     #expect(!vm.isProcessing)
   }
 
-  @Test func handleSignedPSBTKeepsMergeOnWarningsAlone() async {
+  @Test func `handle signed PSBT keeps merge on warnings alone`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -77,7 +77,7 @@ struct SigningFlowTests {
     #expect(vm.psbtVerification == .partiallyVerified(verified: 1, unverified: 1))
   }
 
-  @Test func handleSignedPSBTRecordsVerifiedStateOnCleanMerge() async {
+  @Test func `handle signed PSBT records verified state on clean merge`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -92,11 +92,11 @@ struct SigningFlowTests {
     #expect(vm.psbtVerification == .verified(inputs: 3))
   }
 
-  @Test func bumpFeeHandleSignedPSBTRejectsFailedVerification() async {
+  @Test func `bump fee handle signed PSBT rejects failed verification`() async {
     let mock = makeMockService()
     let tx = TransactionItem(
       id: "test_tx", amount: -5000, fee: 200,
-      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100
+      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100,
     )
     let vm = BumpFeeViewModel(transaction: tx, bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -112,7 +112,7 @@ struct SigningFlowTests {
     #expect(vm.errorMessage == "Bump PSBT lies")
   }
 
-  @Test func duplicateScanTellsTheUser() async {
+  @Test func `duplicate scan tells the user`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -130,7 +130,7 @@ struct SigningFlowTests {
 
   // MARK: - SendViewModel + Mock: handleSignedPSBT
 
-  @Test func handleSignedPSBTAdvancesState() async {
+  @Test func `handle signed PSBT advances state`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -148,7 +148,7 @@ struct SigningFlowTests {
     #expect(vm.psbtBytes == Data([0x02]))
   }
 
-  @Test func handleSignedPSBTDuplicateDoesNotAdvance() async {
+  @Test func `handle signed PSBT duplicate does not advance`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -163,7 +163,7 @@ struct SigningFlowTests {
     #expect(vm.signaturesCollected == 0, "Duplicate sig should not advance counter")
   }
 
-  @Test func handleSignedPSBTLastSignatureGoesToBroadcast() async {
+  @Test func `handle signed PSBT last signature goes to broadcast`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -178,7 +178,7 @@ struct SigningFlowTests {
     #expect(vm.currentStep == .broadcast, "All sigs collected → broadcast")
   }
 
-  @Test func handleSignedPSBTErrorSetsMessage() async {
+  @Test func `handle signed PSBT error sets message`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -194,7 +194,7 @@ struct SigningFlowTests {
 
   // MARK: - SendViewModel + Mock: broadcast
 
-  @Test func broadcastSuccessSetsTransactionId() async {
+  @Test func `broadcast success sets transaction id`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -208,7 +208,7 @@ struct SigningFlowTests {
     #expect(mock.broadcastPSBTCallCount == 1)
   }
 
-  @Test func broadcastFailureSetsError() async {
+  @Test func `broadcast failure sets error`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -221,7 +221,7 @@ struct SigningFlowTests {
     #expect(vm.errorMessage != nil)
   }
 
-  @Test func broadcastSetsTxidOnSuccess() async {
+  @Test func `broadcast sets txid on success`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -237,7 +237,7 @@ struct SigningFlowTests {
 
   // MARK: - SendViewModel + Mock: createPSBT
 
-  @Test func createPSBTPopulatesDetails() async {
+  @Test func `create PSBT populates details`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "1000")]
@@ -255,7 +255,7 @@ struct SigningFlowTests {
     #expect(vm.signaturesCollected == 0)
   }
 
-  @Test func createPSBTRejectsEmptyAddressEarly() async {
+  @Test func `create PSBT rejects empty address early`() async {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.recipients = [Recipient(address: "", amountSats: "1000")]
@@ -268,7 +268,7 @@ struct SigningFlowTests {
 
   // MARK: - Full Flow State Machine
 
-  @Test func fullFlowStateMachine() async throws {
+  @Test func `full flow state machine`() async throws {
     let mock = makeMockService()
     let vm = SendViewModel(bitcoinService: mock)
     vm.requiredSignatures = 2
@@ -303,11 +303,11 @@ struct SigningFlowTests {
 
   // MARK: - BumpFeeViewModel + Mock
 
-  @Test func bumpFeeHandleSignedPSBTDuplicateDoesNotAdvance() async {
+  @Test func `bump fee handle signed PSBT duplicate does not advance`() async {
     let mock = makeMockService()
     let tx = TransactionItem(
       id: "test_tx", amount: -5000, fee: 200,
-      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100
+      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100,
     )
     let vm = BumpFeeViewModel(transaction: tx, bitcoinService: mock)
     vm.psbtBytes = Data([0x01])
@@ -320,11 +320,11 @@ struct SigningFlowTests {
     #expect(vm.signaturesCollected == 0, "Duplicate sig should not advance counter")
   }
 
-  @Test func bumpFeeBroadcastTriggersSyncOnSuccess() async {
+  @Test func `bump fee broadcast triggers sync on success`() async {
     let mock = makeMockService()
     let tx = TransactionItem(
       id: "test_tx", amount: -5000, fee: 200,
-      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100
+      confirmations: 0, timestamp: nil, isIncoming: false, vsize: 100,
     )
     let vm = BumpFeeViewModel(transaction: tx, bitcoinService: mock)
     vm.psbtBytes = Data([0x01])

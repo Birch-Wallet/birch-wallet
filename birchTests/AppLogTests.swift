@@ -16,8 +16,8 @@ struct AppLogTests {
     LogEntry(t: Date(), l: level, c: category, m: message)
   }
 
-  @Test("append/flush/read round-trips and preserves fields")
-  func roundTrip() async {
+  @Test
+  func `append/flush/read round-trips and preserves fields`() async {
     let store = LogFileStore(directory: makeTempDir())
     store.append(entry(.info, "sync", "hello world"))
     store.append(entry(.error, "send", "broadcast failed"))
@@ -33,8 +33,8 @@ struct AppLogTests {
     #expect(entries[1].m == "broadcast failed")
   }
 
-  @Test("entries(since:) filters out older entries")
-  func filtersByDate() async {
+  @Test
+  func `entries(since:) filters out older entries`() async {
     let store = LogFileStore(directory: makeTempDir())
     store.append(LogEntry(t: Date().addingTimeInterval(-3600), l: .info, c: "app", m: "old"))
     store.append(LogEntry(t: Date(), l: .info, c: "app", m: "new"))
@@ -45,8 +45,8 @@ struct AppLogTests {
     #expect(recent.first?.m == "new")
   }
 
-  @Test("rotation preserves pre-rotation entries in the archive")
-  func rotationKeepsArchiveReadable() async {
+  @Test
+  func `rotation preserves pre-rotation entries in the archive`() async {
     // Small cap so a single large message forces exactly one rotation.
     let store = LogFileStore(directory: makeTempDir(), maxFileSize: 1000)
 
@@ -70,8 +70,8 @@ struct AppLogTests {
     #expect(messages.contains("new-1"))
   }
 
-  @Test("startup maintenance deletes a stale archive but keeps a recent one")
-  func startupMaintenancePrunesOldArchive() async {
+  @Test
+  func `startup maintenance deletes a stale archive but keeps a recent one`() async {
     let fm = FileManager.default
 
     // Stale archive (8 days old) should be removed.
@@ -95,8 +95,8 @@ struct AppLogTests {
     #expect(fm.fileExists(atPath: freshArchive.path))
   }
 
-  @Test("concurrent appends produce no dropped or corrupted lines")
-  func concurrentAppends() async {
+  @Test
+  func `concurrent appends produce no dropped or corrupted lines`() async {
     let store = LogFileStore(directory: makeTempDir())
     let count = 500
 

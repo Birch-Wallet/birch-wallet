@@ -17,7 +17,7 @@ enum LogExporter {
     hours: Double,
     levels: Set<LogLevel>? = nil,
     categories: Set<String>? = nil,
-    search: String = ""
+    search: String = "",
   ) async -> [LogEntry] {
     let since = Date().addingTimeInterval(-hours * 3600)
     let entries = await LogFileStore.shared.entries(since: since)

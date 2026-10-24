@@ -25,7 +25,7 @@ struct MultisigConfigView: View {
         if !$0 {
           pendingTotal = nil
         }
-      })
+      }),
     ) {
       Button("Cancel", role: .cancel) { pendingTotal = nil }
       Button("Remove", role: .destructive) {
@@ -135,7 +135,7 @@ struct MultisigConfigView: View {
         NumberPickerSheet(
           title: "Required Signatures",
           range: 1 ... viewModel.totalCosigners,
-          selection: $viewModel.requiredSignatures
+          selection: $viewModel.requiredSignatures,
         )
         .birchSheet()
       }
@@ -162,7 +162,7 @@ struct MultisigConfigView: View {
         NumberPickerSheet(
           title: "Total Cosigners",
           range: Constants.minCosigners ... Constants.maxCosigners,
-          selection: $pickedTotal
+          selection: $pickedTotal,
         )
         .birchSheet()
       }

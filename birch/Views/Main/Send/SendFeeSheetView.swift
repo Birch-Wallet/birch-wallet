@@ -32,7 +32,7 @@ struct SendFeeSheetView: View {
     _customRate = State(
       initialValue: viewModel.selectedFeePreset == .custom
         ? viewModel.feeRateSatVb
-        : Self.defaultCustomRate
+        : Self.defaultCustomRate,
     )
   }
 
@@ -389,7 +389,7 @@ struct SendFeeSheetView: View {
     InputLimits.sanitizeDecimal(
       value, old: old,
       max: Decimal(InputLimits.maxFeeRate),
-      fractionDigits: InputLimits.feeRateFractionDigits
+      fractionDigits: InputLimits.feeRateFractionDigits,
     )
   }
 }

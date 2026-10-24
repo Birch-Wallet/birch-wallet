@@ -185,7 +185,7 @@ enum PSBTParser {
     guard offset == bytes.count else {
       throw PSBTParseError(
         reason: "Found \(bytes.count - offset) unexpected bytes after the last output map. The map count may not match the transaction.",
-        offset: offset
+        offset: offset,
       )
     }
 
@@ -195,7 +195,7 @@ enum PSBTParser {
       records: records,
       inputCount: inputCount,
       outputCount: outputCount,
-      unsignedTx: unsignedTx
+      unsignedTx: unsignedTx,
     )
   }
 
@@ -242,7 +242,7 @@ enum PSBTParser {
       guard seenKeys.insert(keyBytes).inserted else {
         throw PSBTParseError(
           reason: "Duplicate key \(String(format: "0x%02llX", keyType)) in the \(mapName(map)) map. BIP-174 forbids duplicate keys.",
-          offset: start
+          offset: start,
         )
       }
 
@@ -254,7 +254,7 @@ enum PSBTParser {
         valueLengthPrefix: valueLengthPrefix,
         keyType: keyType,
         keyData: keyData,
-        value: value
+        value: value,
       ))
     }
   }
@@ -329,7 +329,7 @@ enum PSBTParser {
       outputs: outputs,
       lockTime: lockTime,
       inputCountLength: inputCountLength,
-      outputCountLength: outputCountLength
+      outputCountLength: outputCountLength,
     )
   }
 

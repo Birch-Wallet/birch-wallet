@@ -129,8 +129,7 @@ enum URService {
     var bestResult: (xpub: String, fingerprint: String, derivationPath: String)?
 
     for descriptor in descriptors {
-      guard let hdKeyMapCBOR = unwrapTagsToMap(descriptor) else { continue }
-      guard case let .map(hdKeyMap) = hdKeyMapCBOR else { continue }
+      guard let hdKeyMapCBOR = unwrapTagsToMap(descriptor), case let .map(hdKeyMap) = hdKeyMapCBOR else { continue }
 
       var result = try extractHDKeyFields(from: hdKeyMap)
 
@@ -206,7 +205,7 @@ enum URService {
   /// Extract xpub, fingerprint, and derivation path from an HD key CBOR map.
   /// Shared between parseHDKey and parseCryptoAccount.
   private static func extractHDKeyFields(
-    from map: some Sequence<(CBOR, CBOR)>
+    from map: some Sequence<(CBOR, CBOR)>,
   ) throws -> (xpub: String, fingerprint: String, derivationPath: String) {
     var keyData = Data()
     var chainCode = Data()
@@ -769,10 +768,8 @@ enum URService {
       // Check if it's just a raw xpub/tpub/Zpub/Vpub etc. without the `[...]` prefix
       let rawPattern = "^([a-zA-Z0-9]{111,})$"
       guard let rawRegex = try? NSRegularExpression(pattern: rawPattern) else { return nil }
-      if rawRegex.firstMatch(in: text, options: [], range: range) != nil {
-        if ["xpub", "tpub", "Zpub", "zpub", "Ypub", "ypub", "Vpub", "vpub", "Upub", "upub"].contains(where: text.hasPrefix) {
-          return .hdKey(xpub: text, fingerprint: "", derivationPath: "")
-        }
+      if rawRegex.firstMatch(in: text, options: [], range: range) != nil, ["xpub", "tpub", "Zpub", "zpub", "Ypub", "ypub", "Vpub", "vpub", "Upub", "upub"].contains(where: text.hasPrefix) {
+        return .hdKey(xpub: text, fingerprint: "", derivationPath: "")
       }
       return nil
     }
@@ -910,8 +907,7 @@ enum URService {
   static func decodeExtendedPublicKey(_ pubKey: String) -> Data? {
     guard let decoded = base58CheckDecode(pubKey), decoded.count == 78 else { return nil }
     let payload = [UInt8](decoded)
-    guard extendedPublicKeyVersions.contains(Array(payload[0 ..< 4])) else { return nil }
-    guard payload[45] == 0x02 || payload[45] == 0x03 else { return nil }
+    guard extendedPublicKeyVersions.contains(Array(payload[0 ..< 4])), payload[45] == 0x02 || payload[45] == 0x03 else { return nil }
     return Data(payload)
   }
 

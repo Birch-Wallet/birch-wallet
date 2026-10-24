@@ -15,7 +15,7 @@ struct NumberPickerSheet: View {
           set: { newValue in
             selection = newValue
             onChange?(newValue)
-          }
+          },
         )) {
           ForEach(range, id: \.self) { num in
             Text("\(num)").tag(num)

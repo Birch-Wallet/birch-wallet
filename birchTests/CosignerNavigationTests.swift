@@ -32,7 +32,7 @@ struct CosignerNavigationTests {
 
   // MARK: - Steps and progress
 
-  @Test func creatingAWalletCountsThreeSteps() {
+  @Test func `creating A wallet counts three steps`() {
     let vm = Self.wizard()
     #expect(vm.currentStep == .cosignerImport)
     #expect(vm.stepCount == 3)
@@ -50,14 +50,14 @@ struct CosignerNavigationTests {
     }
   }
 
-  @Test func importingADescriptorShowsNoProgress() {
+  @Test func `importing A descriptor shows no progress`() {
     let vm = SetupWizardViewModel()
     vm.creationMode = .importDescriptor
     vm.currentStep = .descriptorImport
     #expect(!vm.showsProgress)
   }
 
-  @Test func verifyGoesBackToTheCosigners() {
+  @Test func `verify goes back to the cosigners`() {
     let vm = Self.wizard()
     vm.currentStep = .verify
     vm.currentCosignerIndex = 2
@@ -69,7 +69,7 @@ struct CosignerNavigationTests {
   }
 
   /// Mainnet has no default Electrum server
-  @Test func multisigNeedsAHostOnMainnet() {
+  @Test func `multisig needs A host on mainnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .mainnet
     vm.currentStep = .multisigConfig
@@ -84,7 +84,7 @@ struct CosignerNavigationTests {
 
   // MARK: - Completeness
 
-  @Test func aCosignerIsCompleteWhenEveryFieldValidates() {
+  @Test func `a cosigner is complete when every field validates`() {
     let vm = Self.wizard()
     #expect(!vm.isCosignerComplete(0))
     #expect(vm.cosignerProblems(at: 0)[.xpub] == "Xpub is required")
@@ -104,7 +104,7 @@ struct CosignerNavigationTests {
     #expect(vm.allCosignersComplete)
   }
 
-  @Test func duplicateKeysLeaveBothCosignersIncomplete() {
+  @Test func `duplicate keys leave both cosigners incomplete`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     Self.fill(vm, 1)
@@ -116,7 +116,7 @@ struct CosignerNavigationTests {
 
   // MARK: - Next
 
-  @Test func nextFlagsAnIncompleteCosignerAndStays() {
+  @Test func `next flags an incomplete cosigner and stays`() {
     let vm = Self.wizard()
     let action = vm.goToNextCosigner()
     #expect(action == .flag([.xpub: "Xpub is required", .fingerprint: "Fingerprint is required"]))
@@ -125,7 +125,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerErrors[0]?[.fingerprint] == "Fingerprint is required")
   }
 
-  @Test func editingAFieldClearsItsFlag() {
+  @Test func `editing A field clears its flag`() {
     let vm = Self.wizard()
     vm.goToNextCosigner()
     let before = vm.cosignerXpubs
@@ -141,7 +141,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerErrors[0]?[.fingerprint] != nil)
   }
 
-  @Test func nextOpensTheNextCosignerClean() {
+  @Test func `next opens the next cosigner clean`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     #expect(vm.goToNextCosigner() == .open(1, flagged: false))
@@ -150,7 +150,7 @@ struct CosignerNavigationTests {
     #expect(vm.visitedCosigners == [0, 1])
   }
 
-  @Test func nextSkipsCompleteCosigners() {
+  @Test func `next skips complete cosigners`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     Self.fill(vm, 1)
@@ -159,7 +159,7 @@ struct CosignerNavigationTests {
 
   /// Skip cosigner 1, complete 2 and 3: Next wraps round to 1 and flags it,
   /// because it was opened and left incomplete
-  @Test func nextWrapsRoundToAVisitedCosignerAndFlagsIt() {
+  @Test func `next wraps round to A visited cosigner and flags it`() {
     let vm = Self.wizard()
     vm.openCosigner(1)
     Self.fill(vm, 1)
@@ -171,7 +171,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerErrors[0]?[.fingerprint] == "Fingerprint is required")
   }
 
-  @Test func anUnvisitedCosignerOpensClean() {
+  @Test func `an unvisited cosigner opens clean`() {
     let vm = Self.wizard()
     vm.openCosigner(2)
     Self.fill(vm, 2)
@@ -183,7 +183,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerErrors[1] == nil)
   }
 
-  @Test func nextFinishesOnceEveryCosignerIsComplete() {
+  @Test func `next finishes once every cosigner is complete`() {
     let vm = Self.wizard()
     Self.useUnreachableElectrumServer(vm)
     for index in 0 ..< 3 {
@@ -198,7 +198,7 @@ struct CosignerNavigationTests {
     #expect(!vm.firstReceiveAddress.isEmpty)
   }
 
-  @Test func tabsSwitchWithoutValidating() {
+  @Test func `tabs switch without validating`() {
     let vm = Self.wizard()
     vm.openCosigner(2)
     #expect(vm.currentCosignerIndex == 2)
@@ -208,7 +208,7 @@ struct CosignerNavigationTests {
 
   // MARK: - Changing the cosigner count
 
-  @Test func backAndNextKeepWhatWasEntered() {
+  @Test func `back and next keep what was entered`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     vm.cosignerLabels[0] = "Alice"
@@ -219,7 +219,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerLabels[0] == "Alice")
   }
 
-  @Test func resizingAppendsAndDropsFromTheEnd() {
+  @Test func `resizing appends and drops from the end`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     Self.fill(vm, 2)
@@ -239,7 +239,7 @@ struct CosignerNavigationTests {
     #expect(vm.currentCosignerIndex == 1, "The open cosigner stays in range")
   }
 
-  @Test func loweringTheCountReportsFilledCosignersOnly() {
+  @Test func `lowering the count reports filled cosigners only`() {
     let vm = Self.wizard()
     #expect(vm.filledCosignersDropped(byReducingTo: 1).isEmpty)
     vm.cosignerLabels[2] = "Carol"
@@ -253,14 +253,14 @@ struct CosignerNavigationTests {
 
   // MARK: - Changing the network
 
-  @Test func onlyMainnetAndATestNetworkCrossKeyFormats() {
+  @Test func `only mainnet and A test network cross key formats`() {
     #expect(SetupWizardViewModel.crossesKeyFormat(from: .mainnet, to: .testnet4))
     #expect(SetupWizardViewModel.crossesKeyFormat(from: .signet, to: .mainnet))
     #expect(!SetupWizardViewModel.crossesKeyFormat(from: .testnet4, to: .signet))
     #expect(!SetupWizardViewModel.crossesKeyFormat(from: .testnet3, to: .testnet4))
   }
 
-  @Test func crossingToMainnetClearsKeysAndKeepsLabels() {
+  @Test func `crossing to mainnet clears keys and keeps labels`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     vm.cosignerLabels[0] = "Alice"
@@ -279,7 +279,7 @@ struct CosignerNavigationTests {
     #expect(vm.cosignerErrors.isEmpty)
   }
 
-  @Test func movingBetweenTestNetworksKeepsKeys() {
+  @Test func `moving between test networks keeps keys`() {
     let vm = Self.wizard()
     Self.fill(vm, 0)
     vm.changeNetwork(to: .signet)

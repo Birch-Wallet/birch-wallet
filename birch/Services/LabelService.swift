@@ -11,12 +11,12 @@ enum LabelService {
     transactions: [TransactionItem],
     utxos: [UTXOItem],
     context: ModelContext,
-    walletID: UUID
+    walletID: UUID,
   ) throws {
     let allLabels = fetchAllLabels(walletID: walletID, context: context)
     let addrLabels = Dictionary(
       allLabels.filter { $0.type == "addr" }.map { ($0.ref, $0.label) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
     let txLabelRefs = Set(allLabels.filter { $0.type == "tx" }.map(\.ref))
     let utxoLabelRefs = Set(allLabels.filter { $0.type == "utxo" }.map(\.ref))
@@ -64,7 +64,7 @@ enum LabelService {
     transaction: TransactionItem,
     utxos: [UTXOItem],
     context: ModelContext,
-    walletID: UUID
+    walletID: UUID,
   ) throws {
     guard transaction.isIncoming, !newLabel.isEmpty else { return }
 
@@ -106,7 +106,7 @@ enum LabelService {
     changeAddress: String,
     changeVout: UInt32,
     context: ModelContext,
-    walletID: UUID
+    walletID: UUID,
   ) throws {
     guard !txLabel.isEmpty, !changeAddress.isEmpty else { return }
     let changeLabel = "Change From: \(txLabel)".truncatedLabel
@@ -147,7 +147,7 @@ enum LabelService {
     data: Data,
     walletID: UUID,
     cosigners: [CosignerInfo],
-    context: ModelContext
+    context: ModelContext,
   ) throws -> Int {
     let records = BIP329Record.parseFromJSONL(data)
     let existingLabels = fetchAllLabels(walletID: walletID, context: context)
@@ -155,7 +155,7 @@ enum LabelService {
     // Build lookup: "type:ref" → WalletLabel for existing labels
     let existingByKey = Dictionary(
       existingLabels.map { ("\($0.type):\($0.ref)", $0) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
 
     // Fetch existing frozen UTXOs for this wallet
@@ -163,7 +163,7 @@ enum LabelService {
     let existingFrozen = (try? context.fetch(frozenDescriptor)) ?? []
     let frozenByOutpoint = Dictionary(
       existingFrozen.map { ($0.outpoint, $0) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
 
     var importedCount = 0
@@ -177,7 +177,7 @@ enum LabelService {
         if hasLabel {
           importedCount += upsertLabel(
             key: "tx:\(record.ref)", type: .tx, ref: record.ref,
-            label: label!, walletID: walletID, existing: existingByKey, context: context
+            label: label!, walletID: walletID, existing: existingByKey, context: context,
           )
         }
 
@@ -185,7 +185,7 @@ enum LabelService {
         if hasLabel {
           importedCount += upsertLabel(
             key: "addr:\(record.ref)", type: .addr, ref: record.ref,
-            label: label!, walletID: walletID, existing: existingByKey, context: context
+            label: label!, walletID: walletID, existing: existingByKey, context: context,
           )
         }
 
@@ -194,7 +194,7 @@ enum LabelService {
         if hasLabel {
           importedCount += upsertLabel(
             key: "utxo:\(record.ref)", type: .utxo, ref: record.ref,
-            label: label!, walletID: walletID, existing: existingByKey, context: context
+            label: label!, walletID: walletID, existing: existingByKey, context: context,
           )
         }
 
@@ -250,7 +250,7 @@ enum LabelService {
     label: String,
     walletID: UUID,
     existing: [String: WalletLabel],
-    context: ModelContext
+    context: ModelContext,
   ) -> Int {
     if let existingLabel = existing[key] {
       if existingLabel.label != label {
@@ -277,7 +277,7 @@ enum LabelService {
     changeAddresses: [AddressItem],
     cosigners: [CosignerInfo],
     requiredSignatures: Int,
-    network: BitcoinNetwork
+    network: BitcoinNetwork,
   ) -> Data {
     let labels = fetchAllLabels(walletID: walletID, context: context)
     let records = buildBIP329Records(
@@ -289,7 +289,7 @@ enum LabelService {
       changeAddresses: changeAddresses,
       cosigners: cosigners,
       requiredSignatures: requiredSignatures,
-      network: network
+      network: network,
     )
     return BIP329Record.encodeToJSONL(records)
   }
@@ -304,12 +304,12 @@ enum LabelService {
     changeAddresses: [AddressItem],
     cosigners: [CosignerInfo],
     requiredSignatures: Int,
-    network _: BitcoinNetwork
+    network _: BitcoinNetwork,
   ) -> [BIP329Record] {
     // Build lookup dictionaries
     let labelsByTypeAndRef = Dictionary(
       labels.map { ("\($0.type):\($0.ref)", $0.label) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
     let utxoOutpoints = Set(utxos.map(\.id))
     let origin = buildOrigin(cosigners: cosigners, requiredSignatures: requiredSignatures)
@@ -326,7 +326,7 @@ enum LabelService {
       records.append(BIP329Record(
         type: "xpub",
         ref: cosigner.xpub,
-        label: cosigner.label
+        label: cosigner.label,
       ))
     }
 
@@ -424,7 +424,7 @@ enum LabelService {
   /// Builds address → keypath dictionary from receive and change addresses.
   private static func buildAddressKeypaths(
     receiveAddresses: [AddressItem],
-    changeAddresses: [AddressItem]
+    changeAddresses: [AddressItem],
   ) -> [String: String] {
     var result: [String: String] = [:]
     for addr in receiveAddresses {
@@ -439,7 +439,7 @@ enum LabelService {
   /// Scans confirmed transactions to find which block heights each address appeared in.
   private static func buildAddressHeights(
     transactions: [TransactionItem],
-    addressKeypaths: [String: String]
+    addressKeypaths: [String: String],
   ) -> [String: [UInt32]] {
     var heightSets: [String: Set<UInt32>] = [:]
     for tx in transactions {

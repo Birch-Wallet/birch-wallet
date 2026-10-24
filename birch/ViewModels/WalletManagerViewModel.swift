@@ -48,7 +48,7 @@ final class WalletManagerViewModel {
   func updateCosigners(
     of wallet: WalletProfile,
     to edited: [(label: String, xpub: String, fingerprint: String, derivationPath: String)],
-    modelContext: ModelContext
+    modelContext: ModelContext,
   ) -> Bool {
     let network = wallet.bitcoinNetwork
     let existingCosigners = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
@@ -100,13 +100,13 @@ final class WalletManagerViewModel {
         requiredSignatures: wallet.requiredSignatures,
         cosigners: cosignerData,
         network: network,
-        isChange: false
+        isChange: false,
       )
       intDesc = try BitcoinService.buildDescriptor(
         requiredSignatures: wallet.requiredSignatures,
         cosigners: cosignerData,
         network: network,
-        isChange: true
+        isChange: true,
       )
     } catch {
       errorMessage = error.localizedDescription

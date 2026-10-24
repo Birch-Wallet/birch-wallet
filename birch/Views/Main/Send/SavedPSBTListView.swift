@@ -130,7 +130,7 @@ struct SavedPSBTListView: View {
           if !$0 {
             renamingPSBT = nil
           }
-        }
+        },
       )) {
         TextField("Name", text: $renameText)
         Button("Save") {
@@ -148,7 +148,7 @@ struct SavedPSBTListView: View {
           if !$0 {
             deletingPSBT = nil
           }
-        }
+        },
       )) {
         Button("Delete", role: .destructive) {
           if let psbt = deletingPSBT {
@@ -205,7 +205,7 @@ private struct PSBTIdenticon: View {
             x: CGFloat(col) * cellW,
             y: CGFloat(row) * cellH,
             width: cellW,
-            height: cellH
+            height: cellH,
           )
           context.fill(Path(rect), with: .color(palette[colorIndex].opacity(opacity)))
         }

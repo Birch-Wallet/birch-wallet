@@ -70,7 +70,7 @@ struct TransactionListView: View {
       changeAddresses: changeAddresses,
       cosigners: cosigners,
       requiredSignatures: profile.requiredSignatures,
-      network: profile.bitcoinNetwork
+      network: profile.bitcoinNetwork,
     )
 
     let sanitizedName = profile.name.replacingOccurrences(of: " ", with: "-")
@@ -80,7 +80,7 @@ struct TransactionListView: View {
 
     let activityVC = UIActivityViewController(
       activityItems: [tempURL],
-      applicationActivities: nil
+      applicationActivities: nil,
     )
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
           var topVC = windowScene.windows.first?.rootViewController else { return }
@@ -118,7 +118,7 @@ struct TransactionListView: View {
           data: data,
           walletID: profile.id,
           cosigners: profile.cosigners,
-          context: modelContext
+          context: modelContext,
         )
 
         if count == 0 {
@@ -160,7 +160,7 @@ struct TransactionListView: View {
       changeAddresses: changeAddresses,
       cosigners: profile.cosigners,
       requiredSignatures: profile.requiredSignatures,
-      network: profile.bitcoinNetwork
+      network: profile.bitcoinNetwork,
     )
   }
 
@@ -180,7 +180,7 @@ struct TransactionListView: View {
         data: data,
         walletID: profile.id,
         cosigners: profile.cosigners,
-        context: modelContext
+        context: modelContext,
       )
 
       if count == 0 {
@@ -390,7 +390,7 @@ struct TransactionListView: View {
       .fileImporter(
         isPresented: $showImportFilePicker,
         allowedContentTypes: [UTType(filenameExtension: "jsonl") ?? .plainText],
-        allowsMultipleSelection: false
+        allowsMultipleSelection: false,
       ) { result in
         importLabelsFromFile(result: result)
       }
@@ -400,7 +400,7 @@ struct TransactionListView: View {
           if !$0 {
             walletToDelete = nil
           }
-        }
+        },
       )) {
         Button("Delete", role: .destructive) {
           if let wallet = walletToDelete {
@@ -505,7 +505,7 @@ struct TransactionListView: View {
             transactions: bitcoinService.transactions,
             utxos: bitcoinService.outputs,
             context: modelContext,
-            walletID: walletID
+            walletID: walletID,
           )
         } catch {
           logger.error("Failed to propagate address labels after sync: \(error.localizedDescription)")
@@ -644,7 +644,7 @@ struct TransactionListView: View {
       }
       .transition(.asymmetric(
         insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
-        removal: .scale(scale: 0.95, anchor: .top).combined(with: .opacity)
+        removal: .scale(scale: 0.95, anchor: .top).combined(with: .opacity),
       ))
     }
   }
@@ -663,7 +663,7 @@ struct TransactionListView: View {
         ContentUnavailableView(
           "No Transactions",
           systemImage: "bitcoinsign.circle",
-          description: Text("Time to acquire the world's best money")
+          description: Text("Time to acquire the world's best money"),
         )
         .frame(maxHeight: .infinity)
         .padding(.top, 100)

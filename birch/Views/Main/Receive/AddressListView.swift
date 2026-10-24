@@ -20,7 +20,7 @@ struct AddressListView: View {
         ContentUnavailableView(
           "No Addresses",
           systemImage: "number",
-          description: Text("Addresses will appear after wallet refresh")
+          description: Text("Addresses will appear after wallet refresh"),
         )
       } else {
         List(viewModel.displayedAddresses) { address in

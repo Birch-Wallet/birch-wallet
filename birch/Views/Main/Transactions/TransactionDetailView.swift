@@ -400,7 +400,7 @@ struct TransactionDetailView: View {
           transaction: transaction,
           utxos: BitcoinService.shared.outputs,
           context: modelContext,
-          walletID: walletID
+          walletID: walletID,
         )
       } catch {
         logger.error("Failed to propagate tx label: \(error.localizedDescription)")
@@ -438,7 +438,7 @@ private struct TransactionDetailFlowDiagram: View {
     let receiveAddresses = BitcoinService.shared.getAddresses(keychain: .external)
     return (
       change: Dictionary(uniqueKeysWithValues: changeAddresses.map { ($0.address, $0.index) }),
-      receive: Dictionary(uniqueKeysWithValues: receiveAddresses.map { ($0.address, $0.index) })
+      receive: Dictionary(uniqueKeysWithValues: receiveAddresses.map { ($0.address, $0.index) }),
     )
   }
 
@@ -494,7 +494,7 @@ private struct TransactionDetailFlowDiagram: View {
             path.addCurve(
               to: CGPoint(x: centerX, y: mergeY),
               control1: CGPoint(x: centerX * 0.75, y: y),
-              control2: CGPoint(x: centerX * 0.85, y: mergeY)
+              control2: CGPoint(x: centerX * 0.85, y: mergeY),
             )
             context.stroke(path, with: .color(lineColor.opacity(0.35)), lineWidth: 1.5)
           }
@@ -507,7 +507,7 @@ private struct TransactionDetailFlowDiagram: View {
             path.addCurve(
               to: CGPoint(x: w - centerX * 0.45, y: y),
               control1: CGPoint(x: centerX * 1.15, y: mergeY),
-              control2: CGPoint(x: centerX * 1.25, y: y)
+              control2: CGPoint(x: centerX * 1.25, y: y),
             )
             context.stroke(path, with: .color(lineColor.opacity(0.35)), lineWidth: 1.5)
           }

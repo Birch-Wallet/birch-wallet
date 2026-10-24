@@ -95,7 +95,7 @@ struct DescriptorAddressVectorTests {
   /// addresses via BDK. Returns nil when Birch rejects the descriptor or the
   /// resulting wallet cannot be built.
   func birchImportAndDerive(
-    descriptor: String, network: BitcoinNetwork
+    descriptor: String, network: BitcoinNetwork,
   ) -> (receive: String, change: String)? {
     guard let ranges = birchImportAndDerive(descriptor: descriptor, network: network, count: 1) else { return nil }
     return (ranges.receive[0], ranges.change[0])
@@ -103,7 +103,7 @@ struct DescriptorAddressVectorTests {
 
   /// As above, for the first `count` indexes of each chain.
   func birchImportAndDerive(
-    descriptor: String, network: BitcoinNetwork, count: UInt32
+    descriptor: String, network: BitcoinNetwork, count: UInt32,
   ) -> (receive: [String], change: [String])? {
     let vm = SetupWizardViewModel()
     vm.network = network
@@ -121,7 +121,7 @@ struct DescriptorAddressVectorTests {
         descriptor: extDesc,
         changeDescriptor: chgDesc,
         network: bdkNetwork,
-        persister: persister
+        persister: persister,
       )
       let receive = (0 ..< count).map { wallet.peekAddress(keychain: .external, index: $0).address.description }
       let change = (0 ..< count).map { wallet.peekAddress(keychain: .internal, index: $0).address.description }
@@ -143,7 +143,7 @@ struct DescriptorAddressVectorTests {
 
   /// Every fixture has a known expectation, and Birch's behavior matches it.
   /// For supported descriptors, BDK-derived addresses equal Bitcoin Core.
-  @Test func birchMatchesBitcoinCoreForAllVectors() throws {
+  @Test func `birch matches bitcoin core for all vectors`() throws {
     let vectors = try Self.loadVectors()
     #expect(vectors.count == 39, "Expected 39 valid descriptor vectors")
 
@@ -163,26 +163,26 @@ struct DescriptorAddressVectorTests {
         if let expectedReceive = vector.receive {
           #expect(
             result.receive == expectedReceive,
-            "Descriptor #\(vector.index) receive[0] mismatch: Birch=\(result.receive) Core=\(expectedReceive)"
+            "Descriptor #\(vector.index) receive[0] mismatch: Birch=\(result.receive) Core=\(expectedReceive)",
           )
         }
         if let expectedChange = vector.change {
           #expect(
             result.change == expectedChange,
-            "Descriptor #\(vector.index) change[0] mismatch: Birch=\(result.change) Core=\(expectedChange)"
+            "Descriptor #\(vector.index) change[0] mismatch: Birch=\(result.change) Core=\(expectedChange)",
           )
         }
 
       case .divergent:
         #expect(
           result != nil,
-          "Descriptor #\(vector.index): Birch should import the path-less descriptor (appending /0/* and /1/*)"
+          "Descriptor #\(vector.index): Birch should import the path-less descriptor (appending /0/* and /1/*)",
         )
 
       case .reject:
         #expect(
           result == nil,
-          "Descriptor #\(vector.index): Birch should reject this descriptor on import"
+          "Descriptor #\(vector.index): Birch should reject this descriptor on import",
         )
 
       case .none:
@@ -197,7 +197,7 @@ struct DescriptorAddressVectorTests {
   /// Only multipath descriptors Birch supports are checked — #17 is multipath
   /// but uses BIP44 (`/44'/...`) origins, which Birch's BIP48-only cosigner
   /// gate rejects (see `Expectation.reject`).
-  @Test func multipathReceiveAndChangeMatchCore() throws {
+  @Test func `multipath receive and change match core`() throws {
     let vectors = try Self.loadVectors()
     let multipath = vectors.filter {
       $0.kind == "multipath" && Self.expectations[$0.index] == .match
@@ -208,7 +208,7 @@ struct DescriptorAddressVectorTests {
       let network = bitcoinNetwork(from: vector.network)
       let result = try #require(
         birchImportAndDerive(descriptor: vector.descriptor, network: network),
-        "Descriptor #\(vector.index): expected a successful multipath import"
+        "Descriptor #\(vector.index): expected a successful multipath import",
       )
       #expect(result.receive == vector.receive, "Descriptor #\(vector.index) multipath receive[0]")
       #expect(result.change == vector.change, "Descriptor #\(vector.index) multipath change[0]")
@@ -216,7 +216,7 @@ struct DescriptorAddressVectorTests {
   }
 
   /// Indexes 0-4 of every chain Bitcoin Core derived for a supported descriptor.
-  @Test func firstFiveAddressesMatchCore() throws {
+  @Test func `first five addresses match core`() throws {
     let supported = try Self.loadVectors().filter { Self.expectations[$0.index] == .match }
     #expect(supported.count == 13)
     var receiveChains = 0
@@ -226,7 +226,7 @@ struct DescriptorAddressVectorTests {
       let network = bitcoinNetwork(from: vector.network)
       let result = try #require(
         birchImportAndDerive(descriptor: vector.descriptor, network: network, count: 5),
-        "Descriptor #\(vector.index): expected a successful import"
+        "Descriptor #\(vector.index): expected a successful import",
       )
       if let expected = vector.receiveRange {
         #expect(expected.count == 5)
@@ -247,7 +247,7 @@ struct DescriptorAddressVectorTests {
 
   /// The Verify step shows the first receive address so it can be compared with
   /// the signing devices. It must be Bitcoin Core's receive[0].
-  @Test func verifyStepFirstAddressMatchesCore() throws {
+  @Test func `verify step first address matches core`() throws {
     let withReceive = try Self.loadVectors().filter {
       Self.expectations[$0.index] == .match && $0.receive != nil
     }

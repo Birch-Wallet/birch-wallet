@@ -70,7 +70,7 @@ struct WelcomeStepView: View {
         RoundedRectangle(cornerRadius: 28, style: .continuous)
           .stroke(Color.hbBackground, lineWidth: 24)
           .blur(radius: 12)
-          .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+          .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous)),
       )
   }
 
