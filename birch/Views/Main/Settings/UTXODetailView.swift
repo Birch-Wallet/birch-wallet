@@ -195,8 +195,10 @@ struct UTXODetailView: View {
               DetailRow(label: "First Seen", value: firstSeen.longFormatString)
             }
 
-            DetailRow(label: "Confirmations",
-                      value: "\(tx.confirmations)")
+            if tx.confirmationsKnown {
+              DetailRow(label: "Confirmations",
+                        value: "\(tx.confirmations)")
+            }
           }
         }
         .hbCard()

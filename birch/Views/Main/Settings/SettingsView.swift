@@ -4,6 +4,11 @@ import SwiftUI
 
 private let logger = AppLog(.app)
 
+/// How long the choice list takes to pop back to Settings. Work a choice sets
+/// off (a price fetch, a new palette) waits this long, so redrawing the screen
+/// doesn't land mid-animation.
+private let popDelay: Duration = .milliseconds(400)
+
 struct SettingsView: View {
   @Environment(\.modelContext) private var modelContext
   @State private var showLogExport = false
@@ -19,51 +24,54 @@ struct SettingsView: View {
           .padding(.top, 8)
           .padding(.bottom, 4)
 
-        List {
-          // Security
-          AppLockSettingsSection()
+        ScrollView {
+          VStack(alignment: .leading, spacing: 20) {
+            // Security
+            AppLockSettingsSection()
 
-          // Fee Estimation
-          Section("Fee Estimation") {
-            FeeSettingsRow()
-          }
-
-          // Currency Display
-          Section("Currency Display") {
-            DenominationSettingsRow()
-            FiatSettingsRow()
-          }
-
-          // Appearance
-          Section("Appearance") {
-            AppearanceSettingsRow()
-          }
-
-          // App Icon
-          Section("App Icon") {
-            AppIconSettingsRow()
-          }
-
-          // About
-          Section("About") {
-            HStack {
-              Text("Version")
-                .foregroundStyle(Color.hbTextPrimary)
-              Spacer()
-              Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
-                .foregroundStyle(Color.hbTextSecondary)
-
-              Button(action: { showLogExport = true }) {
-                Image(systemName: "doc.text.magnifyingglass")
-                  .font(.system(size: 14))
-                  .foregroundStyle(Color.hbTextSecondary)
-              }
-              .buttonStyle(.plain)
+            // Fee Estimation
+            SettingsSection("Fee Estimation") {
+              FeeSettingsRow()
             }
-            .listRowBackground(Color.hbSurface)
+
+            // Currency Display
+            SettingsSection("Currency Display") {
+              DenominationSettingsRow()
+              HBDivider()
+              FiatSettingsRow()
+            }
+
+            // Appearance
+            SettingsSection("Appearance") {
+              AppearanceSettingsRow()
+            }
+
+            // App Icon
+            SettingsSection("App Icon") {
+              AppIconSettingsRow()
+            }
+
+            // About
+            SettingsSection("About") {
+              HStack {
+                Text("Version")
+                  .foregroundStyle(Color.hbTextPrimary)
+                Spacer()
+                Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))")
+                  .foregroundStyle(Color.hbTextSecondary)
+
+                Button(action: { showLogExport = true }) {
+                  Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.hbTextSecondary)
+                }
+                .buttonStyle(.plain)
+              }
+              .settingsRow()
+            }
           }
+          .padding(16)
         }
-        .scrollContentBackground(.hidden)
       }
       .background(Color.hbBackground)
       .navigationTitle("")
@@ -75,26 +83,150 @@ struct SettingsView: View {
   }
 }
 
+// MARK: - Section and Rows
+
+/// A titled card of settings rows, the same lifted card as the other screens
+private struct SettingsSection<Content: View>: View {
+  let title: String
+  @ViewBuilder let content: Content
+
+  init(_ title: String, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.system(size: 17, weight: .semibold))
+        .foregroundStyle(Color(.secondaryLabel))
+        .padding(.horizontal, 4)
+
+      // Rows carry most of their own height, like a list; the card adds a
+      // little above and below so a single row doesn't sit tight to its edges
+      VStack(alignment: .leading, spacing: 0) {
+        content
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 4)
+      .birchCard()
+    }
+  }
+}
+
+private extension View {
+  /// A settings row's height: 8pt above and below, at least 52pt in all
+  func settingsRow() -> some View {
+    padding(.vertical, 8)
+      .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+  }
+}
+
+/// Label on the left, the chosen value on the right. Tapping the row pushes a
+/// list of the options, as in iOS Settings. A menu would collapse back into the
+/// value with iOS 26's morph, which leaves it misaligned for a moment.
+private struct SettingsPickerRow<Value: Hashable>: View {
+  let title: String
+  @Binding var selection: Value
+  let options: [Value]
+  let optionTitle: (Value) -> String
+
+  init(_ title: String, selection: Binding<Value>, options: [Value], optionTitle: @escaping (Value) -> String) {
+    self.title = title
+    _selection = selection
+    self.options = options
+    self.optionTitle = optionTitle
+  }
+
+  var body: some View {
+    NavigationLink {
+      SettingsChoiceList(title: title, selection: $selection, options: options, optionTitle: optionTitle)
+    } label: {
+      HStack {
+        Text(title)
+          .foregroundStyle(Color.hbTextPrimary)
+        Spacer()
+        Text(optionTitle(selection))
+          .foregroundStyle(Color.hbTextSecondary)
+        Image(systemName: "chevron.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(Color.hbTextSecondary)
+      }
+      .settingsRow()
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(title)
+    .accessibilityValue(optionTitle(selection))
+  }
+}
+
+/// The options for one setting, the chosen one checked. Choosing pops back.
+private struct SettingsChoiceList<Value: Hashable>: View {
+  let title: String
+  @Binding var selection: Value
+  let options: [Value]
+  let optionTitle: (Value) -> String
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    ScrollView {
+      VStack(spacing: 0) {
+        ForEach(Array(options.enumerated()), id: \.element) { index, option in
+          if index > 0 {
+            HBDivider()
+          }
+          Button {
+            selection = option
+            dismiss()
+          } label: {
+            HStack {
+              Text(optionTitle(option))
+                .foregroundStyle(Color.hbTextPrimary)
+              Spacer()
+              if option == selection {
+                Image(systemName: "checkmark")
+                  .font(.system(size: 14, weight: .semibold))
+                  .foregroundStyle(Color.hbBitcoinOrange)
+              }
+            }
+            .settingsRow()
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityAddTraits(option == selection ? .isSelected : [])
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 4)
+      .birchCard()
+      .padding(16)
+    }
+    .background(Color.hbBackground)
+    .navigationTitle(title)
+  }
+}
+
 // MARK: - Appearance Settings
 
 private struct AppearanceSettingsRow: View {
   @AppStorage(Constants.themeKey) private var themeRaw = AppTheme.system.rawValue
 
   var body: some View {
-    Picker("Theme", selection: $themeRaw) {
-      ForEach(AppTheme.allCases, id: \.rawValue) { theme in
-        Text(theme.displayName).tag(theme.rawValue)
-      }
-    }
-    .tint(Color.hbBitcoinOrange)
-    .foregroundStyle(Color.hbTextPrimary)
+    SettingsPickerRow(
+      "Theme",
+      selection: $themeRaw,
+      options: AppTheme.allCases.map(\.rawValue),
+      optionTitle: { AppTheme(rawValue: $0)?.displayName ?? $0 }
+    )
     .onChange(of: themeRaw) { _, new in
-      if let t = AppTheme(rawValue: new) {
-        logger.info("Theme changed to \(t.displayName)")
+      guard let t = AppTheme(rawValue: new) else { return }
+      logger.info("Theme changed to \(t.displayName)")
+      Task {
+        try? await Task.sleep(for: popDelay)
         ThemeManager.shared.apply(t)
       }
     }
-    .listRowBackground(Color.hbSurface)
   }
 }
 
@@ -146,7 +278,7 @@ private struct AppIconSettingsRow: View {
         }
       }
     }
-    .listRowBackground(Color.hbSurface)
+    .padding(.vertical, 8)
   }
 
   private func select(_ option: AppIconOption) {
@@ -208,15 +340,13 @@ private struct DenominationSettingsRow: View {
   @AppStorage(Constants.denominationKey) private var denomination: String = Denomination.sats.rawValue
 
   var body: some View {
-    Picker("Bitcoin Unit", selection: $denomination) {
-      ForEach(Denomination.allCases, id: \.rawValue) { denom in
-        Text(denom.label).tag(denom.rawValue)
-      }
-    }
-    .tint(Color.hbBitcoinOrange)
-    .foregroundStyle(Color.hbTextPrimary)
+    SettingsPickerRow(
+      "Bitcoin Unit",
+      selection: $denomination,
+      options: Denomination.allCases.map(\.rawValue),
+      optionTitle: { Denomination(rawValue: $0)?.label ?? $0 }
+    )
     .accessibilityIdentifier("bitcoinUnitPicker")
-    .listRowBackground(Color.hbSurface)
     .onChange(of: denomination) { _, new in
       logger.info("Bitcoin unit changed to \(new)")
     }
@@ -229,14 +359,12 @@ private struct FeeSettingsRow: View {
   @AppStorage(Constants.feeSourceKey) private var feeSourceRaw = FeeSource.electrum.rawValue
 
   var body: some View {
-    Picker("Fee Source", selection: $feeSourceRaw) {
-      ForEach(FeeSource.allCases, id: \.rawValue) { source in
-        Text(source.displayName).tag(source.rawValue)
-      }
-    }
-    .tint(Color.hbBitcoinOrange)
-    .foregroundStyle(Color.hbTextPrimary)
-    .listRowBackground(Color.hbSurface)
+    SettingsPickerRow(
+      "Fee Source",
+      selection: $feeSourceRaw,
+      options: FeeSource.allCases.map(\.rawValue),
+      optionTitle: { FeeSource(rawValue: $0)?.displayName ?? $0 }
+    )
     .onChange(of: feeSourceRaw) { _, new in
       logger.info("Fee source changed to \(new)")
     }
@@ -269,34 +397,35 @@ private struct FiatSettingsRow: View {
         }
       }
       .tint(Color.hbBitcoinOrange)
+      .settingsRow()
       .accessibilityIdentifier("showFiatPriceToggle")
 
       if fiatEnabled {
-        Picker("Price Source", selection: $fiatSourceRaw) {
-          ForEach(FiatSource.allCases, id: \.rawValue) { source in
-            Text(source.displayName).tag(source.rawValue)
-          }
-        }
-        .tint(Color.hbBitcoinOrange)
-        .foregroundStyle(Color.hbTextPrimary)
-        .padding(.top, 12)
+        HBDivider()
+        SettingsPickerRow(
+          "Price Source",
+          selection: $fiatSourceRaw,
+          options: FiatSource.allCases.map(\.rawValue),
+          optionTitle: { FiatSource(rawValue: $0)?.displayName ?? $0 }
+        )
         .onChange(of: fiatSourceRaw) {
           logger.info("Fiat source changed to \(fiatSourceRaw)")
-          fiatService.resetCache()
-          Task { await fiatService.fetchRates() }
-        }
-
-        Picker("Currency", selection: $fiatCurrency) {
-          ForEach(FiatPriceService.availableCurrencies, id: \.code) { currency in
-            Text(currency.code).tag(currency.code)
+          Task {
+            try? await Task.sleep(for: popDelay)
+            fiatService.resetCache()
+            await fiatService.fetchRates()
           }
         }
-        .tint(Color.hbBitcoinOrange)
-        .foregroundStyle(Color.hbTextPrimary)
-        .padding(.top, 12)
+
+        HBDivider()
+        SettingsPickerRow(
+          "Currency",
+          selection: $fiatCurrency,
+          options: FiatPriceService.availableCurrencies.map(\.code),
+          optionTitle: { $0 }
+        )
       }
     }
-    .listRowBackground(Color.hbSurface)
   }
 }
 
@@ -331,7 +460,7 @@ private struct AppLockSettingsSection: View {
   }
 
   var body: some View {
-    Section("Security") {
+    SettingsSection("Security") {
       Toggle(isOn: Binding(
         get: { appLockEnabled },
         set: { newValue in
@@ -353,7 +482,7 @@ private struct AppLockSettingsSection: View {
         }
       }
       .tint(Color.hbBitcoinOrange)
-      .listRowBackground(Color.hbSurface)
+      .settingsRow()
       .alert("Authentication Unavailable", isPresented: $showBiometricError) {
         Button("OK") {}
       } message: {
@@ -369,26 +498,28 @@ private struct AppLockSettingsSection: View {
       }
 
       if appLockEnabled {
-        Picker("Lock After", selection: $lockTimeout) {
-          ForEach(Self.timeoutOptions, id: \.1) { option in
-            Text(option.0).tag(option.1)
-          }
-        }
-        .tint(Color.hbBitcoinOrange)
-        .foregroundStyle(Color.hbTextPrimary)
-        .listRowBackground(Color.hbSurface)
+        HBDivider()
+        SettingsPickerRow(
+          "Lock After",
+          selection: $lockTimeout,
+          options: Self.timeoutOptions.map(\.1),
+          optionTitle: { seconds in Self.timeoutOptions.first { $0.1 == seconds }?.0 ?? "\(seconds / 60) minutes" }
+        )
         .onChange(of: lockTimeout) { _, new in
           logger.info("Lock timeout changed to \(new)s")
         }
 
+        HBDivider()
         if lockVM.hasPIN {
           Button(role: .destructive) {
             showRemovePIN = true
           } label: {
             Text("Remove PIN")
               .foregroundStyle(Color.hbError)
+              .settingsRow()
+              .contentShape(Rectangle())
           }
-          .listRowBackground(Color.hbSurface)
+          .buttonStyle(.plain)
         } else {
           Button {
             showSetPIN = true
@@ -401,8 +532,10 @@ private struct AppLockSettingsSection: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Color.hbTextSecondary)
             }
+            .settingsRow()
+            .contentShape(Rectangle())
           }
-          .listRowBackground(Color.hbSurface)
+          .buttonStyle(.plain)
         }
       }
     }

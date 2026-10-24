@@ -5,6 +5,9 @@ struct TransactionItem: Identifiable, Equatable {
   let amount: Int64 // sats, positive = received, negative = sent
   let fee: UInt64? // sats
   let confirmations: UInt32
+  /// False for a confirmed transaction whose count isn't known yet, because no
+  /// chain tip has been seen. `confirmations` is then 1 and shouldn't be shown.
+  let confirmationsKnown: Bool
   let timestamp: Date?
   let isIncoming: Bool
   let blockHeight: UInt32?
@@ -30,6 +33,7 @@ struct TransactionItem: Identifiable, Equatable {
   }
 
   init(id: String, amount: Int64, fee: UInt64?, confirmations: UInt32,
+       confirmationsKnown: Bool = true,
        timestamp: Date?, isIncoming: Bool, blockHeight: UInt32? = nil,
        vsize: UInt64? = nil, firstSeen: Date? = nil,
        inputs: [TxIO] = [], outputs: [TxIO] = [])
@@ -38,6 +42,7 @@ struct TransactionItem: Identifiable, Equatable {
     self.amount = amount
     self.fee = fee
     self.confirmations = confirmations
+    self.confirmationsKnown = confirmationsKnown
     self.timestamp = timestamp
     self.isIncoming = isIncoming
     self.blockHeight = blockHeight
@@ -65,6 +70,14 @@ struct TransactionItem: Identifiable, Equatable {
 
   var isConfirmed: Bool {
     confirmations > 0
+  }
+
+  /// Confirmations for a transaction mined at `blockHeight`, counting that block,
+  /// with `tipHeight` the best chain tip known (0 when none has been seen).
+  /// Nil when the tip is unknown or behind the block, so the count can't be told.
+  static func confirmations(blockHeight: UInt32, tipHeight: UInt32) -> UInt32? {
+    guard tipHeight > 0, tipHeight >= blockHeight else { return nil }
+    return tipHeight - blockHeight + 1
   }
 
   var truncatedTxid: String {

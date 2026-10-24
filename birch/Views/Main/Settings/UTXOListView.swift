@@ -11,9 +11,6 @@ struct UTXOListView: View {
   @AppStorage(Constants.fiatPrimaryKey) private var fiatPrimary = false
   @AppStorage(Constants.utxoFilterKey) private var filter = UTXOFilter()
   @State private var showFilterSheet = false
-  @Namespace private var filterNamespace
-
-  private static let filterTransitionID = "utxoFilter"
 
   private var isPrivate: Bool {
     BitcoinService.shared.currentProfile?.privacyMode ?? false
@@ -99,7 +96,6 @@ struct UTXOListView: View {
     .navigationTitle("")
     .sheet(isPresented: $showFilterSheet) {
       UTXOFilterSheet(filter: $filter)
-        .navigationTransition(.zoom(sourceID: Self.filterTransitionID, in: filterNamespace))
     }
     .onAppear {
       viewModel.loadUTXOs()
@@ -112,7 +108,7 @@ struct UTXOListView: View {
   // MARK: - Filter Button
 
   /// Sits in the title row rather than the toolbar, so the empty navigation bar
-  /// stays collapsed like the other tabs. The sheet zooms out of it, as in Mail.
+  /// stays collapsed like the other tabs.
   private var filterButton: some View {
     Button {
       showFilterSheet = true
@@ -124,7 +120,6 @@ struct UTXOListView: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .matchedTransitionSource(id: Self.filterTransitionID, in: filterNamespace)
     .accessibilityLabel("Filter")
     .accessibilityValue(filter.isFiltering ? "On" : "Off")
     .accessibilityIdentifier("utxoFilterButton")

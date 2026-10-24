@@ -162,6 +162,9 @@ struct SavedPSBTListView: View {
         Text("This will permanently delete \"\(deletingPSBT?.name ?? "")\" and any collected signatures.")
       }
     }
+    .presentationDetents([.medium, .large])
+    .presentationDragIndicator(.visible)
+    .birchSheet()
   }
 }
 

@@ -14,6 +14,11 @@ struct TransactionRowView: View {
     transaction.timestamp ?? transaction.firstSeen
   }
 
+  private var confirmationText: String {
+    guard transaction.confirmationsKnown else { return "Confirmed" }
+    return transaction.confirmations >= 6 ? "6+ conf" : "\(transaction.confirmations) conf"
+  }
+
   private var directionIcon: String {
     if transaction.isSelfTransfer {
       return "arrow.triangle.2.circlepath"
@@ -93,7 +98,7 @@ struct TransactionRowView: View {
             Image(systemName: "checkmark.circle.fill")
               .font(.system(size: 10))
               .foregroundStyle(Color.hbSuccess)
-            Text(transaction.confirmations >= 6 ? "6+ conf" : "\(transaction.confirmations) conf")
+            Text(confirmationText)
               .font(.hbLabel(10))
               .foregroundStyle(Color.hbTextSecondary)
           } else {

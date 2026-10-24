@@ -371,6 +371,8 @@ final class BitcoinService {
         electrumVerified = true
         electrumConnectionError = nil
         addToLog("Chain tip height: \(chainTipHeight)")
+      } else {
+        addToLog("Chain tip fetch returned nothing; keeping tip \(chainTipHeight)")
       }
 
       if needsFullScan {
@@ -626,6 +628,10 @@ final class BitcoinService {
       txList.map { ($0.transaction.computeTxid().description, $0.transaction) },
       uniquingKeysWith: { first, _ in first }
     )
+    // The server's tip, or failing that the wallet's own: applying a scan moves
+    // BDK's checkpoint to the tip the server reported, even when the header fetch
+    // in sync() came back empty.
+    let tipHeight = max(chainTipHeight, wallet.latestCheckpoint().height)
     transactions = txList.map { canonicalTx -> TransactionItem in
       let tx = canonicalTx.transaction
       let txid = tx.computeTxid().description
@@ -638,17 +644,21 @@ final class BitcoinService {
       let amount: Int64 = isIncoming ? Int64(received - sent) : -Int64(sent - received)
 
       var confirmations: UInt32 = 0
+      var confirmationsKnown = true
       var timestamp: Date?
       var blockHeight: UInt32?
       var firstSeen: Date?
 
       switch canonicalTx.chainPosition {
       case let .confirmed(confirmationBlockTime, _):
-        blockHeight = confirmationBlockTime.blockId.height
-        if chainTipHeight > 0, let bh = blockHeight {
-          confirmations = chainTipHeight >= bh ? chainTipHeight - bh + 1 : 1
+        let minedHeight = confirmationBlockTime.blockId.height
+        blockHeight = minedHeight
+        if let count = TransactionItem.confirmations(blockHeight: minedHeight, tipHeight: tipHeight) {
+          confirmations = count
         } else {
+          // Confirmed, but how deep isn't known until a tip is seen
           confirmations = 1
+          confirmationsKnown = false
         }
         if confirmationBlockTime.confirmationTime > 0 {
           timestamp = Date(timeIntervalSince1970: TimeInterval(confirmationBlockTime.confirmationTime))
@@ -721,6 +731,7 @@ final class BitcoinService {
         amount: amount,
         fee: feeAmount,
         confirmations: confirmations,
+        confirmationsKnown: confirmationsKnown,
         timestamp: timestamp,
         isIncoming: isIncoming,
         blockHeight: blockHeight,
