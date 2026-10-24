@@ -137,10 +137,21 @@ extension String {
 }
 
 extension Date {
+  /// The current time for what screens show: ages, relative times and default
+  /// names. The screenshot tour freezes it (ScreenshotFixtures.now).
+  static var displayNow: Date {
+    #if DEBUG
+      if ScreenshotFixtures.isActive {
+        return ScreenshotFixtures.now
+      }
+    #endif
+    return Date()
+  }
+
   var relativeString: String {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
-    return formatter.localizedString(for: self, relativeTo: Date())
+    return formatter.localizedString(for: self, relativeTo: .displayNow)
   }
 
   var shortString: String {
@@ -151,7 +162,7 @@ extension Date {
   }
 
   var smartRelativeString: String {
-    let now = Date()
+    let now = Date.displayNow
     let interval = now.timeIntervalSince(self)
 
     if interval < 60 {
@@ -159,7 +170,7 @@ extension Date {
     } else if interval < 3600 {
       let minutes = Int(interval / 60)
       return "\(minutes) min ago"
-    } else if Calendar.current.isDateInToday(self) {
+    } else if Calendar.current.isDate(self, inSameDayAs: now) {
       let formatter = DateFormatter()
       formatter.dateFormat = "h:mm a"
       return "Today at \(formatter.string(from: self))"

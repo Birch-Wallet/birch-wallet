@@ -613,7 +613,7 @@ final class SendViewModel: PSBTFlowManaging {
   func defaultPSBTName() -> String {
     let formatter = DateFormatter()
     formatter.dateFormat = "MMM d, yyyy h:mm a"
-    return formatter.string(from: Date())
+    return formatter.string(from: .displayNow)
   }
 
   func savePSBT(name: String, context: ModelContext) {

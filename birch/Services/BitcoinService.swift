@@ -359,6 +359,12 @@ final class BitcoinService {
           return
         }
         chainTipHeight = UInt32(header.height)
+        #if DEBUG
+          // The screenshot tour's confirmation counts and locktime stay the same every run.
+          if ScreenshotFixtures.isActive {
+            chainTipHeight = ScreenshotFixtures.chainTipHeight
+          }
+        #endif
         if let profileId = syncProfileId {
           UserDefaults.standard.set(Int(chainTipHeight), forKey: "chainTipHeight_\(profileId.uuidString)")
         }
@@ -467,7 +473,13 @@ final class BitcoinService {
 
       let now = Date()
       lastSyncDate = now
-      setSyncState(.synced(now), generation: syncGeneration)
+      #if DEBUG
+        // The screenshot tour's "Last refreshed" reads the same every run.
+        let shownSyncDate = ScreenshotFixtures.isActive ? ScreenshotFixtures.lastRefreshed : now
+      #else
+        let shownSyncDate = now
+      #endif
+      setSyncState(.synced(shownSyncDate), generation: syncGeneration)
 
       let duration = String(format: "%.1f", now.timeIntervalSince(syncStartTime))
       let balanceDelta = Int64(balance) - Int64(balanceBefore)
@@ -907,10 +919,20 @@ final class BitcoinService {
     /// connected). A conservative flat rate so the send / bump-fee flow stays
     /// usable instead of leaving the fee field empty.
     static let fallback = RecommendedFees(fast: 1.5, medium: 1.5, slow: 1.5)
+
+    /// The "Fixed Default" fee source's rates.
+    static let fixed = RecommendedFees(fast: 5.0, medium: 2.0, slow: 1.0)
   }
 
   /// Fetches estimated fee rates in sats/vB, dispatching to the selected source
   func getFeeRates() async throws -> RecommendedFees {
+    #if DEBUG
+      // The screenshot tour uses the fixed rates, while Settings keeps showing the
+      // default source.
+      if ScreenshotFixtures.isActive {
+        return .fixed
+      }
+    #endif
     let sourceRaw = UserDefaults.standard.string(forKey: Constants.feeSourceKey) ?? FeeSource.electrum.rawValue
     let source = FeeSource(rawValue: sourceRaw) ?? .electrum
 
@@ -921,7 +943,7 @@ final class BitcoinService {
       case .electrum:
         try await fetchElectrumFees()
       case .fixed:
-        RecommendedFees(fast: 5.0, medium: 2.0, slow: 1.0)
+        .fixed
       }
       logger.info(
         "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB"
@@ -1069,6 +1091,23 @@ final class BitcoinService {
         builder = builder.unspendable(unspendable: frozenOutpoints)
       }
     }
+
+    #if DEBUG
+      // The screenshot tour builds the same transaction every run: coins picked
+      // largest first and kept in order, where BDK would pick and shuffle them at random.
+      var utxos = utxos
+      if ScreenshotFixtures.isActive {
+        builder = builder.ordering(ordering: .untouched)
+        if utxos?.isEmpty ?? true, !recipients.contains(where: \.isSendMax) {
+          utxos = ScreenshotFixtures.coins(
+            from: self.utxos.filter { !unspendable.contains($0.id) },
+            amount: InputLimits.sum(recipients.map(\.amount)),
+            feeRate: feeRate,
+            outputs: recipients.count + 1
+          )
+        }
+      }
+    #endif
 
     // Manual UTXO selection (addUtxos takes priority over the unspendable list in BDK)
     if let utxos, !utxos.isEmpty {

@@ -64,17 +64,19 @@ open class Snapshot: NSObject {
   static var deviceLanguage = ""
   static var currentLocale = ""
 
-  /// Each snapshot is captured once per appearance, dark first, into a
-  /// `screenshots/<appearance>/` subfolder, so one tour covers both modes.
-  static let appearances: [(name: String, value: XCUIDevice.Appearance)] = [("dark", .dark), ("light", .light)]
-
-  /// Time for the app to redraw after the appearance changes.
-  static let appearanceSettle: useconds_t = 500_000
+  /// The appearance this tour captures, which names its
+  /// `screenshots/<appearance>/` subfolder. The Fastfile runs one tour per
+  /// appearance, sets it on the simulator before launch and passes it in
+  /// SNAPSHOT_APPEARANCE: switching mid-tour left the status bar in the old
+  /// appearance on some light captures. Outside the lane, the device's own.
+  static var appearance: String {
+    ProcessInfo.processInfo.environment["SNAPSHOT_APPEARANCE"]
+      ?? (XCUIDevice.shared.appearance == .light ? "light" : "dark")
+  }
 
   open class func setupSnapshot(_ app: XCUIApplication, waitForAnimations: Bool = true) {
     Snapshot.app = app
     Snapshot.waitForAnimations = waitForAnimations
-    XCUIDevice.shared.appearance = .dark
 
     do {
       let cacheDir = try getCacheDirectory()
@@ -175,17 +177,7 @@ open class Snapshot: NSObject {
         return
       }
 
-      for (index, appearance) in appearances.enumerated() {
-        if XCUIDevice.shared.appearance != appearance.value {
-          XCUIDevice.shared.appearance = appearance.value
-          usleep(appearanceSettle)
-        }
-        capture(name, appearance: appearance.name)
-        if index == appearances.count - 1 {
-          XCUIDevice.shared.appearance = appearances[0].value
-          usleep(appearanceSettle)
-        }
-      }
+      capture(name, appearance: appearance)
     #endif
   }
 
@@ -370,5 +362,6 @@ private extension CGFloat {
 // Please don't remove the lines below
 // They are used to detect outdated configuration files
 // SnapshotHelperVersion [1.30]
-// Local changes: dual-appearance capture into screenshots/<appearance>/ and
-// host capture for the open iPhone Duo (see fastlane/Fastfile).
+// Local changes: capture into screenshots/<appearance>/ for the appearance the
+// Fastfile sets, and host capture for the open iPhone Duo (see
+// fastlane/Fastfile).

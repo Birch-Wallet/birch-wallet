@@ -51,7 +51,7 @@ struct WalletDashboardView: View {
 
   /// Average age of confirmed UTXOs in seconds, using parent tx timestamp.
   private var avgUTXOAge: TimeInterval? {
-    let now = Date()
+    let now = Date.displayNow
     let txMap = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
     let ages: [TimeInterval] = utxos.compactMap { utxo in
       guard utxo.isConfirmed, let tx = txMap[utxo.txid],
