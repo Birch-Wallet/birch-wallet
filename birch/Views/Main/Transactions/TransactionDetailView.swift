@@ -184,7 +184,7 @@ struct TransactionDetailView: View {
             }
           }
 
-          if transaction.confirmations > 0 {
+          if transaction.isConfirmed, transaction.confirmationsKnown {
             DetailRow(label: "Confirmations") {
               Text(transaction.confirmations >= 6 ? "6+" : "\(transaction.confirmations)")
                 .font(.hbMono())

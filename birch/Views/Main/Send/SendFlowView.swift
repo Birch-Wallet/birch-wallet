@@ -112,7 +112,6 @@ struct SendFlowView: View {
       SavedPSBTListView(viewModel: viewModel) { savedPSBT in
         bumpFeeViewModel = BumpFeeViewModel(savedPSBT: savedPSBT)
       }
-      .birchSheet()
     }
     .sheet(item: $bumpFeeViewModel) { vm in
       BumpFeeView(viewModel: vm)
