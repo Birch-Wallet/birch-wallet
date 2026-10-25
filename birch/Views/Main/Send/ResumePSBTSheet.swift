@@ -74,7 +74,7 @@ struct ResumePSBTSheet: View {
     HStack(alignment: .top, spacing: 14) {
       ZStack {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
-          .fill(Color.hbBitcoinOrange.opacity(0.15))
+          .fill(Color.hbBrandInk.opacity(0.15))
         PSBTGlyph()
       }
       .frame(width: 48, height: 48)
@@ -167,7 +167,7 @@ struct ResumePSBTSheet: View {
       Button(action: { isExpanded = true }) {
         Text("+ \(recipients.count - Self.collapsedRowCount) more")
           .font(.hbBody(14).weight(.semibold))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbLink)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 16)
           .padding(.vertical, 14)
@@ -181,9 +181,9 @@ struct ResumePSBTSheet: View {
     HStack(spacing: 12) {
       Text("\(number)")
         .font(.hbMonoBold(11))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
         .frame(width: 22, height: 22)
-        .background(Color.hbBitcoinOrange.opacity(0.15))
+        .background(Color.hbBrandInk.opacity(0.15))
         .clipShape(Circle())
 
       VStack(alignment: .leading, spacing: 4) {
@@ -239,9 +239,9 @@ struct ResumePSBTSheet: View {
       }) {
         Text("Resume signing")
           .font(.hbBody(17).weight(.bold))
-          .foregroundStyle(.white)
+          .foregroundStyle(Color.hbOnBrand)
           .frame(maxWidth: .infinity, minHeight: 56)
-          .background(Color.hbBitcoinOrange, in: .rect(cornerRadius: 12, style: .continuous))
+          .background(Color.hbBrand, in: .rect(cornerRadius: 12, style: .continuous))
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -327,7 +327,7 @@ private struct PSBTGlyph: View {
         HStack(spacing: 2) {
           ForEach(0 ..< 3, id: \.self) { col in
             Rectangle()
-              .fill(row == 1 && col == 1 ? Color.clear : Color.hbBitcoinOrange)
+              .fill(row == 1 && col == 1 ? Color.clear : Color.hbBrandInk)
               .frame(width: 5, height: 5)
           }
         }

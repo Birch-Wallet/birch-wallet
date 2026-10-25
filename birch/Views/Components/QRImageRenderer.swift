@@ -48,7 +48,7 @@ struct AnimatedQRFrame: View {
         .aspectRatio(contentMode: .fit)
     } else {
       ProgressView()
-        .tint(Color.hbBitcoinOrange)
+        .tint(Color.hbProgress)
     }
   }
 }

@@ -64,7 +64,7 @@ struct ReceiveView: View {
             }) {
               Label(copied ? "Copied!" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc")
                 .font(.hbBody(14))
-                .foregroundStyle(copied ? Color.hbSuccess : Color.hbSteelBlue)
+                .foregroundStyle(copied ? Color.hbSuccess : Color.hbInfo)
             }
 
             // Address label
@@ -98,7 +98,7 @@ struct ReceiveView: View {
                     Text(addressLabel.isEmpty ? "Add Label" : addressLabel)
                       .font(.hbBody(13))
                   }
-                  .foregroundStyle(addressLabel.isEmpty ? Color.hbTextSecondary : Color.hbSteelBlue)
+                  .foregroundStyle(addressLabel.isEmpty ? Color.hbTextSecondary : Color.hbInfo)
                 }
               }
             }
@@ -106,7 +106,7 @@ struct ReceiveView: View {
           }
         } else {
           ProgressView()
-            .tint(Color.hbBitcoinOrange)
+            .tint(Color.hbProgress)
         }
 
         gap
@@ -124,7 +124,7 @@ struct ReceiveView: View {
         NavigationLink(destination: AddressListView()) {
           Text("View All Addresses")
             .font(.hbBody(14))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
         }
 
         gap(max: 32)

@@ -57,7 +57,7 @@ struct BroadcastResultView: View {
           }) {
             Label("Copy TXID", systemImage: "doc.on.doc")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbSteelBlue)
+              .foregroundStyle(Color.hbInfo)
           }
         }
         .opacity(txidOpacity)
@@ -71,7 +71,7 @@ struct BroadcastResultView: View {
 
         Image(systemName: "antenna.radiowaves.left.and.right")
           .font(.system(size: 48))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
 
         Text("Ready to Broadcast")
           .font(.hbDisplay(24))
@@ -99,7 +99,7 @@ struct BroadcastResultView: View {
         }) {
           if viewModel.isProcessing {
             ProgressView()
-              .tint(.white)
+              .tint(Color.hbOnBrand)
               .hbPrimaryButton()
           } else {
             Text("Broadcast Transaction")
@@ -112,7 +112,7 @@ struct BroadcastResultView: View {
         Button(action: { viewModel.showExportQR = true }) {
           Label("Export Transaction", systemImage: "qrcode")
             .font(.hbBody(15))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbLink)
         }
       }
 
@@ -264,7 +264,7 @@ struct ExportTransactionSheet: View {
             URDisplaySheet(data: txBytes, urType: "bytes")
               .padding(5)
               .background(Color.white)
-              .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+              .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
           } else {
             Text("Transaction could not be finalized")
               .font(.hbBody())
@@ -281,7 +281,7 @@ struct ExportTransactionSheet: View {
           }) {
             Label("Copy Raw TX Hex", systemImage: "doc.on.doc")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbSteelBlue)
+              .foregroundStyle(Color.hbInfo)
           }
         }
         .padding(.top, 8)

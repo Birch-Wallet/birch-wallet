@@ -125,10 +125,10 @@ struct MultisigConfigView: View {
         HStack(spacing: 4) {
           Image(systemName: "chevron.up.chevron.down")
             .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(Color.hbBitcoinOrange.opacity(0.7))
+            .foregroundStyle(Color.hbBrandInk.opacity(0.7))
           Text("\(viewModel.requiredSignatures)")
             .font(.hbDisplay(48))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
         }
       }
       .sheet(isPresented: $showingMSheet) {

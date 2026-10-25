@@ -37,12 +37,12 @@ struct DescriptorPDFView: View {
             Button(action: printPDF) {
               Image(systemName: "printer")
             }
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
 
             Button(action: sharePDF) {
               Image(systemName: "square.and.arrow.up")
             }
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
           }
         }
       }

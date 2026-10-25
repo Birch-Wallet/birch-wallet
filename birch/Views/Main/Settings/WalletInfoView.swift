@@ -78,7 +78,7 @@ struct WalletInfoView: View {
               }) {
                 Image(systemName: "pencil")
                   .font(.system(size: 12))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
             }
           }
@@ -96,10 +96,10 @@ struct WalletInfoView: View {
             Text("Show Output Descriptor QR")
               .font(.hbBody(15))
           }
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
-          .background(Color.hbBitcoinOrange.opacity(0.12))
+          .background(Color.hbBrandInk.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .disabled(exportDescriptor == nil)
@@ -116,10 +116,10 @@ struct WalletInfoView: View {
             Text("Copy Output Descriptor")
               .font(.hbBody(15))
           }
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
-          .background(Color.hbSteelBlue.opacity(0.12))
+          .background(Color.hbInfo.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .disabled(exportDescriptor == nil)
@@ -132,10 +132,10 @@ struct WalletInfoView: View {
             Text("PDF/Print Output Descriptor")
               .font(.hbBody(15))
           }
-          .foregroundStyle(Color.purple)
+          .foregroundStyle(Color.hbPurple)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 14)
-          .background(Color.purple.opacity(0.12))
+          .background(Color.hbPurple.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .disabled(exportDescriptor == nil)
@@ -158,7 +158,7 @@ struct WalletInfoView: View {
             Button(action: { showEditCosigners = true }) {
               Text("Edit")
                 .font(.hbBody(15))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbBrandInk)
             }
             .accessibilityIdentifier("editCosigners")
           }
@@ -197,7 +197,7 @@ struct WalletInfoView: View {
             Text("Port")
               .font(.hbLabel())
               .foregroundStyle(Color.hbTextSecondary)
-            TextField("\(wallet.bitcoinNetwork.defaultElectrumPort)", text: $electrumPortText)
+            TextField(String(wallet.bitcoinNetwork.defaultElectrumPort), text: $electrumPortText)
               .font(.hbMono(14))
               .keyboardType(.numberPad)
               .padding(10)
@@ -254,30 +254,30 @@ struct WalletInfoView: View {
                 .font(.hbBody(13))
                 .foregroundStyle(Color.hbTextPrimary)
             }
-            .tint(Color.hbBitcoinOrange)
+            .tint(Color.hbToggle)
           }
 
           if let result = connectionTestResult {
             Text(result)
               .font(.hbBody(13))
-              .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbBitcoinOrange : Color.hbError)
+              .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbWarning : Color.hbError)
           }
 
           HStack(spacing: 12) {
             Button(action: testElectrumConnection) {
               HStack(spacing: 6) {
                 if isTestingConnection {
-                  ProgressView().tint(Color.hbSteelBlue)
+                  ProgressView().tint(Color.hbInfo)
                 } else {
                   Image(systemName: "antenna.radiowaves.left.and.right")
                 }
                 Text(isTestingConnection ? "Testing..." : "Test Connection")
                   .font(.hbBody(14))
               }
-              .foregroundStyle(Color.hbSteelBlue)
+              .foregroundStyle(Color.hbInfo)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
-              .background(Color.hbSteelBlue.opacity(0.12))
+              .background(Color.hbInfo.opacity(0.12))
               .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .disabled(isTestingConnection)
@@ -384,17 +384,17 @@ struct WalletInfoView: View {
               HStack(spacing: 8) {
                 if isResyncing {
                   ProgressView()
-                    .tint(Color.hbBitcoinOrange)
+                    .tint(Color.hbProgress)
                 } else {
                   Image(systemName: "arrow.clockwise")
                 }
                 Text(isResyncing ? "Refreshing..." : "Force Full Refresh")
                   .font(.hbBody(15))
               }
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbBrandInk)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
-              .background(Color.hbBitcoinOrange.opacity(0.12))
+              .background(Color.hbBrandInk.opacity(0.12))
               .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .disabled(isResyncing)
@@ -441,7 +441,7 @@ struct WalletInfoView: View {
                 .foregroundStyle(Color.hbTextSecondary)
             }
           }
-          .tint(Color.hbBitcoinOrange)
+          .tint(Color.hbToggle)
         }
         .hbCard()
 
@@ -776,11 +776,11 @@ struct LabelsQRSheet: View {
             URDisplaySheet(data: exportData, urType: "bytes", maxFragmentLen: Self.maxFragmentLen)
               .padding(5)
               .background(Color.white)
-              .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+              .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
           } else {
             VStack(spacing: 12) {
               ProgressView()
-                .tint(Color.hbBitcoinOrange)
+                .tint(Color.hbProgress)
                 .scaleEffect(1.5)
               Text("Preparing labels...")
                 .font(.hbBody(14))
@@ -963,7 +963,7 @@ private struct DescriptorQRSheet: View {
             URDisplaySheet(ur: ur)
               .padding(5)
               .background(Color.white)
-              .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+              .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
           } else {
             Text("Failed to encode descriptor")
               .font(.hbBody())
@@ -979,15 +979,15 @@ private struct DescriptorQRSheet: View {
             if isExporting {
               HStack(spacing: 8) {
                 ProgressView()
-                  .tint(Color.hbSteelBlue)
+                  .tint(Color.hbInfo)
                 Text("Generating video...")
                   .font(.hbBody(14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
             } else {
               Label("Export Descriptor as MP4", systemImage: "film")
                 .font(.hbBody(14))
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
             }
           }
           .disabled(isExporting || descriptorUR == nil)

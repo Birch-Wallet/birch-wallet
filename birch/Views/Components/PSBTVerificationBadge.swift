@@ -19,7 +19,7 @@ struct PSBTVerificationBadge: View {
     switch state {
     case .notChecked: .hbTextSecondary
     case .verified: .hbSuccess
-    case .partiallyVerified: .hbBitcoinOrange
+    case .partiallyVerified: .hbWarning
     case .failed: .hbError
     }
   }
@@ -70,7 +70,7 @@ struct ChangeVerificationBadge: View {
   private var tint: Color {
     switch status {
     case .verified: .hbSuccess
-    case .warning: .hbBitcoinOrange
+    case .warning: .hbWarning
     case .failed: .hbError
     }
   }

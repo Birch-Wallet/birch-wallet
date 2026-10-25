@@ -148,7 +148,7 @@ struct SendFeeSheetView: View {
         Text(isValidDraft ? formatFeeRate(draftRateValue) : "—")
           .font(.hbMono(11))
       }
-      .foregroundStyle(Color.hbBitcoinOrange)
+      .foregroundStyle(Color.hbSelection)
       .lineLimit(1)
       .minimumScaleFactor(0.7)
       .frame(maxWidth: .infinity)
@@ -163,7 +163,7 @@ struct SendFeeSheetView: View {
       HStack {
         Text("Custom fee rate")
           .font(.hbLabel())
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbSelection)
 
         Spacer()
 
@@ -179,7 +179,7 @@ struct SendFeeSheetView: View {
           .font(.system(size: 40, weight: .regular, design: .monospaced))
           .keyboardType(.decimalPad)
           .focused($isRateFocused)
-          .tint(Color.hbBitcoinOrange)
+          .tint(Color.hbSelection)
           .foregroundStyle(Color.hbTextPrimary)
           .onAppear { isRateFocused = true }
           .onChange(of: isRateFocused) {
@@ -340,7 +340,7 @@ struct SendFeeSheetView: View {
   private func selectionIndicator(isSelected: Bool) -> some View {
     ZStack {
       Circle()
-        .fill(isSelected ? Color.hbBitcoinOrange : .clear)
+        .fill(isSelected ? Color.hbSelection : .clear)
         .frame(width: 22, height: 22)
 
       Circle()
@@ -350,7 +350,7 @@ struct SendFeeSheetView: View {
       if isSelected {
         Image(systemName: "checkmark")
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(.white)
+          .foregroundStyle(Color.hbOnSelection)
       }
     }
   }

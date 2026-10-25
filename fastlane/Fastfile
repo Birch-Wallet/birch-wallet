@@ -100,6 +100,16 @@ def inner_display(udid)
   ports.compact.max_by(&:last)&.first || UI.user_error!("No built-in display found on #{udid}")
 end
 
+# Local Electrum servers for the tour to sync from instead of each network's
+# default, one per network as BIRCH_TOUR_ELECTRUM_<NETWORK>=ssl://host:port
+# (TESTNET4, the tour's network; also MAINNET, TESTNET3, SIGNET). Set them in
+# fastlane/.env, which fastlane loads and git ignores. TEST_RUNNER_ hands them
+# to ScreenshotTests, which passes them to the app.
+def tour_electrum_env
+  ENV.select { |key, _| key.start_with?("BIRCH_TOUR_ELECTRUM_") }
+     .transform_keys { |key| "TEST_RUNNER_#{key}" }
+end
+
 # Runs the tour while answering the capture requests SnapshotHelper makes when
 # SNAPSHOT_HOST_CAPTURE is set: XCUIScreen can't see the open Duo's inner
 # display, so each shot is taken here with `simctl io --display`. Requests
@@ -277,8 +287,9 @@ def run_device_passes(name, config)
                 "-parallel-testing-enabled NO " \
                 "-resultBundlePath '#{result}' " \
                 "> '#{log}' 2>&1"
-      # Tells SnapshotHelper which appearance folder the captures go in.
-      env = { "TEST_RUNNER_SNAPSHOT_APPEARANCE" => mode }
+      # Tells SnapshotHelper which appearance folder the captures go in, and
+      # passes on any local Electrum servers (tour_electrum_env).
+      env = { "TEST_RUNNER_SNAPSHOT_APPEARANCE" => mode }.merge(tour_electrum_env)
       started = Time.now
       passed = if posture == "open"
                  run_tour_with_host_capture(env, command, udid, name)
@@ -376,6 +387,7 @@ platform :ios do
     #       waits on the Electrum sync rather than sleeping, so a slower
     #       shared sync is fine ─────────────────────────────────────────────
     UI.header("Tours on #{devices.size} device(s), #{parallel} at a time")
+    tour_electrum_env.each { |key, url| UI.message("Electrum: #{key.delete_prefix('TEST_RUNNER_BIRCH_TOUR_ELECTRUM_').downcase} from #{url}") }
     run_screenshot_passes(devices, parallel)
 
     report_pass_times(lane_started)

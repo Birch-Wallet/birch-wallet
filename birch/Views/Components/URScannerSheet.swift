@@ -69,7 +69,7 @@ struct URScannerSheet: View {
         if displayProgress > 0, displayProgress < 1 {
           VStack(spacing: 4) {
             ProgressView(value: displayProgress)
-              .tint(Color.hbBitcoinOrange)
+              .tint(Color.hbProgress)
 
             Text("\(Int(displayProgress * 100))% received")
               .font(.hbLabel())
@@ -106,7 +106,7 @@ struct URScannerSheet: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.hbError.opacity(0.9))
+            .background(Color.hbErrorFill.opacity(0.9))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
@@ -286,7 +286,7 @@ struct ScannerOverlay: View {
         path.addLine(to: CGPoint(x: origin.x, y: origin.y + size))
         path.addLine(to: CGPoint(x: origin.x, y: origin.y + size - cornerLength))
       }
-      .stroke(Color.hbBitcoinOrange, lineWidth: 3)
+      .stroke(Color.hbBrand, lineWidth: 3)
     }
   }
 }

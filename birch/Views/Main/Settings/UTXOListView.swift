@@ -60,7 +60,7 @@ struct UTXOListView: View {
           Text("No outputs match the current filter")
         } actions: {
           Button("Reset Filters", action: resetShowFilters)
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbLink)
         }
       } else {
         List(visible) { utxo in
@@ -76,14 +76,16 @@ struct UTXOListView: View {
               } label: {
                 Label("Unfreeze", systemImage: "flame")
               }
-              .tint(Color.hbBitcoinOrange)
+              // Swipe actions draw a white label on the tint, which would vanish on Bark
+              // Dark's near-white brand ink, so this keeps the warning color
+              .tint(Color.hbWarning)
             } else {
               Button {
                 freezeUTXO(utxo)
               } label: {
                 Label("Freeze", systemImage: "snowflake")
               }
-              .tint(Color.hbSteelBlue)
+              .tint(Color.hbInfo)
             }
           }
           .listRowBackground(Color.hbSurface)
@@ -115,7 +117,7 @@ struct UTXOListView: View {
     } label: {
       Image(systemName: "line.3.horizontal.decrease")
         .font(.system(size: 20, weight: .semibold))
-        .foregroundStyle(filter.isFiltering ? Color.hbBitcoinOrange : Color.hbTextPrimary)
+        .foregroundStyle(filter.isFiltering ? Color.hbSelection : Color.hbTextPrimary)
         .frame(width: 44, height: 44)
         .contentShape(Rectangle())
     }
@@ -152,11 +154,11 @@ struct UTXOListView: View {
           statusCapsule("Spent", color: Color.hbTextSecondary)
         } else {
           if isFrozen {
-            statusCapsule("Frozen", color: Color.hbSteelBlue)
+            statusCapsule("Frozen", color: Color.hbInfo)
           }
           statusCapsule(
             utxo.isConfirmed ? "Confirmed" : "Unconfirmed",
-            color: utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange,
+            color: utxo.isConfirmed ? Color.hbSuccess : Color.hbWarning,
           )
         }
       }
@@ -196,7 +198,7 @@ struct UTXOListView: View {
               .font(.hbBody(11))
               .lineLimit(1)
           }
-          .foregroundStyle(isSpent ? Color.hbTextSecondary : Color.hbSteelBlue)
+          .foregroundStyle(isSpent ? Color.hbTextSecondary : Color.hbInfo)
         }
       }
 

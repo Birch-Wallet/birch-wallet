@@ -106,7 +106,7 @@ struct ConnectionStatusView: View {
       if let result = testResult {
         Text(result)
           .font(.hbBody(13))
-          .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbBitcoinOrange : Color.hbError)
+          .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbWarning : Color.hbError)
       }
     }
     .hbCard()
@@ -165,17 +165,17 @@ struct ConnectionStatusView: View {
       Button(action: syncNow) {
         HStack(spacing: 8) {
           if isSyncing {
-            ProgressView().tint(Color.hbBitcoinOrange)
+            ProgressView().tint(Color.hbProgress)
           } else {
             Image(systemName: "arrow.triangle.2.circlepath")
           }
           Text(isSyncing ? "Refreshing..." : "Refresh Now")
             .font(.hbBody(15))
         }
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Color.hbBitcoinOrange.opacity(0.12))
+        .background(Color.hbBrandInk.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .disabled(isSyncing)
@@ -197,17 +197,17 @@ struct ConnectionStatusView: View {
       Button(action: testConnection) {
         HStack(spacing: 8) {
           if isTesting {
-            ProgressView().tint(Color.hbSteelBlue)
+            ProgressView().tint(Color.hbInfo)
           } else {
             Image(systemName: "antenna.radiowaves.left.and.right")
           }
           Text(isTesting ? "Testing..." : "Test Connection")
             .font(.hbBody(15))
         }
-        .foregroundStyle(Color.hbSteelBlue)
+        .foregroundStyle(Color.hbInfo)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Color.hbSteelBlue.opacity(0.12))
+        .background(Color.hbInfo.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
       .disabled(isTesting)

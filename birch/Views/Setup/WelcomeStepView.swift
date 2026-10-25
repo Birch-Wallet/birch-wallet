@@ -112,7 +112,7 @@ private struct FeatureRow: View {
     HStack(spacing: 14) {
       Image(systemName: icon)
         .font(.system(size: 18))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
         .frame(width: 28)
 
       Text(text)

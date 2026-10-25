@@ -40,7 +40,7 @@ struct AddressDetailView: View {
         }) {
           Label(copied ? "Copied!" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc")
             .font(.hbBody(14))
-            .foregroundStyle(copied ? Color.hbSuccess : Color.hbSteelBlue)
+            .foregroundStyle(copied ? Color.hbSuccess : Color.hbInfo)
         }
 
         // Address label
@@ -74,7 +74,7 @@ struct AddressDetailView: View {
                 Text(addressLabel.isEmpty ? "Add Label" : addressLabel)
                   .font(.hbBody(13))
               }
-              .foregroundStyle(addressLabel.isEmpty ? Color.hbTextSecondary : Color.hbSteelBlue)
+              .foregroundStyle(addressLabel.isEmpty ? Color.hbTextSecondary : Color.hbInfo)
             }
           }
         }

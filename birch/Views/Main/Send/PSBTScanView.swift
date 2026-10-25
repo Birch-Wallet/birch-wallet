@@ -34,13 +34,13 @@ struct PSBTScanView: View {
       Button(action: { showImportFile = true }) {
         Label("Import PSBT File", systemImage: "doc.badge.arrow.up")
           .font(.hbBody(14))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbLink)
       }
 
       Button(action: { showManualInput = true }) {
         Label("Paste Base64 PSBT", systemImage: "doc.on.clipboard")
           .font(.hbBody(14))
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
       }
 
       Spacer()

@@ -166,7 +166,7 @@ private struct AppLockView: View {
 
       Image(systemName: biometricIcon)
         .font(.system(size: 56))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
 
       Text(Constants.appName)
         .font(.hbDisplay(28))

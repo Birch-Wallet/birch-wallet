@@ -45,7 +45,7 @@ struct URDisplaySheet: View {
           .aspectRatio(1, contentMode: .fit)
       } else {
         ProgressView()
-          .tint(Color.hbBitcoinOrange)
+          .tint(Color.hbProgress)
       }
     }
     .onAppear {

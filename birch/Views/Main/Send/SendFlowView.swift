@@ -262,7 +262,7 @@ private struct FiatHintOverlay: View {
       HStack(alignment: .top, spacing: 10) {
         Image(systemName: "info.circle.fill")
           .font(.system(size: 17))
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
 
         VStack(alignment: .leading, spacing: 4) {
           Text("Fiat is off")

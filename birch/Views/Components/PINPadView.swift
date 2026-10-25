@@ -38,7 +38,7 @@ struct PINPadView: View {
       HStack(spacing: 12) {
         ForEach(0 ..< dotCount, id: \.self) { index in
           Circle()
-            .fill(index < pin.count ? Color.hbBitcoinOrange : Color.hbBorder)
+            .fill(index < pin.count ? Color.hbProgress : Color.hbBorder)
             .frame(width: 14, height: 14)
         }
       }
@@ -62,7 +62,7 @@ struct PINPadView: View {
           Button(action: onFaceIDTap) {
             Image(systemName: "faceid")
               .font(.system(size: 24))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbBrandInk)
               .frame(width: 72, height: 72)
           }
           .disabled(isDisabled)

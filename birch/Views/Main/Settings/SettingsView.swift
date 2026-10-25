@@ -187,7 +187,7 @@ private struct SettingsChoiceList<Value: Hashable>: View {
               if option == selection {
                 Image(systemName: "checkmark")
                   .font(.system(size: 14, weight: .semibold))
-                  .foregroundStyle(Color.hbBitcoinOrange)
+                  .foregroundStyle(Color.hbSelection)
               }
             }
             .settingsRow()
@@ -312,7 +312,7 @@ private struct AppIconTile: View {
           .overlay {
             if isSelected {
               RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+                .strokeBorder(Color.hbSelection, lineWidth: 1.5)
             }
           }
 
@@ -320,7 +320,7 @@ private struct AppIconTile: View {
           if isSelected {
             Image(systemName: "checkmark.circle.fill")
               .font(.system(size: 12))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbSelection)
           }
           Text(option.displayName)
             .font(.hbBody(13))
@@ -396,7 +396,7 @@ private struct FiatSettingsRow: View {
             .foregroundStyle(Color.hbTextSecondary)
         }
       }
-      .tint(Color.hbBitcoinOrange)
+      .tint(Color.hbToggle)
       .settingsRow()
       .accessibilityIdentifier("showFiatPriceToggle")
 
@@ -481,7 +481,7 @@ private struct AppLockSettingsSection: View {
             .foregroundStyle(Color.hbTextSecondary)
         }
       }
-      .tint(Color.hbBitcoinOrange)
+      .tint(Color.hbToggle)
       .settingsRow()
       .alert("Authentication Unavailable", isPresented: $showBiometricError) {
         Button("OK") {}
@@ -526,7 +526,7 @@ private struct AppLockSettingsSection: View {
           } label: {
             HStack {
               Text("Add Additional PIN")
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbLink)
               Spacer()
               Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
@@ -787,7 +787,7 @@ private struct LogExportSheet: View {
 
         if isLoading {
           Spacer()
-          ProgressView().tint(Color.hbBitcoinOrange)
+          ProgressView().tint(Color.hbProgress)
           Spacer()
         } else {
           logList
@@ -807,12 +807,12 @@ private struct LogExportSheet: View {
             Button { pendingExport = .share } label: {
               Image(systemName: "square.and.arrow.up").font(.system(size: 14))
             }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
 
             Button { pendingExport = .copy } label: {
               Image(systemName: copied ? "checkmark" : "doc.on.doc")
                 .font(.system(size: 14))
-                .foregroundStyle(copied ? Color.hbSuccess : Color.hbBitcoinOrange)
+                .foregroundStyle(copied ? Color.hbSuccess : Color.hbBrandInk)
             }
           }
         }
@@ -906,7 +906,7 @@ private struct LogExportSheet: View {
       Text(text).font(.hbLabel())
       Image(systemName: "chevron.down").font(.system(size: 9))
     }
-    .foregroundStyle(Color.hbBitcoinOrange)
+    .foregroundStyle(Color.hbBrandInk)
     .padding(.horizontal, 10)
     .padding(.vertical, 6)
     .background(Color.hbSurface, in: Capsule())
@@ -960,7 +960,7 @@ private struct LogExportSheet: View {
     switch level {
     case .debug: Color.hbTextSecondary
     case .info: Color.hbTextPrimary
-    case .warning: Color.hbBitcoinOrange
+    case .warning: Color.hbWarning
     case .error, .critical: Color.hbError
     }
   }

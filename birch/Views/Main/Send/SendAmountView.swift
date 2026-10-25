@@ -135,7 +135,7 @@ private struct KeyboardDismissButton: View {
     Button(action: dismissKeyboard) {
       Image(systemName: "keyboard.chevron.compact.down")
         .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
         .frame(width: 44, height: 44)
         .background(
           Circle()
@@ -313,10 +313,10 @@ private struct MaxPill: View {
     Button(action: { viewModel.toggleMaxAmount(for: index) }) {
       Text("MAX")
         .font(.hbMonoBold(12))
-        .foregroundStyle(isActive ? .white : Color.hbBitcoinOrange)
+        .foregroundStyle(isActive ? Color.hbOnBrand : Color.hbBrandInk)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
-        .background(isActive ? Color.hbBitcoinOrange : Color.hbBitcoinOrange.opacity(0.15))
+        .background(isActive ? Color.hbBrand : Color.hbBrandInk.opacity(0.15))
         .clipShape(Capsule())
     }
     .buttonStyle(.plain)
@@ -616,9 +616,9 @@ private struct RecipientCard: View {
       if showsAmount {
         Text("\(index + 1)")
           .font(.hbMonoBold(11))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
           .frame(width: 20, height: 20)
-          .background(Color.hbBitcoinOrange.opacity(0.15))
+          .background(Color.hbBrandInk.opacity(0.15))
           .clipShape(Circle())
       }
 
@@ -631,10 +631,10 @@ private struct RecipientCard: View {
         if let network = viewModel.currentNetwork {
           Text(network.displayName)
             .font(.hbBody(11).weight(.semibold))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .background(Color.hbSteelBlue.opacity(0.15))
+            .background(Color.hbInfo.opacity(0.15))
             .clipShape(Capsule())
         }
       } else {
@@ -721,9 +721,9 @@ private struct RecipientCard: View {
             Text("Scan QR")
               .font(.hbBody(16).weight(.bold))
           }
-          .foregroundStyle(.white)
+          .foregroundStyle(Color.hbOnBrand)
           .frame(maxWidth: .infinity, minHeight: 56)
-          .background(Color.hbBitcoinOrange, in: .rect(cornerRadius: 8, style: .continuous))
+          .background(Color.hbBrand, in: .rect(cornerRadius: 8, style: .continuous))
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -731,7 +731,7 @@ private struct RecipientCard: View {
         Button(action: pasteAddress) {
           Text("Paste")
             .font(.hbBody(16).weight(.bold))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
             .frame(maxWidth: .infinity, minHeight: 56)
             .birchCard(.nested)
             .contentShape(Rectangle())
@@ -830,9 +830,9 @@ private struct RecipientCard: View {
         }) {
           Image(systemName: "qrcode.viewfinder")
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
             .frame(width: 40, height: 40)
-            .background(Color.hbBitcoinOrange.opacity(0.15), in: .rect(cornerRadius: 8, style: .continuous))
+            .background(Color.hbBrandInk.opacity(0.15), in: .rect(cornerRadius: 8, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -991,7 +991,7 @@ private struct DecisionStack: View {
       row(
         title: "Fee",
         subtitle: feeSubtitle,
-        subtitleColor: viewModel.feeRateValue > 0 ? Color.hbTextSecondary : Color.hbBitcoinOrange,
+        subtitleColor: viewModel.feeRateValue > 0 ? Color.hbTextSecondary : Color.hbWarning,
         badge: viewModel.selectedFeePreset == .custom ? nil : viewModel.selectedFeePreset.displayName,
         action: { viewModel.showFeeSheet = true },
       )
@@ -1001,7 +1001,7 @@ private struct DecisionStack: View {
       row(
         title: "Coins",
         subtitle: coinsSubtitle,
-        subtitleColor: viewModel.manualUTXOSelection ? Color.hbBitcoinOrange : Color.hbTextSecondary,
+        subtitleColor: viewModel.manualUTXOSelection ? Color.hbSelection : Color.hbTextSecondary,
         badge: nil,
         action: { viewModel.showUTXOPicker = true },
       )
@@ -1044,10 +1044,10 @@ private struct DecisionStack: View {
         if let badge {
           Text(badge)
             .font(.hbBody(13).weight(.semibold))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.hbBitcoinOrange.opacity(0.15))
+            .background(Color.hbBrandInk.opacity(0.15))
             .clipShape(Capsule())
         }
 
@@ -1115,7 +1115,7 @@ private struct SendFooter: View {
       Button(action: { viewModel.tryReview() }) {
         if viewModel.isProcessing {
           ProgressView()
-            .tint(.white)
+            .tint(isReady ? Color.hbOnBrand : Color.hbDisabledInk)
             .hbPrimaryButton(isEnabled: isReady)
         } else {
           Text("Review")
@@ -1206,7 +1206,7 @@ struct UTXOPickerSheet: View {
           if !viewModel.selectedUTXOIds.isEmpty {
             Text(viewModel.selectedUTXOTotal.formattedSats)
               .font(.hbMonoBold())
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbAmount)
           }
         }
         .padding(.horizontal, 24)
@@ -1228,7 +1228,7 @@ private struct UTXOPickerRow: View {
       HStack(spacing: 12) {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
           .font(.system(size: 22))
-          .foregroundStyle(isSelected ? Color.hbBitcoinOrange : Color.hbBorder)
+          .foregroundStyle(isSelected ? Color.hbSelection : Color.hbBorder)
 
         VStack(alignment: .leading, spacing: 4) {
           Text(utxo.amount.formattedSats)
@@ -1247,7 +1247,7 @@ private struct UTXOPickerRow: View {
                 .font(.hbBody(11))
                 .lineLimit(1)
             }
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
           }
         }
 
@@ -1255,7 +1255,7 @@ private struct UTXOPickerRow: View {
 
         HStack(spacing: 4) {
           Circle()
-            .fill(utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange)
+            .fill(utxo.isConfirmed ? Color.hbSuccess : Color.hbWarning)
             .frame(width: 6, height: 6)
           Text(utxo.isConfirmed ? "Confirmed" : "Unconfirmed")
             .font(.hbLabel(10))
@@ -1296,7 +1296,7 @@ private struct FrozenUTXOPickerRow: View {
               .font(.hbBody(11))
               .lineLimit(1)
           }
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
         }
       }
 
@@ -1308,10 +1308,10 @@ private struct FrozenUTXOPickerRow: View {
         Text("Frozen")
           .font(.hbLabel(10))
       }
-      .foregroundStyle(Color.hbSteelBlue)
+      .foregroundStyle(Color.hbInfo)
       .padding(.horizontal, 8)
       .padding(.vertical, 4)
-      .background(Color.hbSteelBlue.opacity(0.15))
+      .background(Color.hbInfo.opacity(0.15))
       .clipShape(Capsule())
     }
     .padding(.horizontal, 16)

@@ -112,7 +112,7 @@ struct ElectrumServerSetupSection: View {
               .font(.hbBody(13))
               .foregroundStyle(Color.hbTextPrimary)
           }
-          .tint(Color.hbBitcoinOrange)
+          .tint(Color.hbToggle)
         }
 
         if viewModel.network.defaultElectrumHost != nil {
@@ -122,29 +122,29 @@ struct ElectrumServerSetupSection: View {
         } else {
           Text("Electrum Server config is required for \(viewModel.network.displayName)")
             .font(.hbBody(11))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbWarning)
         }
 
         if let result = connectionTestResult {
           Text(result)
             .font(.hbBody(13))
-            .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbBitcoinOrange : Color.hbError)
+            .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbWarning : Color.hbError)
         }
 
         Button(action: testConnection) {
           HStack(spacing: 6) {
             if isTestingConnection {
-              ProgressView().tint(Color.hbSteelBlue)
+              ProgressView().tint(Color.hbInfo)
             } else {
               Image(systemName: "antenna.radiowaves.left.and.right")
             }
             Text(isTestingConnection ? "Testing..." : "Test Connection")
               .font(.hbBody(14))
           }
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
           .frame(maxWidth: .infinity)
           .padding(.vertical, 12)
-          .background(Color.hbSteelBlue.opacity(0.12))
+          .background(Color.hbInfo.opacity(0.12))
           .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .disabled(isTestingConnection)

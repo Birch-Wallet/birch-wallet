@@ -346,7 +346,7 @@ struct TransactionListView: View {
             }) {
               Text("Add")
                 .font(.hbBody(15))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbBrandInk)
             }
           }
           .padding(.horizontal, 14)
@@ -393,7 +393,7 @@ struct TransactionListView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 15)
-                .background(wallet.isActive ? Color.hbBitcoinOrange.opacity(0.12) : Color.clear)
+                .background(wallet.isActive ? Color.hbBrand.opacity(0.12) : Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture {
                   if walletPickerEditMode {
