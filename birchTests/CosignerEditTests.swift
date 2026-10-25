@@ -114,7 +114,7 @@ struct CosignerEditTests {
     return database
   }
 
-  /// What Save Changes passes to `updateCosigners` from the Edit Cosigners form
+  /// What Save passes to `updateCosigners` from the Edit Cosigners form
   private func edits(from form: SetupWizardViewModel) -> [Edit] {
     (0 ..< form.totalCosigners).map {
       (
@@ -630,7 +630,7 @@ struct CosignerEditTests {
     #expect(form.cosignerXpubs == [Self.keyB, Self.keyA])
   }
 
-  /// Save Changes stays outlined and flags the cosigner for every edit that
+  /// Save stays outlined and flags the cosigner for every edit that
   /// saving would refuse, so the form never offers a save that then fails
   @Test func `form flags every cosigner edit that saving rejects`() throws {
     let rejected: [(name: String, change: (inout Edit) -> Void)] = [
