@@ -147,6 +147,12 @@ final class ScreenshotTests: XCTestCase {
 
     let importTitle = app.staticTexts["Import Descriptor"]
     XCTAssertTrue(importTitle.waitForExistence(timeout: 3), "Descriptor import screen should appear")
+    settle()
+
+    // MARK: 35 - Descriptor Import (empty)
+
+    // Before anything is entered: the field's placeholder and Import disabled
+    snapshot("35-DescriptorImport-Empty")
 
     let testDescriptor = "wsh(sortedmulti(1,[7a13a7b1/48'/1'/0'/2']tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH/<0;1>/*,[30a36b52/48'/1'/0'/2']tpubDF6MPv2vWsbCo8c7rk4X32BPa5yuj4niem5Pr6isrd9cSdCkYETcGUmBSFY4ekTR1CRFmjn4eoYGrwPU19FffwEpX7Tda6BBmg91aiHKpmE/<0;1>/*))"
 
@@ -256,6 +262,34 @@ final class ScreenshotTests: XCTestCase {
       }
     }
 
+    // MARK: 36 - Wallet Settings sheet (via the top-left button)
+
+    let walletSettingsButton = barItem("walletSettings")
+    XCTAssertTrue(walletSettingsButton.waitForExistence(timeout: 5), "Wallet Settings button should exist")
+    walletSettingsButton.tap()
+    XCTAssertTrue(app.navigationBars["Wallet Settings"].waitForExistence(timeout: 5), "Wallet Settings sheet should appear")
+    settle()
+    snapshot("36-WalletSettings")
+
+    // MARK: 37 - Edit Cosigners sheet (via Edit on the Cosigners card)
+
+    let editCosignersButton = app.buttons["editCosigners"]
+    XCTAssertTrue(editCosignersButton.waitForExistence(timeout: 3), "Cosigners card should show Edit")
+    editCosignersButton.tap()
+    let editCosignersTitle = app.staticTexts["Edit Cosigners"]
+    XCTAssertTrue(editCosignersTitle.waitForExistence(timeout: 5), "Edit Cosigners sheet should appear")
+    settle()
+    snapshot("37-EditCosigners")
+
+    // Nothing was edited, so Cancel closes it; then Done closes Wallet Settings.
+    // A swipe down could stop at Wallet Settings' half-height detent.
+    app.buttons["Cancel"].firstMatch.tap()
+    XCTAssertTrue(editCosignersTitle.waitForNonExistence(timeout: 5), "Edit Cosigners sheet should close")
+    let walletSettingsDone = app.buttons["Done"].firstMatch
+    XCTAssertTrue(walletSettingsDone.waitForExistence(timeout: 3), "Wallet Settings Done button should exist")
+    walletSettingsDone.tap()
+    XCTAssertTrue(app.navigationBars["Wallet Settings"].waitForNonExistence(timeout: 5), "Wallet Settings sheet should close")
+
     // MARK: 08 - Receive
 
     let receiveTab = tabButton("Receive")
@@ -315,6 +349,19 @@ final class ScreenshotTests: XCTestCase {
       // Go back to UTXO list
       navigateBack()
     }
+
+    // MARK: 38 - UTXO Filter sheet (opens at its half-height detent)
+
+    let utxoFilterButton = barItem("utxoFilterButton")
+    XCTAssertTrue(utxoFilterButton.waitForExistence(timeout: 5), "UTXO filter button should exist")
+    utxoFilterButton.tap()
+    XCTAssertTrue(app.navigationBars["Filter"].waitForExistence(timeout: 5), "UTXO filter sheet should appear")
+    settle()
+    snapshot("38-UTXOFilter")
+    let filterDone = app.buttons["Done"].firstMatch
+    XCTAssertTrue(filterDone.waitForExistence(timeout: 3), "Filter Done button should exist")
+    filterDone.tap()
+    XCTAssertTrue(app.navigationBars["Filter"].waitForNonExistence(timeout: 5), "UTXO filter sheet should close")
 
     // MARK: 14 - Settings
 

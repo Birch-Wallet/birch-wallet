@@ -160,6 +160,7 @@ struct WalletInfoView: View {
                 .font(.hbBody(15))
                 .foregroundStyle(Color.hbBitcoinOrange)
             }
+            .accessibilityIdentifier("editCosigners")
           }
 
           let sorted = (wallet.cosigners).sorted { $0.orderIndex < $1.orderIndex }
@@ -814,7 +815,7 @@ struct LabelsQRSheet: View {
 // MARK: - Edit Cosigners Sheet
 
 /// Edit Cosigners: the Import cosigners form (`CosignerForm`) filled in from the
-/// wallet, with Cancel and Save Changes. Renaming saves straight away; changing a
+/// wallet, with Cancel and Save. Renaming saves straight away; changing a
 /// key, fingerprint or path rebuilds the wallet, so it asks first.
 private struct EditCosignersView: View {
   @Environment(\.dismiss) private var dismiss
@@ -877,7 +878,7 @@ private struct EditCosignersView: View {
             // Outlined until every cosigner is complete, but never disabled:
             // Save is what shows the user what is missing
             Button(action: { save(proxy: proxy) }) {
-              Text("Save Changes")
+              Text("Save")
                 .hbCompactPrimaryButton(form.allCosignersComplete ? .filled : .outlined)
             }
           }
@@ -905,7 +906,7 @@ private struct EditCosignersView: View {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
   }
 
-  /// Save Changes: shows what is missing like Next does, then saves according to
+  /// Save: shows what is missing like Next does, then saves according to
   /// what changed
   private func save(proxy: ScrollViewProxy) {
     dismissKeyboard()

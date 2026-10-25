@@ -335,9 +335,11 @@ platform :ios do
 
     # ── 0. Clear previous output so stale files don't accumulate ────────
     if !only.empty?
-      # Only these devices' captures, bare and framed.
+      # Only these devices' captures, bare and framed: "<name>-NN-…" or, for the
+      # Duo's postures, "<name> (Closed)-NN-…". A bare "<name>*" would also take
+      # iPhone 17 Pro Max's files for iPhone 17 Pro.
       only.each do |name|
-        Dir.glob(File.expand_path("screenshots/{dark,light}/**/#{name}*.png", __dir__)).each { |f| FileUtils.rm_f(f) }
+        Dir.glob(File.expand_path("screenshots/{dark,light}/**/{#{name},#{name} (*)}-*.png", __dir__)).each { |f| FileUtils.rm_f(f) }
       end
     else
       FileUtils.rm_rf(File.expand_path("screenshots/dark", __dir__))
