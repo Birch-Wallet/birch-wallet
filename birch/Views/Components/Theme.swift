@@ -3,36 +3,65 @@ import SwiftUI
 
 // MARK: - Theme Data
 
+/// One theme's colors, by the role each plays. Views read them through the
+/// `Color.hb*` accessors below, never from a theme directly.
 struct HBTheme {
-  var background: Color
-  var surface: Color
-  var surfaceElevated: Color
+  /// Screens and sheets
+  var ground: Color
+  /// Cards and grouped rows
+  var card: Color
+  /// Fields, rows and the segmented track inside a card
+  var nested: Color
+  /// Popovers and menus over other content
+  var floating: Color
+  /// The wallet header behind the balance
+  var hero: Color
+  /// 1pt line between rows inside a card
+  var divider: Color
+  /// Quiet strokes: empty radios, progress tracks, underlines
   var border: Color
   var textPrimary: Color
   var textSecondary: Color
-  var accent: Color
-  var heroBackground: Color
+  /// Primary button fill
+  var brand: Color
+  /// Text and icons on a brand fill
+  var onBrand: Color
+  /// The brand as text or an icon on a surface
+  var brandInk: Color
+  /// Selection ring and fill, checkmarks, selected radios
+  var selection: Color
+  /// A checkmark on a selection fill. The design system draws it in the accent's
+  /// on-color, which is too dark on the light themes' deep selection colors
+  var onSelection: Color
+  /// A toggle that is on
+  var toggle: Color
+  /// Spinners, step bars and the syncing dot
+  var progress: Color
+  /// The active tab
+  var tabTint: Color
+  /// Text links for forward actions
+  var link: Color
+  /// Bitcoin amounts and flow marks
+  var amount: Color
   var success: Color
+  /// Needs a closer look: unconfirmed, partly verified, warnings
+  var warning: Color
+  /// Error text and icons
   var error: Color
-  var secondaryAccent: Color
-  var colorScheme: ColorScheme? = .dark
+  /// Destructive fills, under white text
+  var errorFill: Color
+  /// Neutral information: change, labels, copy and paste
+  var info: Color
+  var disabledFill: Color
+  var disabledInk: Color
+  var mainnet: Color
+  var testnet4: Color
+  var testnet3: Color
+  /// Signet, and the PDF and print actions
+  var purple: Color
+  var colorScheme: ColorScheme
 
-  static let system = HBTheme(
-    background: Color(.systemBackground),
-    surface: Color(.secondarySystemBackground),
-    surfaceElevated: Color(.tertiarySystemBackground),
-    border: Color(.separator),
-    textPrimary: Color(.label),
-    textSecondary: Color(.secondaryLabel),
-    accent: Color(red: 0.969, green: 0.576, blue: 0.102),
-    heroBackground: Color(.tertiarySystemBackground),
-    success: Color(.systemGreen),
-    error: Color(.systemRed),
-    secondaryAccent: Color(.systemBlue),
-    colorScheme: nil,
-  )
-
-  static let dark = HBTheme(
+  static let dark = legacy(
     background: Color(red: 0.039, green: 0.039, blue: 0.059),
     surface: Color(red: 0.082, green: 0.082, blue: 0.098),
     surfaceElevated: Color(red: 0.110, green: 0.110, blue: 0.141),
@@ -47,7 +76,7 @@ struct HBTheme {
     colorScheme: .dark,
   )
 
-  static let light = HBTheme(
+  static let light = legacy(
     background: Color(red: 1.000, green: 1.000, blue: 1.000),
     surface: Color(red: 0.949, green: 0.949, blue: 0.969),
     surfaceElevated: Color(red: 1.000, green: 1.000, blue: 1.000),
@@ -62,77 +91,216 @@ struct HBTheme {
     colorScheme: .light,
   )
 
+  // Birch and Bark are the design system's Catkin and Bark presets
+  // (design/assets/ds-tokens.js), as derive() resolves them.
+
   static let birchDark = HBTheme(
-    background: Color(red: 0.102, green: 0.094, blue: 0.078),
-    surface: Color(red: 0.141, green: 0.125, blue: 0.094),
-    surfaceElevated: Color(red: 0.180, green: 0.157, blue: 0.125),
-    border: Color(red: 0.239, green: 0.208, blue: 0.188),
-    textPrimary: Color(red: 0.929, green: 0.910, blue: 0.875),
-    textSecondary: Color(red: 0.659, green: 0.620, blue: 0.573),
-    accent: Color(red: 0.831, green: 0.659, blue: 0.208),
-    heroBackground: Color(red: 0.141, green: 0.125, blue: 0.094),
-    success: Color(red: 0.416, green: 0.478, blue: 0.322),
-    error: Color(red: 0.690, green: 0.235, blue: 0.157),
-    secondaryAccent: Color(red: 0.416, green: 0.478, blue: 0.322),
+    ground: Color(hex: 0x161512),
+    card: Color(hex: 0x201E1B),
+    nested: Color(hex: 0x292724),
+    floating: Color(hex: 0x292724),
+    hero: Color(hex: 0x201E1B),
+    divider: Color(hex: 0x2F2D2A),
+    border: Color(hex: 0x383633),
+    textPrimary: Color(hex: 0xECEBE8),
+    textSecondary: Color(hex: 0xADAAA6),
+    brand: Color(hex: 0xE7B64A),
+    onBrand: Color(hex: 0x1B150A),
+    brandInk: Color(hex: 0xE7B64A),
+    selection: Color(hex: 0xE7B64A),
+    onSelection: Color(hex: 0x1B150A),
+    toggle: Color(hex: 0xE7B64A),
+    progress: Color(hex: 0xE7B64A),
+    tabTint: Color(hex: 0xE7B64A),
+    link: Color(hex: 0xE7B64A),
+    amount: Color(hex: 0xE7B64A),
+    success: Color(hex: 0x7DC67F),
+    warning: Color(hex: 0xF2A359),
+    error: Color(hex: 0xF0726C),
+    errorFill: Color(hex: 0xC8393A),
+    info: Color(hex: 0x7DB9E1),
+    disabledFill: Color(hex: 0x2B2A27),
+    disabledInk: Color(hex: 0x74716D),
+    mainnet: Color(hex: 0xD8BA7E),
+    testnet4: Color(hex: 0x89C6EE),
+    testnet3: Color(hex: 0x77CFD0),
+    purple: Color(hex: 0xCAB0EA),
     colorScheme: .dark,
   )
 
   static let birchLight = HBTheme(
-    background: Color(red: 0.949, green: 0.933, blue: 0.902),
-    surface: Color(red: 0.890, green: 0.867, blue: 0.827),
-    surfaceElevated: Color(red: 0.949, green: 0.933, blue: 0.902),
-    border: Color(red: 0.690, green: 0.663, blue: 0.616),
-    textPrimary: Color(red: 0.137, green: 0.122, blue: 0.106),
-    textSecondary: Color(red: 0.310, green: 0.282, blue: 0.251),
-    accent: Color(red: 0.698, green: 0.525, blue: 0.133),
-    heroBackground: Color(red: 0.890, green: 0.867, blue: 0.827),
-    success: Color(red: 0.278, green: 0.373, blue: 0.224),
-    error: Color(red: 0.600, green: 0.180, blue: 0.120),
-    secondaryAccent: Color(red: 0.278, green: 0.373, blue: 0.224),
+    ground: Color(hex: 0xF2F1EC),
+    card: Color(hex: 0xFEFEFD),
+    nested: Color(hex: 0xF3F3EE),
+    floating: Color(hex: 0xFEFEFD),
+    hero: Color(hex: 0xF2F1EC),
+    divider: Color(hex: 0xD9D8D4),
+    border: Color(hex: 0xB1B0AC),
+    textPrimary: Color(hex: 0x1D1D1B),
+    textSecondary: Color(hex: 0x5E5E59),
+    brand: Color(hex: 0xD9A93B),
+    onBrand: Color(hex: 0x1B150A),
+    brandInk: Color(hex: 0x8D6800),
+    selection: Color(hex: 0x8D6800),
+    onSelection: Color(hex: 0xFFFFFF),
+    toggle: Color(hex: 0xD9A93B),
+    progress: Color(hex: 0x8D6800),
+    tabTint: Color(hex: 0x8D6800),
+    link: Color(hex: 0x8D6800),
+    amount: Color(hex: 0x8D6800),
+    success: Color(hex: 0x2C7533),
+    warning: Color(hex: 0x915100),
+    error: Color(hex: 0xAA3332),
+    errorFill: Color(hex: 0xBA2B2E),
+    info: Color(hex: 0x2D6A8E),
+    disabledFill: Color(hex: 0xE2E1DC),
+    disabledInk: Color(hex: 0x8B8B86),
+    mainnet: Color(hex: 0x74591B),
+    testnet4: Color(hex: 0x276488),
+    testnet3: Color(hex: 0x006C6D),
+    purple: Color(hex: 0x695184),
     colorScheme: .light,
   )
 
-  // MARK: Lifted surface roles
+  /// Slate, with near-monochrome buttons and amber for selection, toggles,
+  /// progress, links and amounts. The design system's Bark also gives the
+  /// active tab amber, but its light-mode amber reads as brown in the tab bar,
+  /// so the tab takes the slate brand ink like the other controls
+  static let barkDark = HBTheme(
+    ground: Color(hex: 0x0F1419),
+    card: Color(hex: 0x191E23),
+    nested: Color(hex: 0x22282E),
+    floating: Color(hex: 0x22282E),
+    hero: Color(hex: 0x191E23),
+    divider: Color(hex: 0x292E34),
+    border: Color(hex: 0x32383E),
+    textPrimary: Color(hex: 0xEAEFF4),
+    textSecondary: Color(hex: 0xA6AFB8),
+    brand: Color(hex: 0xE1E9F1),
+    onBrand: Color(hex: 0x0A1723),
+    brandInk: Color(hex: 0xE1E9F1),
+    selection: Color(hex: 0xFCA942),
+    onSelection: Color(hex: 0x1F1307),
+    toggle: Color(hex: 0xFCA942),
+    progress: Color(hex: 0xFCA942),
+    tabTint: Color(hex: 0xE1E9F1),
+    link: Color(hex: 0xFCA942),
+    amount: Color(hex: 0xFCA942),
+    success: Color(hex: 0x86C478),
+    warning: Color(hex: 0xEEA753),
+    error: Color(hex: 0xF0726C),
+    errorFill: Color(hex: 0xC8393A),
+    info: Color(hex: 0x7DB9E1),
+    disabledFill: Color(hex: 0x252A2F),
+    disabledInk: Color(hex: 0x6E757D),
+    mainnet: Color(hex: 0xE3B482),
+    testnet4: Color(hex: 0x8BC6EF),
+    testnet3: Color(hex: 0x77CFD1),
+    purple: Color(hex: 0xCAB0EA),
+    colorScheme: .dark,
+  )
 
-  // Derived from each theme's own palette. Light themes swap ground and card so
-  // cards sit lighter than the screen and read as lifted by their soft shadow.
-  // The system theme uses the grouped backgrounds, which already step that way.
+  static let barkLight = HBTheme(
+    ground: Color(hex: 0xEBF1F5),
+    card: Color(hex: 0xFDFEFF),
+    nested: Color(hex: 0xEEF3F7),
+    floating: Color(hex: 0xFDFEFF),
+    hero: Color(hex: 0xEBF1F5),
+    divider: Color(hex: 0xD3D8DC),
+    border: Color(hex: 0xABB0B4),
+    textPrimary: Color(hex: 0x1B1D1F),
+    textSecondary: Color(hex: 0x595F62),
+    brand: Color(hex: 0x242A30),
+    onBrand: Color(hex: 0xFFFFFF),
+    brandInk: Color(hex: 0x242A30),
+    selection: Color(hex: 0x9B5F00),
+    onSelection: Color(hex: 0xFFFFFF),
+    toggle: Color(hex: 0xE89629),
+    progress: Color(hex: 0x9B5F00),
+    tabTint: Color(hex: 0x242A30),
+    link: Color(hex: 0x9B5F00),
+    amount: Color(hex: 0x9B5F00),
+    success: Color(hex: 0x38742A),
+    warning: Color(hex: 0x8C5500),
+    error: Color(hex: 0xAA3332),
+    errorFill: Color(hex: 0xBA2B2E),
+    info: Color(hex: 0x2D6A8E),
+    disabledFill: Color(hex: 0xDBE1E5),
+    disabledInk: Color(hex: 0x848A8E),
+    mainnet: Color(hex: 0x7D5422),
+    testnet4: Color(hex: 0x296389),
+    testnet3: Color(hex: 0x006B6E),
+    purple: Color(hex: 0x695184),
+    colorScheme: .light,
+  )
 
-  /// Screen background
-  var ground: Color {
-    switch colorScheme {
-    case .light: surface
-    case .dark: background
-    default: Color(.systemGroupedBackground)
-    }
+  /// What System shows: Birch, in the appearance iOS is set to
+  static func birch(_ colorScheme: ColorScheme) -> HBTheme {
+    colorScheme == .dark ? .birchDark : .birchLight
   }
 
-  /// Card fill
-  var card: Color {
-    switch colorScheme {
-    case .light: background
-    case .dark: surface
-    default: Color(.secondarySystemGroupedBackground)
-    }
+  /// Hellbender, built from the eleven colors it was drawn with. Light swaps
+  /// ground and card so cards sit lighter than the screen and read as lifted by
+  /// their soft shadow.
+  private static func legacy(
+    background: Color,
+    surface: Color,
+    surfaceElevated: Color,
+    border: Color,
+    textPrimary: Color,
+    textSecondary: Color,
+    accent: Color,
+    heroBackground: Color,
+    success: Color,
+    error: Color,
+    secondaryAccent: Color,
+    colorScheme: ColorScheme,
+  ) -> HBTheme {
+    let light = colorScheme == .light
+    return HBTheme(
+      ground: light ? surface : background,
+      card: light ? background : surface,
+      nested: light ? surface : surfaceElevated,
+      floating: light ? background : surfaceElevated,
+      hero: heroBackground,
+      divider: light ? surface : surfaceElevated,
+      border: border,
+      textPrimary: textPrimary,
+      textSecondary: textSecondary,
+      brand: accent,
+      onBrand: .white,
+      brandInk: accent,
+      selection: accent,
+      onSelection: .white,
+      toggle: accent,
+      progress: accent,
+      tabTint: accent,
+      link: accent,
+      amount: accent,
+      success: success,
+      warning: accent,
+      error: error,
+      errorFill: error,
+      info: secondaryAccent,
+      disabledFill: border,
+      disabledInk: .white,
+      mainnet: accent,
+      testnet4: secondaryAccent,
+      testnet3: secondaryAccent.opacity(0.7),
+      purple: .purple,
+      colorScheme: colorScheme,
+    )
   }
+}
 
-  /// Fill for elements nested inside a card: fields, rows, segmented track
-  var nested: Color {
-    switch colorScheme {
-    case .light: surface
-    case .dark: surfaceElevated
-    default: Color(.tertiarySystemGroupedBackground)
-    }
-  }
-
-  /// Floating surfaces over other content (popovers): one step above a card in
-  /// dark, card-light in light where the shadow carries the lift
-  var floating: Color {
-    switch colorScheme {
-    case .light: background
-    case .dark: surfaceElevated
-    default: Color(.tertiarySystemBackground)
-    }
+private extension Color {
+  /// An sRGB color written as 0xRRGGBB, the way the design system lists it
+  init(hex: UInt32) {
+    self.init(
+      red: Double((hex >> 16) & 0xFF) / 255,
+      green: Double((hex >> 8) & 0xFF) / 255,
+      blue: Double(hex & 0xFF) / 255,
+    )
   }
 }
 
@@ -144,6 +312,8 @@ enum AppTheme: String, CaseIterable {
   case light
   case birchDark
   case birchLight
+  case barkDark
+  case barkLight
 
   var displayName: String {
     switch self {
@@ -152,16 +322,21 @@ enum AppTheme: String, CaseIterable {
     case .light: "Hellbender Light"
     case .birchDark: "Birch Dark"
     case .birchLight: "Birch Light"
+    case .barkDark: "Bark Dark"
+    case .barkLight: "Bark Light"
     }
   }
 
   var theme: HBTheme {
     switch self {
-    case .system: .system
+    // System follows iOS with Birch; RootView switches it as the appearance changes
+    case .system: .birch(ThemeManager.systemColorScheme)
     case .dark: .dark
     case .light: .light
     case .birchDark: .birchDark
     case .birchLight: .birchLight
+    case .barkDark: .barkDark
+    case .barkLight: .barkLight
     }
   }
 }
@@ -185,11 +360,20 @@ final class ThemeManager {
     applyControlAppearance()
   }
 
-  /// Sets the displayed theme to the appropriate custom palette for the given OS color scheme.
+  /// Sets the displayed theme to Birch for the given OS color scheme.
   /// Only used when the System theme is selected — does not save to UserDefaults.
   func applySystemColorScheme(_ colorScheme: ColorScheme) {
-    theme = colorScheme == .dark ? .birchDark : .birchLight
+    theme = .birch(colorScheme)
     applyControlAppearance()
+  }
+
+  /// The appearance iOS is set to. The screen's traits, unlike the window's, aren't
+  /// forced by a theme's preferredColorScheme, so this is right even at the moment
+  /// the app switches from a fixed theme to System.
+  static var systemColorScheme: ColorScheme {
+    let screen = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.screen }.first
+    let style = screen?.traitCollection.userInterfaceStyle ?? UITraitCollection.current.userInterfaceStyle
+    return style == .dark ? .dark : .light
   }
 
   /// Segmented pickers are UIKit-backed, so their track takes the nested fill via appearance
@@ -226,7 +410,7 @@ extension Color {
 
   /// 1pt line between rows inside a card
   static var hbDivider: Color {
-    ThemeManager.shared.theme.nested
+    ThemeManager.shared.theme.divider
   }
 
   static var hbBorder: Color {
@@ -235,16 +419,49 @@ extension Color {
 
   /// Hero
   static var hbHeroBackground: Color {
-    ThemeManager.shared.theme.heroBackground
+    ThemeManager.shared.theme.hero
   }
 
-  /// Accents
-  static var hbBitcoinOrange: Color {
-    ThemeManager.shared.theme.accent
+  /// Brand: the primary fill, what sits on it, and the brand as text or an icon
+  static var hbBrand: Color {
+    ThemeManager.shared.theme.brand
   }
 
-  static var hbSteelBlue: Color {
-    ThemeManager.shared.theme.secondaryAccent
+  static var hbOnBrand: Color {
+    ThemeManager.shared.theme.onBrand
+  }
+
+  static var hbBrandInk: Color {
+    ThemeManager.shared.theme.brandInk
+  }
+
+  /// Roles that are the brand in Birch and amber in Bark
+  static var hbSelection: Color {
+    ThemeManager.shared.theme.selection
+  }
+
+  static var hbOnSelection: Color {
+    ThemeManager.shared.theme.onSelection
+  }
+
+  static var hbToggle: Color {
+    ThemeManager.shared.theme.toggle
+  }
+
+  static var hbProgress: Color {
+    ThemeManager.shared.theme.progress
+  }
+
+  static var hbTabTint: Color {
+    ThemeManager.shared.theme.tabTint
+  }
+
+  static var hbLink: Color {
+    ThemeManager.shared.theme.link
+  }
+
+  static var hbAmount: Color {
+    ThemeManager.shared.theme.amount
   }
 
   /// Semantic
@@ -252,8 +469,33 @@ extension Color {
     ThemeManager.shared.theme.success
   }
 
+  static var hbWarning: Color {
+    ThemeManager.shared.theme.warning
+  }
+
   static var hbError: Color {
     ThemeManager.shared.theme.error
+  }
+
+  static var hbErrorFill: Color {
+    ThemeManager.shared.theme.errorFill
+  }
+
+  static var hbInfo: Color {
+    ThemeManager.shared.theme.info
+  }
+
+  static var hbPurple: Color {
+    ThemeManager.shared.theme.purple
+  }
+
+  /// A disabled primary button
+  static var hbDisabledFill: Color {
+    ThemeManager.shared.theme.disabledFill
+  }
+
+  static var hbDisabledInk: Color {
+    ThemeManager.shared.theme.disabledInk
   }
 
   /// Text
@@ -263,6 +505,17 @@ extension Color {
 
   static var hbTextSecondary: Color {
     ThemeManager.shared.theme.textSecondary
+  }
+
+  /// A network's badge color
+  static func hbNetwork(_ network: BitcoinNetwork) -> Color {
+    let theme = ThemeManager.shared.theme
+    return switch network {
+    case .mainnet: theme.mainnet
+    case .testnet4: theme.testnet4
+    case .testnet3: theme.testnet3
+    case .signet: theme.purple
+    }
   }
 
   /// PSBT inspector map colours: section hues plus a signing tint, with
@@ -346,7 +599,7 @@ struct BirchCard: ViewModifier {
   }
 }
 
-/// Selected item: gold-tinted fill over an opaque card, with an optional gold ring.
+/// Selected item: a selection-tinted fill over an opaque card, with an optional ring.
 /// The ring is the only stroke a card-like surface carries.
 struct BirchSelected: ViewModifier {
   var isSelected: Bool = true
@@ -360,10 +613,10 @@ struct BirchSelected: ViewModifier {
         .background(
           shape
             .fill(Color.hbSurface)
-            .overlay(shape.fill(Color.hbBitcoinOrange.opacity(0.12)))
+            .overlay(shape.fill(Color.hbSelection.opacity(0.12)))
             .overlay {
               if ring {
-                shape.strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+                shape.strokeBorder(Color.hbSelection, lineWidth: 1.5)
               }
             },
         )
@@ -374,7 +627,7 @@ struct BirchSelected: ViewModifier {
 }
 
 /// Done / Cancel in a sheet's toolbar, drawn in the app's own button style.
-/// Prominent is the gold primary look; otherwise it takes the card fill.
+/// Prominent is the primary look; otherwise it takes the card fill.
 /// Pair with `hbHidesGlassBackground()` on the ToolbarItem so iOS 26 doesn't
 /// wrap it in a Liquid Glass capsule.
 struct HBBarButtonStyle: ButtonStyle {
@@ -394,14 +647,14 @@ private struct HBBarButtonBody<Label: View>: View {
   var body: some View {
     label
       .font(.hbBody(15).weight(.semibold))
-      .foregroundStyle(prominent ? Color.white : Color.hbTextPrimary)
+      .foregroundStyle(prominent ? Color.hbOnBrand : Color.hbTextPrimary)
       // The toolbar measures the bare label, so keep it on one line at its own size
       .lineLimit(1)
       .fixedSize()
       .padding(.horizontal, 14)
       .frame(minHeight: 34)
       .background(
-        prominent ? Color.hbBitcoinOrange : Color.hbSurface,
+        prominent ? Color.hbBrand : Color.hbSurface,
         in: .rect(cornerRadius: 8, style: .continuous),
       )
       .shadow(color: .black.opacity(scheme == .dark || prominent ? 0 : 0.06), radius: 8, y: 3)
@@ -438,11 +691,11 @@ struct HBPrimaryButtonModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .font(.hbHeadline)
-      .foregroundStyle(.white)
+      .foregroundStyle(isEnabled ? Color.hbOnBrand : Color.hbDisabledInk)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 16)
       .background(
-        isEnabled ? Color.hbBitcoinOrange : Color.hbBorder,
+        isEnabled ? Color.hbBrand : Color.hbDisabledFill,
         in: .rect(cornerRadius: 12, style: .continuous),
       )
   }
@@ -454,7 +707,7 @@ struct HBSecondaryButtonModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .font(.hbHeadline)
-      .foregroundStyle(Color.hbBitcoinOrange)
+      .foregroundStyle(Color.hbBrandInk)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 16)
       .birchCard()
@@ -463,11 +716,11 @@ struct HBSecondaryButtonModifier: ViewModifier {
 
 /// How the compact primary on a setup step's footer (Next, Import) is drawn
 enum HBCompactButtonState {
-  /// Gold fill, white text
+  /// Brand fill, on-brand text
   case filled
-  /// White on hbBorder, like hbPrimaryButton(isEnabled: false)
+  /// The disabled fill and ink, like hbPrimaryButton(isEnabled: false)
   case disabled
-  /// A 1.5pt gold border and gold text with no fill: the step isn't finished,
+  /// A 1.5pt brand border and brand text with no fill: the step isn't finished,
   /// but the button can still be tapped
   case outlined
 }
@@ -481,27 +734,35 @@ struct HBCompactPrimaryButtonModifier: ViewModifier {
     let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
     content
       .font(.hbHeadline)
-      .foregroundStyle(state == .outlined ? Color.hbBitcoinOrange : Color.white)
+      .foregroundStyle(foreground)
       .padding(.horizontal, 32)
       .padding(.vertical, 14)
       .background {
         switch state {
-        case .filled: shape.fill(Color.hbBitcoinOrange)
-        case .disabled: shape.fill(Color.hbBorder)
-        case .outlined: shape.strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
+        case .filled: shape.fill(Color.hbBrand)
+        case .disabled: shape.fill(Color.hbDisabledFill)
+        case .outlined: shape.strokeBorder(Color.hbBrand, lineWidth: 1.5)
         }
       }
       .contentShape(shape)
   }
+
+  private var foreground: Color {
+    switch state {
+    case .filled: .hbOnBrand
+    case .disabled: .hbDisabledInk
+    case .outlined: .hbBrandInk
+    }
+  }
 }
 
-/// Back on a setup step's footer: the secondary look (hbHeadline in gold on the
+/// Back on a setup step's footer: the secondary look (hbHeadline in brand ink on the
 /// card fill) at the compact primary's size.
 struct HBCompactSecondaryButtonModifier: ViewModifier {
   func body(content: Content) -> some View {
     content
       .font(.hbHeadline)
-      .foregroundStyle(Color.hbBitcoinOrange)
+      .foregroundStyle(Color.hbBrandInk)
       .padding(.horizontal, 32)
       .padding(.vertical, 14)
       .birchCard()
@@ -509,7 +770,7 @@ struct HBCompactSecondaryButtonModifier: ViewModifier {
 }
 
 /// In-card utilities: equal tonal buttons under a field, sharing an
-/// `HStack(spacing: 8)`. The most useful action takes the gold tint, the rest
+/// `HStack(spacing: 8)`. The most useful action takes the brand tint, the rest
 /// are neutral on the nested fill.
 struct HBTonalButton: View {
   let title: String
@@ -525,11 +786,11 @@ struct HBTonalButton: View {
         Text(title)
           .font(.hbBody(15).weight(.semibold))
       }
-      .foregroundStyle(neutral ? Color.hbTextPrimary : Color.hbBitcoinOrange)
+      .foregroundStyle(neutral ? Color.hbTextPrimary : Color.hbBrandInk)
       .lineLimit(1)
       .frame(maxWidth: .infinity, minHeight: 44)
       .background(
-        neutral ? Color.hbSurfaceElevated : Color.hbBitcoinOrange.opacity(0.12),
+        neutral ? Color.hbSurfaceElevated : Color.hbBrandInk.opacity(0.12),
         in: .rect(cornerRadius: 12, style: .continuous),
       )
       .contentShape(.rect(cornerRadius: 12, style: .continuous))
@@ -581,7 +842,7 @@ extension View {
     modifier(BirchCard(level: level))
   }
 
-  /// Selected fill plus a gold ring; unselected falls back to a plain card.
+  /// Selected fill plus a ring; unselected falls back to a plain card.
   func birchSelected(_ isSelected: Bool = true, ring: Bool = true, cornerRadius: CGFloat = 12) -> some View {
     modifier(BirchSelected(isSelected: isSelected, ring: ring, cornerRadius: cornerRadius))
   }
@@ -663,12 +924,7 @@ struct NetworkBadge: View {
   let network: BitcoinNetwork
 
   var badgeColor: Color {
-    switch network {
-    case .mainnet: .hbBitcoinOrange
-    case .testnet4: .hbSteelBlue
-    case .testnet3: .hbSteelBlue.opacity(0.7)
-    case .signet: .purple
-    }
+    .hbNetwork(network)
   }
 
   var body: some View {
@@ -689,8 +945,8 @@ struct WalletIdenticon: View {
 
   private let gridSize = 4
   private let palette: [Color] = [
-    Color.hbBitcoinOrange,
-    Color.hbSteelBlue,
+    Color.hbBrand,
+    Color.hbInfo,
     Color.hbSuccess,
     Color(red: 0.6, green: 0.4, blue: 0.8),
     Color(red: 0.9, green: 0.5, blue: 0.3),
@@ -738,7 +994,7 @@ struct SyncStatusDot: View {
   var color: Color {
     switch state {
     case .notStarted: .hbTextSecondary
-    case .syncing: .hbBitcoinOrange
+    case .syncing: .hbProgress
     case .synced: .hbSuccess
     case .error: .hbError
     }

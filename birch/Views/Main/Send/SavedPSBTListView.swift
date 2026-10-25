@@ -55,10 +55,10 @@ struct SavedPSBTListView: View {
                       if saved.originalTxid != nil {
                         Text("RBF")
                           .font(.hbLabel(10))
-                          .foregroundStyle(.white)
+                          .foregroundStyle(Color.hbOnBrand)
                           .padding(.horizontal, 5)
                           .padding(.vertical, 2)
-                          .background(Color.hbBitcoinOrange)
+                          .background(Color.hbBrand)
                           .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                       }
                     }
@@ -106,7 +106,7 @@ struct SavedPSBTListView: View {
                 } label: {
                   Label("Rename", systemImage: "pencil")
                 }
-                .tint(Color.hbSteelBlue)
+                .tint(Color.hbInfo)
               }
             }
             .listRowBackground(Color.hbSurface)
@@ -175,8 +175,8 @@ private struct PSBTIdenticon: View {
 
   private let gridSize = 4
   private let palette: [Color] = [
-    Color.hbBitcoinOrange,
-    Color.hbSteelBlue,
+    Color.hbBrand,
+    Color.hbInfo,
     Color.hbSuccess,
     Color(red: 0.6, green: 0.4, blue: 0.8),
     Color(red: 0.9, green: 0.5, blue: 0.3),

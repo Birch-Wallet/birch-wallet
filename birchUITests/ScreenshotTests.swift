@@ -29,6 +29,11 @@ final class ScreenshotTests: XCTestCase {
     // fee rates, the clock, the identicons, the chain tip and the transaction
     // (see ScreenshotFixtures.swift).
     app.launchArguments += ["-UITesting", "-DisableAnimations", "-fiatEnabled", "YES", "-ScreenshotFixtures"]
+    // A local Electrum server to sync from (BIRCH_TOUR_ELECTRUM_TESTNET4, which the
+    // Fastfile passes from fastlane/.env). Unset, the tour uses the default server.
+    for (key, value) in ProcessInfo.processInfo.environment where key.hasPrefix("BIRCH_TOUR_ELECTRUM_") {
+      app.launchEnvironment[key] = value
+    }
   }
 
   override func tearDownWithError() throws {

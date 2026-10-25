@@ -106,7 +106,7 @@ private struct CharWrappingTextView: UIViewRepresentable {
     // The binding moves to another cosigner's key when the open cosigner changes
     let coordinator = context.coordinator
     coordinator.text = $text
-    view.tintColor = UIColor(Color.hbBitcoinOrange)
+    view.tintColor = UIColor(Color.hbSelection)
 
     // Wrapping by character is a paragraph attribute: the text container's
     // own lineBreakMode only applies to its last line

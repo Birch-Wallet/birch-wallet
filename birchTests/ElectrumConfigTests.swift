@@ -1,5 +1,4 @@
 @testable import birch
-import BitcoinDevKit
 import Foundation
 import Testing
 
@@ -59,17 +58,5 @@ struct ElectrumConfigTests {
 
     #expect(testnet4Config.port != mainnetConfig.port)
     #expect(testnet4Config.url != mainnetConfig.url)
-  }
-
-  @Test func `fetch real fee rates from mempool space`() throws {
-    // Connect directly to testnet4 mempool space
-    let config = ElectrumConfig(host: "testnet4.mempool.space", port: 40002, useSSL: true)
-    let client = try ElectrumClient(url: config.url)
-
-    let highRaw = try? client.estimateFee(number: 1)
-    let medRaw = try? client.estimateFee(number: 6)
-    let lowRaw = try? client.estimateFee(number: 144)
-
-    print("RAW FEES RETURNED BY BDK: High: \(String(describing: highRaw)), Med: \(String(describing: medRaw)), Low: \(String(describing: lowRaw))")
   }
 }

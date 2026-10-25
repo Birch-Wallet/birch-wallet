@@ -35,7 +35,7 @@ struct SendReviewView: View {
                 HStack(spacing: 4) {
                   Image(systemName: "tag.fill")
                     .font(.system(size: 10))
-                    .foregroundStyle(Color.hbSteelBlue)
+                    .foregroundStyle(Color.hbInfo)
                   Text(recipient.label)
                     .font(.hbBody())
                     .foregroundStyle(Color.hbTextPrimary)
@@ -51,7 +51,7 @@ struct SendReviewView: View {
                 HStack(spacing: 6) {
                   Text("MAX (\(recipient.amountValue?.formattedSats ?? "—"))")
                     .font(.hbMonoBold(16))
-                    .foregroundStyle(Color.hbBitcoinOrange)
+                    .foregroundStyle(Color.hbAmount)
                   if fiatEnabled, let sats = recipient.amountValue,
                      let fiat = fiatService.formattedSatsToFiat(sats)
                   {
@@ -64,7 +64,7 @@ struct SendReviewView: View {
                 HStack(spacing: 6) {
                   Text(recipient.amountValue?.formattedSats ?? UInt64(0).formattedSats)
                     .font(.hbMonoBold(16))
-                    .foregroundStyle(Color.hbBitcoinOrange)
+                    .foregroundStyle(Color.hbAmount)
                   if fiatEnabled, let sats = recipient.amountValue,
                      let fiat = fiatService.formattedSatsToFiat(sats)
                   {
@@ -174,7 +174,7 @@ struct SendReviewView: View {
           Button(action: { showInspector = true }) {
             Text("Inspect PSBT")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
         }
 
@@ -260,10 +260,10 @@ struct TransactionFlowDiagram: View {
       } else {
         viewModel.recipients.count > 1 ? "Recipient \(i + 1)" : "Recipient"
       }
-      outputs.append((label, Color.hbBitcoinOrange))
+      outputs.append((label, Color.hbBrandInk))
     }
     if viewModel.changeAmount != nil {
-      outputs.append(("Change", Color.hbSteelBlue))
+      outputs.append(("Change", Color.hbInfo))
     }
     if viewModel.totalFee > 0 {
       outputs.append(("Fee", Color.hbTextSecondary))
@@ -301,7 +301,7 @@ struct TransactionFlowDiagram: View {
               control1: CGPoint(x: centerX * 0.75, y: y),
               control2: CGPoint(x: centerX * 0.85, y: mergeY),
             )
-            context.stroke(path, with: .color(Color.hbBitcoinOrange.opacity(0.35)), lineWidth: 1.5)
+            context.stroke(path, with: .color(Color.hbBrand.opacity(0.35)), lineWidth: 1.5)
           }
 
           for i in 0 ..< outputs.count {

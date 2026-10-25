@@ -160,7 +160,7 @@ struct PSBTDisplayView: View {
             .frame(width: maxSide - 10, height: maxSide - 10)
             .padding(5)
             .background(Color.white)
-            .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+            .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
             .frame(maxWidth: .infinity)
           }
           .aspectRatio(1, contentMode: .fit)
@@ -207,11 +207,11 @@ struct PSBTDisplayView: View {
               Spacer()
               Text("\(Int(framesPerSecond)) FPS")
                 .font(.hbMono(14))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbBrandInk)
             }
 
             Slider(value: $framesPerSecond, in: 1 ... 10, step: 1)
-              .tint(Color.hbBitcoinOrange)
+              .tint(Color.hbToggle)
 
             // QR Density
             HStack {
@@ -239,7 +239,7 @@ struct PSBTDisplayView: View {
               Spacer()
               Toggle("", isOn: $compactPSBT)
                 .labelsHidden()
-                .tint(Color.hbBitcoinOrange)
+                .tint(Color.hbToggle)
                 // The iOS 26+ switch draws slightly wider than its layout bounds
                 // and gets clipped by the DisclosureGroup; inset to compensate
                 .padding(.trailing, 4)
@@ -283,7 +283,7 @@ struct PSBTDisplayView: View {
           Button(action: { showExportFile = true }) {
             Label("Export PSBT File", systemImage: "square.and.arrow.up")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
 
           Button(action: {
@@ -297,7 +297,7 @@ struct PSBTDisplayView: View {
           }) {
             Label("Save PSBT", systemImage: "tray.and.arrow.down.fill")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
         }
 
@@ -306,7 +306,7 @@ struct PSBTDisplayView: View {
         }) {
           Label("Copy Base64", systemImage: "doc.on.doc")
             .font(.hbBody(14))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
         }
 
         // Transaction details
@@ -322,7 +322,7 @@ struct PSBTDisplayView: View {
           Button(action: { showInspector = true }) {
             Text("Inspect PSBT")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
         }
 
@@ -450,7 +450,7 @@ private struct PSBTReviewCard: View {
             HStack(spacing: 4) {
               Image(systemName: "tag.fill")
                 .font(.system(size: 10))
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
               Text(recipient.label)
                 .font(.hbBody())
                 .foregroundStyle(Color.hbTextPrimary)
@@ -466,7 +466,7 @@ private struct PSBTReviewCard: View {
             HStack(spacing: 6) {
               Text("MAX (\(recipient.amountValue?.formattedSats ?? "—"))")
                 .font(.hbMonoBold(16))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbAmount)
               if fiatEnabled, let sats = recipient.amountValue,
                  let fiat = fiatService.formattedSatsToFiat(sats)
               {
@@ -479,7 +479,7 @@ private struct PSBTReviewCard: View {
             HStack(spacing: 6) {
               Text(recipient.amountValue?.formattedSats ?? UInt64(0).formattedSats)
                 .font(.hbMonoBold(16))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbAmount)
               if fiatEnabled, let sats = recipient.amountValue,
                  let fiat = fiatService.formattedSatsToFiat(sats)
               {
@@ -585,12 +585,12 @@ struct SignatureProgressView: View {
           let isSigned = signer != nil
 
           RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(isSigned ? Color.hbBitcoinOrange : Color.hbSurface)
+            .fill(isSigned ? Color.hbBrand : Color.hbSurface)
             .frame(width: 48, height: 48)
             .overlay(
               RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(
-                  isSigned ? Color.hbBitcoinOrange : Color.hbBorder,
+                  isSigned ? Color.hbBrand : Color.hbBorder,
                   lineWidth: isSigned ? 2 : 1,
                 ),
             )
@@ -598,7 +598,7 @@ struct SignatureProgressView: View {
               if isSigned {
                 Image(systemName: "signature")
                   .font(.system(size: 18))
-                  .foregroundStyle(.white)
+                  .foregroundStyle(Color.hbOnBrand)
               } else {
                 Text("\(index + 1)")
                   .font(.hbMono(14))

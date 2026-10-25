@@ -34,7 +34,7 @@ struct MainTabView: View {
         SettingsView()
       }
     }
-    .tint(Color.hbBitcoinOrange)
+    .tint(Color.hbTabTint)
     .onChange(of: selectedTab) { _, newTab in
       let name = newTab < Self.tabNames.count ? Self.tabNames[newTab] : "Unknown"
       logger.info("Tab changed to \(name)")

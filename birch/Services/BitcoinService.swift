@@ -137,6 +137,20 @@ final class BitcoinService {
     return profile.electrumConfig.url
   }
 
+  /// The server to connect `profile` to: its own, unless the screenshot tour
+  /// names a local one for a wallet left on the network's default
+  /// (ScreenshotFixtures.electrumServer)
+  private func connectionConfig(for profile: WalletProfile) -> ElectrumConfig {
+    #if DEBUG
+      if ScreenshotFixtures.isActive, profile.electrumHost.isEmpty,
+         let server = ScreenshotFixtures.electrumServer(for: profile.bitcoinNetwork)
+      {
+        return server
+      }
+    #endif
+    return profile.electrumConfig
+  }
+
   /// Returns a user-friendly description for Electrum connection errors,
   /// detecting self-signed certificate issues that BDK cannot handle.
   static func friendlyElectrumError(_ error: Error) -> String {
@@ -285,7 +299,7 @@ final class BitcoinService {
     updateCachedData()
 
     // Connect to Electrum — may fail offline, but wallet data is still available
-    let config = profile.electrumConfig
+    let config = connectionConfig(for: profile)
     addToLog("Connecting to Electrum: \(config.url)")
     do {
       let url = config.url
@@ -333,7 +347,7 @@ final class BitcoinService {
     do {
       // Try to reconnect if client is nil (e.g. app started offline)
       if electrumClient == nil, let profile = currentProfile {
-        let config = profile.electrumConfig
+        let config = connectionConfig(for: profile)
         addToLog("Re-initializing Electrum client: \(config.url)")
         let reconnectURL = config.url
         let validateDomain = !config.allowInsecureSSL
@@ -631,7 +645,14 @@ final class BitcoinService {
     // The server's tip, or failing that the wallet's own: applying a scan moves
     // BDK's checkpoint to the tip the server reported, even when the header fetch
     // in sync() came back empty.
-    let tipHeight = max(chainTipHeight, wallet.latestCheckpoint().height)
+    var tipHeight = max(chainTipHeight, wallet.latestCheckpoint().height)
+    #if DEBUG
+      // The screenshot tour's confirmation counts stay the same every run, even where
+      // BDK's checkpoint has moved past the fixed chain tip
+      if ScreenshotFixtures.isActive {
+        tipHeight = ScreenshotFixtures.chainTipHeight
+      }
+    #endif
     transactions = txList.map { canonicalTx -> TransactionItem in
       let tx = canonicalTx.transaction
       let txid = tx.computeTxid().description

@@ -7,7 +7,7 @@ struct CosignerCardView: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
         Image(systemName: "person.badge.key.fill")
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
 
         Text(cosigner.label)
           .font(.hbBody(15))
@@ -27,7 +27,7 @@ struct CosignerCardView: View {
             .foregroundStyle(Color.hbTextSecondary)
           Text(cosigner.fingerprint)
             .font(.hbMono(12))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
         }
 
         VStack(alignment: .leading, spacing: 2) {

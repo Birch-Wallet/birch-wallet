@@ -258,10 +258,10 @@ struct PSBTInspectorView: View {
       } label: {
         Text(item.label)
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(item == lens ? Color.hbBackground : Color.hbTextSecondary)
+          .foregroundStyle(item == lens ? Color.hbOnBrand : Color.hbTextSecondary)
           .padding(.vertical, 7)
           .padding(.horizontal, 13)
-          .background(item == lens ? Color.hbBitcoinOrange : Color.hbSurface)
+          .background(item == lens ? Color.hbBrand : Color.hbSurface)
           .clipShape(Capsule())
       }
       .buttonStyle(.plain)
@@ -378,7 +378,7 @@ private struct PSBTInspectorLoadingView: View {
   var body: some View {
     VStack(spacing: 12) {
       ProgressView()
-        .tint(Color.hbBitcoinOrange)
+        .tint(Color.hbProgress)
       Text("Reading PSBT…")
         .font(.hbBody(13))
         .foregroundStyle(Color.hbTextSecondary)
@@ -564,7 +564,7 @@ private struct PSBTTagChip: View {
     case .requiredToSign: .hbPSBTInput
     case .verifiesChange: .hbPSBTGlobal
     case .unrecognized: .hbTextSecondary
-    case .v2: .hbBitcoinOrange
+    case .v2: .hbBrandInk
     }
   }
 

@@ -42,7 +42,7 @@ struct TransactionDetailView: View {
             ? "arrow.triangle.2.circlepath.circle.fill"
             : (transaction.isIncoming ? "arrow.down.left.circle.fill" : "arrow.up.right.circle.fill"))
             .font(.system(size: 44))
-            .foregroundStyle(transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbBitcoinOrange)
+            .foregroundStyle(transaction.isIncoming && !transaction.isSelfTransfer ? Color.hbSuccess : Color.hbBrandInk)
 
           if isPrivate {
             Text(Constants.privacyText())
@@ -96,7 +96,7 @@ struct TransactionDetailView: View {
               }) {
                 Image(systemName: label.isEmpty ? "plus.circle" : "pencil")
                   .font(.system(size: 14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
             }
           }
@@ -149,14 +149,14 @@ struct TransactionDetailView: View {
               }) {
                 Image(systemName: "doc.on.doc")
                   .font(.system(size: 14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
 
               if let network, let url = network.explorerTxURL(txid: transaction.id, customHost: BitcoinService.shared.currentProfile?.blockExplorerHost) {
                 Link(destination: url) {
                   Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.hbSteelBlue)
+                    .foregroundStyle(Color.hbInfo)
                 }
               }
             }
@@ -176,10 +176,10 @@ struct TransactionDetailView: View {
                   .foregroundStyle(Color.hbSuccess)
               } else {
                 Image(systemName: "clock")
-                  .foregroundStyle(Color.hbBitcoinOrange)
+                  .foregroundStyle(Color.hbWarning)
                 Text("Unconfirmed")
                   .font(.hbBody())
-                  .foregroundStyle(Color.hbBitcoinOrange)
+                  .foregroundStyle(Color.hbWarning)
               }
             }
           }
@@ -310,7 +310,7 @@ struct TransactionDetailView: View {
                     Text(displayLabel)
                       .font(.hbBody(12))
                   }
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
                 }
               }
               .padding(.vertical, 4)
@@ -328,10 +328,10 @@ struct TransactionDetailView: View {
           Button(action: { showBumpFee = true }) {
             Label("Bump Fee", systemImage: "arrow.up.circle")
               .font(.hbBody(16))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbBrandInk)
               .frame(maxWidth: .infinity)
               .padding(14)
-              .background(Color.hbBitcoinOrange.opacity(0.1))
+              .background(Color.hbBrandInk.opacity(0.1))
               .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
           }
         }
@@ -425,7 +425,7 @@ private struct TransactionDetailFlowDiagram: View {
       if isPlaceholder {
         return .hbTextSecondary
       }
-      return isMine ? .hbSteelBlue : .hbTextPrimary
+      return isMine ? .hbInfo : .hbTextPrimary
     }
   }
 
@@ -488,7 +488,7 @@ private struct TransactionDetailFlowDiagram: View {
 
           for i in 0 ..< inputs.count {
             let y = flowY(index: i, count: inputs.count, totalH: totalH, rowH: rowH)
-            let lineColor = inputs[i].isMine ? Color.hbSteelBlue : Color.hbBitcoinOrange
+            let lineColor = inputs[i].isMine ? Color.hbInfo : Color.hbBrandInk
             var path = Path()
             path.move(to: CGPoint(x: centerX * 0.45, y: y))
             path.addCurve(
@@ -501,7 +501,7 @@ private struct TransactionDetailFlowDiagram: View {
 
           for i in 0 ..< outputs.count {
             let y = flowY(index: i, count: outputs.count, totalH: totalH, rowH: rowH)
-            let lineColor = outputs[i].isMine ? Color.hbSteelBlue : Color.hbBitcoinOrange
+            let lineColor = outputs[i].isMine ? Color.hbInfo : Color.hbBrandInk
             var path = Path()
             path.move(to: CGPoint(x: centerX, y: mergeY))
             path.addCurve(
@@ -538,7 +538,7 @@ private struct TransactionDetailFlowDiagram: View {
       if hasAnyMine {
         HStack(spacing: 6) {
           RoundedRectangle(cornerRadius: 2, style: .continuous)
-            .fill(Color.hbSteelBlue)
+            .fill(Color.hbInfo)
             .frame(width: 10, height: 10)
           Text("My Wallet")
             .font(.hbLabel(11))

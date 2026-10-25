@@ -55,7 +55,7 @@ struct UTXODetailView: View {
         VStack(spacing: 8) {
           Image(systemName: isFrozen ? "snowflake" : (utxo.isSpent ? "bitcoinsign.circle" : "bitcoinsign.circle.fill"))
             .font(.system(size: 44))
-            .foregroundStyle(isFrozen ? Color.hbSteelBlue : (utxo.isSpent ? Color.hbTextSecondary : Color.hbBitcoinOrange))
+            .foregroundStyle(isFrozen ? Color.hbInfo : (utxo.isSpent ? Color.hbTextSecondary : Color.hbBrandInk))
 
           if isPrivate {
             Text(Constants.privacyText())
@@ -91,20 +91,20 @@ struct UTXODetailView: View {
             } else if isFrozen {
               Text("Frozen")
                 .font(.hbLabel(11))
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color.hbSteelBlue.opacity(0.15))
+                .background(Color.hbInfo.opacity(0.15))
                 .clipShape(Capsule())
             }
 
             if !utxo.isSpent {
               Text(utxo.isConfirmed ? "Confirmed" : "Unconfirmed")
                 .font(.hbLabel(11))
-                .foregroundStyle(utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange)
+                .foregroundStyle(utxo.isConfirmed ? Color.hbSuccess : Color.hbWarning)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background((utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange).opacity(0.15))
+                .background((utxo.isConfirmed ? Color.hbSuccess : Color.hbWarning).opacity(0.15))
                 .clipShape(Capsule())
             }
           }
@@ -144,7 +144,7 @@ struct UTXODetailView: View {
                   }) {
                     Image(systemName: "doc.on.doc")
                       .font(.system(size: 14))
-                      .foregroundStyle(Color.hbSteelBlue)
+                      .foregroundStyle(Color.hbInfo)
                   }
 
                   if let network = service.currentNetwork,
@@ -153,7 +153,7 @@ struct UTXODetailView: View {
                     Link(destination: url) {
                       Image(systemName: "arrow.up.right.square")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color.hbSteelBlue)
+                        .foregroundStyle(Color.hbInfo)
                     }
                   }
                 }
@@ -166,7 +166,7 @@ struct UTXODetailView: View {
                   Text(addrLabel)
                     .font(.hbBody(12))
                 }
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
               }
             }
 
@@ -222,7 +222,7 @@ struct UTXODetailView: View {
               }) {
                 Image(systemName: utxoLabel.isEmpty ? "plus.circle" : "pencil")
                   .font(.system(size: 14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
             }
           }
@@ -275,7 +275,7 @@ struct UTXODetailView: View {
               }) {
                 Image(systemName: "doc.on.doc")
                   .font(.system(size: 14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
 
               if let network = service.currentNetwork,
@@ -284,7 +284,7 @@ struct UTXODetailView: View {
                 Link(destination: url) {
                   Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.hbSteelBlue)
+                    .foregroundStyle(Color.hbInfo)
                 }
               }
             }
@@ -310,7 +310,7 @@ struct UTXODetailView: View {
                         .font(.hbBody(14))
                         .lineLimit(2)
                     }
-                    .foregroundStyle(Color.hbSteelBlue)
+                    .foregroundStyle(Color.hbInfo)
                   }
 
                   Text(isPrivate ? Constants.privacyText(length: 8) : spender.id.truncatedMiddle(leading: 10, trailing: 8))
@@ -346,10 +346,10 @@ struct UTXODetailView: View {
               Text(isFrozen ? "Unfreeze UTXO" : "Freeze UTXO")
                 .font(.hbBody(15))
             }
-            .foregroundStyle(isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue)
+            .foregroundStyle(isFrozen ? Color.hbBrandInk : Color.hbInfo)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background((isFrozen ? Color.hbBitcoinOrange : Color.hbSteelBlue).opacity(0.12))
+            .background((isFrozen ? Color.hbBrandInk : Color.hbInfo).opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
           .hbCard()

@@ -92,7 +92,7 @@ struct TransactionRowView: View {
           if let label, !label.isEmpty {
             Image(systemName: "tag.fill")
               .font(.system(size: 9))
-              .foregroundStyle(Color.hbSteelBlue)
+              .foregroundStyle(Color.hbInfo)
           }
           if transaction.isConfirmed {
             Image(systemName: "checkmark.circle.fill")
@@ -104,10 +104,10 @@ struct TransactionRowView: View {
           } else {
             Image(systemName: "clock")
               .font(.system(size: 10))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbWarning)
             Text("Unconfirmed")
               .font(.hbLabel(10))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbWarning)
           }
         }
       }

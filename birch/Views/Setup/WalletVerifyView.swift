@@ -46,7 +46,7 @@ struct WalletVerifyView: View {
                   .foregroundStyle(Color.hbTextSecondary)
                 Text(viewModel.cosignerFingerprints[index])
                   .font(.hbMono(12))
-                  .foregroundStyle(Color.hbBitcoinOrange)
+                  .foregroundStyle(Color.hbBrandInk)
               }
 
               // The whole key, wrapped at the character onto up to three lines
@@ -70,7 +70,7 @@ struct WalletVerifyView: View {
         VStack(alignment: .leading, spacing: 12) {
           HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbBrandInk)
               .font(.system(size: 20))
             Text("Back Up Your Descriptor")
               .font(.hbHeadline)
@@ -93,10 +93,10 @@ struct WalletVerifyView: View {
               Text("PDF/Print Output Descriptor")
                 .font(.hbBody(15))
             }
-            .foregroundStyle(Color.purple)
+            .foregroundStyle(Color.hbPurple)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.purple.opacity(0.12))
+            .background(Color.hbPurple.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
 
@@ -106,10 +106,10 @@ struct WalletVerifyView: View {
               Text("Show Descriptor QR")
                 .font(.hbBody(15))
             }
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.hbBitcoinOrange.opacity(0.12))
+            .background(Color.hbBrandInk.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
 
@@ -125,10 +125,10 @@ struct WalletVerifyView: View {
               Text(copiedDescriptor ? "Copied!" : "Copy Descriptor")
                 .font(.hbBody(15))
             }
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.hbSteelBlue.opacity(0.12))
+            .background(Color.hbInfo.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
           }
         }
@@ -154,7 +154,7 @@ struct WalletVerifyView: View {
             Button(action: { viewModel.deriveFirstAddress() }) {
               Text("Retry")
                 .font(.hbBody(14))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbLink)
             }
           } else if !viewModel.firstReceiveAddress.isEmpty {
             QRCodeView(content: viewModel.firstReceiveAddress)
@@ -258,7 +258,7 @@ private struct DescriptorQRSheet: View {
             URDisplaySheet(ur: ur)
               .padding(5)
               .background(Color.white)
-              .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+              .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
           } else {
             Text("Failed to encode descriptor")
               .font(.hbBody())
@@ -274,15 +274,15 @@ private struct DescriptorQRSheet: View {
             if isExporting {
               HStack(spacing: 8) {
                 ProgressView()
-                  .tint(Color.hbSteelBlue)
+                  .tint(Color.hbInfo)
                 Text("Generating video...")
                   .font(.hbBody(14))
-                  .foregroundStyle(Color.hbSteelBlue)
+                  .foregroundStyle(Color.hbInfo)
               }
             } else {
               Label("Export Descriptor as MP4", systemImage: "film")
                 .font(.hbBody(14))
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
             }
           }
           .disabled(isExporting || descriptorUR == nil)
@@ -350,7 +350,7 @@ private struct BulletRow: View {
     HStack(alignment: .top, spacing: 8) {
       Text("\u{2022}")
         .font(.hbBody(13))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
       Text(text)
         .font(.hbBody(13))
         .foregroundStyle(Color.hbTextSecondary)

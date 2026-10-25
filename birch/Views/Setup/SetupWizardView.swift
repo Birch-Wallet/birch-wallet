@@ -118,7 +118,7 @@ private struct ProgressBarView: View {
         ForEach(0 ..< stepCount, id: \.self) { index in
           RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(Double(index) / Double(stepCount - 1) <= progress
-              ? Color.hbBitcoinOrange
+              ? Color.hbProgress
               : Color.hbBorder)
             .frame(height: 4)
         }

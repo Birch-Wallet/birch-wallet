@@ -84,6 +84,7 @@ After cloning, run `git submodule update --init` (or clone with `--recurse-submo
 
 - **Needs** the iOS 27.2 simulator runtimes (the iPhone Duo has its own) and the `hinge` CLI for the Duo's fold: `brew install artemnovichkov/tap/hinge`.
 - **Fixed data:** the tour launches the app with `-UITesting` (wipes UserDefaults and the keychain, and uses an in-memory SwiftData store) and `-ScreenshotFixtures` (`birch/Utilities/ScreenshotFixtures.swift`, debug builds only), which fixes the price, fee rates, clock, identicons, chain tip and coin selection. A new run only changes a screenshot when the app changes.
+- **Electrum server:** the tour syncs its testnet4 wallet from `testnet4.mempool.space`, which can throttle a machine that runs many tours at once. To sync from another server, put `BIRCH_TOUR_ELECTRUM_TESTNET4=ssl://host:port` in `fastlane/.env` (git-ignored; fastlane loads it). The same pattern works for `MAINNET`, `TESTNET3` and `SIGNET`. Only the connection uses it, so the screenshots still show the default server.
 - **Output:** `fastlane/screenshots/{dark,light}/{en-US,framed}/`. Commit them in the `fastlane/screenshots` submodule.
 
 ## Tests and CI
@@ -146,4 +147,4 @@ Views/
 
 **Errors:** All wallet operations throw `AppError` (defined in `AppError.swift`). Catch and display via the shared error handling pattern in views.
 
-**Theme:** `Theme.swift` provides the design system — use `Color.hb*` extensions (e.g., `Color.hbBackground`, `Color.hbBitcoinOrange`), `Font.hb*()` functions (e.g., `.hbBody()`, `.hbMono()`, `.hbLabel()`), and view modifiers (`.hbCard()`, `.hbPrimaryButton()`, `.hbSecondaryButton()`) rather than inline SwiftUI styling. Part 1 of `design/DESIGN-SYSTEM.md` documents these, the patterns to keep and the known inconsistencies not to copy; read it, and `design/AGENTS.md`, before building UI.
+**Theme:** `Theme.swift` provides the design system — use `Color.hb*` extensions (e.g., `Color.hbBackground`, `Color.hbBrand`, `Color.hbBrandInk`), `Font.hb*()` functions (e.g., `.hbBody()`, `.hbMono()`, `.hbLabel()`), and view modifiers (`.hbCard()`, `.hbPrimaryButton()`, `.hbSecondaryButton()`) rather than inline SwiftUI styling. Part 1 of `design/DESIGN-SYSTEM.md` documents these, the patterns to keep and the known inconsistencies not to copy; read it, and `design/AGENTS.md`, before building UI.

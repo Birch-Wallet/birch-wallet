@@ -135,7 +135,7 @@ private struct ChoiceCard: View {
       HStack(spacing: 16) {
         Image(systemName: icon)
           .font(.system(size: 28))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
 
         VStack(alignment: .leading, spacing: 4) {
           Text(title)

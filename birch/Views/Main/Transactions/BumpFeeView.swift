@@ -73,7 +73,7 @@ private struct BumpFeeInputView: View {
           DetailRow(label: "Minimum to Bump") {
             Text(formatFeeRate(viewModel.minimumBumpRate) + " sat/vB")
               .font(.hbMono())
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbBrandInk)
           }
         }
         .hbCard()
@@ -90,7 +90,7 @@ private struct BumpFeeInputView: View {
         }) {
           if viewModel.isProcessing {
             ProgressView()
-              .tint(.white)
+              .tint(Color.hbProgress)
               .frame(maxWidth: .infinity, minHeight: 48)
           } else {
             Text("Create Replacement")
@@ -135,10 +135,10 @@ private struct BumpFeeRateCard: View {
         HStack(spacing: 4) {
           Text(viewModel.selectedFeePreset.displayName)
             .font(.hbBody(14))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
           Image(systemName: showFeeMenu ? "chevron.down" : "chevron.left")
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Color.hbBitcoinOrange)
+            .foregroundStyle(Color.hbBrandInk)
         }
       }
       .contentShape(Rectangle())
@@ -177,7 +177,7 @@ private struct BumpFeeRateCard: View {
       HStack(spacing: 10) {
         Image(systemName: viewModel.selectedFeePreset == preset ? "checkmark.circle.fill" : "circle")
           .font(.system(size: 18))
-          .foregroundStyle(viewModel.selectedFeePreset == preset ? Color.hbBitcoinOrange : Color.hbBorder)
+          .foregroundStyle(viewModel.selectedFeePreset == preset ? Color.hbSelection : Color.hbBorder)
 
         Text(preset.displayName)
           .font(.hbBody(14))
@@ -204,7 +204,7 @@ private struct BumpFeeRateCard: View {
     HStack(spacing: 10) {
       Image(systemName: viewModel.selectedFeePreset == .custom ? "checkmark.circle.fill" : "circle")
         .font(.system(size: 18))
-        .foregroundStyle(viewModel.selectedFeePreset == .custom ? Color.hbBitcoinOrange : Color.hbBorder)
+        .foregroundStyle(viewModel.selectedFeePreset == .custom ? Color.hbSelection : Color.hbBorder)
         .onTapGesture { viewModel.selectedFeePreset = .custom }
 
       Text(FeePreset.custom.displayName)
@@ -346,7 +346,7 @@ private struct BumpFeePSBTDisplayView: View {
             .frame(width: maxSide - 10, height: maxSide - 10)
             .padding(5)
             .background(Color.white)
-            .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+            .shadow(color: Color.hbBrand.opacity(0.2), radius: 20)
             .frame(maxWidth: .infinity)
           }
           .aspectRatio(1, contentMode: .fit)
@@ -387,11 +387,11 @@ private struct BumpFeePSBTDisplayView: View {
               Spacer()
               Text("\(Int(framesPerSecond)) FPS")
                 .font(.hbMono(14))
-                .foregroundStyle(Color.hbBitcoinOrange)
+                .foregroundStyle(Color.hbBrandInk)
             }
 
             Slider(value: $framesPerSecond, in: 1 ... 10, step: 1)
-              .tint(Color.hbBitcoinOrange)
+              .tint(Color.hbToggle)
 
             HStack {
               Text("QR Density")
@@ -418,7 +418,7 @@ private struct BumpFeePSBTDisplayView: View {
               Spacer()
               Toggle("", isOn: $compactPSBT)
                 .labelsHidden()
-                .tint(Color.hbBitcoinOrange)
+                .tint(Color.hbToggle)
                 // The iOS 26+ switch draws slightly wider than its layout bounds
                 // and gets clipped by the DisclosureGroup; inset to compensate
                 .padding(.trailing, 4)
@@ -462,7 +462,7 @@ private struct BumpFeePSBTDisplayView: View {
           Button(action: { showExportFile = true }) {
             Label("Export PSBT File", systemImage: "square.and.arrow.up")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
 
           Button(action: {
@@ -476,7 +476,7 @@ private struct BumpFeePSBTDisplayView: View {
           }) {
             Label("Save PSBT", systemImage: "tray.and.arrow.down.fill")
               .font(.hbBody(14))
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbLink)
           }
         }
 
@@ -485,7 +485,7 @@ private struct BumpFeePSBTDisplayView: View {
         }) {
           Label("Copy Base64", systemImage: "doc.on.doc")
             .font(.hbBody(14))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
         }
         .padding(.bottom, 32)
       }
@@ -577,13 +577,13 @@ private struct BumpFeePSBTScanView: View {
       Button(action: { showImportFile = true }) {
         Label("Import PSBT File", systemImage: "doc.badge.arrow.up")
           .font(.hbBody(14))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbLink)
       }
 
       Button(action: { showManualInput = true }) {
         Label("Paste Base64 PSBT", systemImage: "doc.on.clipboard")
           .font(.hbBody(14))
-          .foregroundStyle(Color.hbSteelBlue)
+          .foregroundStyle(Color.hbInfo)
       }
 
       Spacer()
@@ -637,7 +637,7 @@ private struct BumpFeeBroadcastView: View {
         // Ready to broadcast
         Image(systemName: "arrow.up.circle.fill")
           .font(.system(size: 56))
-          .foregroundStyle(Color.hbBitcoinOrange)
+          .foregroundStyle(Color.hbBrandInk)
 
         Text("Ready to Broadcast")
           .font(.hbDisplay(22))
@@ -657,7 +657,7 @@ private struct BumpFeeBroadcastView: View {
         }) {
           if viewModel.isProcessing {
             ProgressView()
-              .tint(.white)
+              .tint(Color.hbProgress)
               .frame(maxWidth: .infinity, minHeight: 48)
           } else {
             Text("Broadcast Transaction")
@@ -694,7 +694,7 @@ private struct BumpFeeBroadcastView: View {
         }) {
           Label("Copy Transaction ID", systemImage: "doc.on.doc")
             .font(.hbBody(14))
-            .foregroundStyle(Color.hbSteelBlue)
+            .foregroundStyle(Color.hbInfo)
         }
 
         Button(action: { dismiss() }) {

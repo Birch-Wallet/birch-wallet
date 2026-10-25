@@ -39,7 +39,7 @@ struct UTXOFilterSheet: View {
                   if filter.sort == key {
                     Image(systemName: "checkmark")
                       .font(.system(size: 14, weight: .semibold))
-                      .foregroundStyle(Color.hbBitcoinOrange)
+                      .foregroundStyle(Color.hbSelection)
                   }
                 }
                 .contentShape(Rectangle())
@@ -120,6 +120,6 @@ struct UTXOFilterSheet: View {
           .foregroundStyle(Color.hbTextSecondary)
       }
     }
-    .tint(Color.hbBitcoinOrange)
+    .tint(Color.hbToggle)
   }
 }

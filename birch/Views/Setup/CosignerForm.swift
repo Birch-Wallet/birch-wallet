@@ -109,7 +109,7 @@ struct CosignerForm: View {
         Button(action: toggleXpubFormat) {
           Image(systemName: "arrow.left.arrow.right")
             .font(.system(size: 14, weight: .bold))
-            .foregroundStyle(Color.green)
+            .foregroundStyle(Color.hbSuccess)
         }
         .accessibilityLabel("Switch key format")
       }

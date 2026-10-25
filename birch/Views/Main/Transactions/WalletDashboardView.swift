@@ -116,7 +116,7 @@ struct WalletDashboardView: View {
                   .font(.hbLabel(12))
                 Spacer()
               }
-              .foregroundStyle(Color.hbBitcoinOrange)
+              .foregroundStyle(Color.hbWarning)
               .padding(.top, 4)
             }
           }
@@ -191,7 +191,7 @@ private struct DashboardMetricCard: View {
     VStack(alignment: .leading, spacing: 10) {
       Image(systemName: icon)
         .font(.system(size: 22, weight: .regular))
-        .foregroundStyle(Color.hbBitcoinOrange)
+        .foregroundStyle(Color.hbBrandInk)
 
       Spacer()
 

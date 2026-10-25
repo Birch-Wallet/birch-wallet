@@ -59,7 +59,7 @@ struct AddressListView: View {
                     .font(.hbBody(12))
                     .lineLimit(1)
                 }
-                .foregroundStyle(Color.hbSteelBlue)
+                .foregroundStyle(Color.hbInfo)
                 .padding(.leading, 48)
               }
             }

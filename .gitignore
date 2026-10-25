@@ -37,6 +37,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/test_output/
 fastlane/README.md
+# Local settings fastlane loads, such as the tour's Electrum servers (Fastfile)
+fastlane/.env
 
 # Bundler (Gemfile.lock is OK to commit; uncomment next line to ignore vendor dir if added later)
 vendor/bundle/
