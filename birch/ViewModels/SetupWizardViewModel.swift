@@ -43,6 +43,10 @@ final class SetupWizardViewModel {
   /// Next opens one of these flagged when it is still incomplete.
   var visitedCosigners: Set<Int> = []
 
+  /// Keys, in standard form, that skip the BIP48 placement check: an edited
+  /// wallet's own keys, so wallets saved before that rule aren't blocked
+  var placementExemptXpubs: Set<String> = []
+
   /// Import
   var importedDescriptorText: String = ""
 
@@ -292,6 +296,18 @@ final class SetupWizardViewModel {
   /// scrolls to the first flagged field and announces it.
   @discardableResult
   func goToNextCosigner() -> CosignerNextAction {
+    let action = checkCosigners()
+    if action == .finish {
+      goToNext()
+    }
+    return action
+  }
+
+  /// Next without leaving the step: flags the open cosigner or opens the next
+  /// incomplete one. `.finish` means every cosigner is complete. Edit Cosigners'
+  /// Save uses it directly.
+  @discardableResult
+  func checkCosigners() -> CosignerNextAction {
     // Drop surrounding whitespace first, so the key that is validated is the key that is stored
     cosignerXpubs = cosignerXpubs.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -305,21 +321,39 @@ final class SetupWizardViewModel {
       visitedCosigners.insert(index)
       cosignerErrors[index] = flagged ? cosignerProblems(at: index) : nil
     case .finish:
-      goToNext()
+      break
     }
     return action
+  }
+
+  /// A cosigner form filled in from a saved wallet, for Edit Cosigners. Its own
+  /// keys skip the placement check, as `WalletManagerViewModel.updateCosigners` does.
+  static func forEditing(_ wallet: WalletProfile) -> SetupWizardViewModel {
+    let vm = SetupWizardViewModel()
+    let sorted = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
+    vm.network = wallet.bitcoinNetwork
+    vm.requiredSignatures = wallet.requiredSignatures
+    vm.totalCosigners = sorted.count
+    vm.cosignerLabels = sorted.map(\.label)
+    vm.cosignerXpubs = sorted.map(\.xpub)
+    vm.cosignerFingerprints = sorted.map(\.fingerprint)
+    vm.cosignerDerivationPaths = sorted.map(\.derivationPath)
+    let isTestnet = wallet.bitcoinNetwork != .mainnet
+    vm.placementExemptXpubs = Set(sorted.compactMap { URService.canonicalXpub($0.xpub, isTestnet: isTestnet) })
+    return vm
   }
 
   // MARK: - Validation
 
   func validateCosignerXpub(_ xpub: String, at index: Int) -> String? {
-    if let error = Self.validateXpub(xpub, for: network) {
+    let isTestnet = network != .mainnet
+    let canonical = URService.canonicalXpub(xpub, isTestnet: isTestnet)
+    let checkingPlacement = canonical.map { !placementExemptXpubs.contains($0) } ?? true
+    if let error = Self.validateXpub(xpub, for: network, checkingPlacement: checkingPlacement) {
       return error
     }
 
     // Check for duplicates in standard form, so a Vpub and its tpub count as the same key
-    let isTestnet = network != .mainnet
-    let canonical = URService.canonicalXpub(xpub, isTestnet: isTestnet)
     for (i, existing) in cosignerXpubs.enumerated() where i != index {
       if !existing.isEmpty, URService.canonicalXpub(existing, isTestnet: isTestnet) == canonical {
         return "Duplicate xpub (same as Cosigner \(i + 1))"

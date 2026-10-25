@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 import URKit
 
 private let logger = AppLog(.wallet)
@@ -155,8 +156,8 @@ struct WalletInfoView: View {
               .foregroundStyle(Color.hbTextPrimary)
             Spacer()
             Button(action: { showEditCosigners = true }) {
-              Label("Edit", systemImage: "pencil")
-                .font(.hbLabel())
+              Text("Edit")
+                .font(.hbBody(15))
                 .foregroundStyle(Color.hbBitcoinOrange)
             }
           }
@@ -416,6 +417,12 @@ struct WalletInfoView: View {
         }
         .hbCard()
 
+        // Wallet Labels: exporting reads the loaded wallet's transactions,
+        // UTXOs and addresses, so the card is only offered for that wallet
+        if BitcoinService.shared.currentProfile?.id == wallet.id {
+          WalletLabelsCard(wallet: wallet)
+        }
+
         // Privacy Mode
         VStack(spacing: 12) {
           Toggle(isOn: Binding(
@@ -580,264 +587,353 @@ struct WalletInfoView: View {
   }
 }
 
-// MARK: - Edit Cosigners Sheet
+// MARK: - Wallet Labels Card
 
-private struct EditCosignersView: View {
-  @Environment(\.dismiss) private var dismiss
+/// BIP 329 label import and export, by file or QR, for the loaded wallet
+private struct WalletLabelsCard: View {
   @Environment(\.modelContext) private var modelContext
-  @Bindable var wallet: WalletProfile
-  @State private var editableCosigners: [EditableCosigner] = []
-  @State private var currentIndex: Int = 0
-  @State private var validationError: String?
-  @State private var showScanner = false
-  @State private var showSaveConfirmation = false
+  let wallet: WalletProfile
+  @State private var showImportFilePicker = false
+  @State private var showImportQRScanner = false
+  @State private var showExportQR = false
+  @State private var importResult: String?
+  @State private var showImportResult = false
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
-        VStack(spacing: 20) {
-          // Cosigner tabs
-          HStack(spacing: 8) {
-            ForEach(editableCosigners.indices, id: \.self) { index in
-              Button(action: { currentIndex = index }) {
-                VStack(spacing: 4) {
-                  ZStack {
-                    Color.clear
-                      .frame(height: 44)
-                      .birchSelected(index == currentIndex)
-                    Image(systemName: "person.badge.key.fill")
-                      .font(.system(size: 14))
-                      .foregroundStyle(index == currentIndex ? Color.hbBitcoinOrange : Color.hbTextSecondary)
-                  }
-                  Text("\(index + 1)")
-                    .font(.hbLabel(11))
-                    .foregroundStyle(index == currentIndex ? Color.hbBitcoinOrange : Color.hbTextSecondary)
-                }
-              }
-            }
-          }
-          .padding(.horizontal, 16)
+    VStack(spacing: 12) {
+      Text("Wallet Labels")
+        .font(.hbHeadline)
+        .foregroundStyle(Color.hbTextPrimary)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
-          if editableCosigners.indices.contains(currentIndex) {
-            cosignerForm(for: currentIndex)
-          }
+      Text("Import or export transaction, address, UTXO and cosigner labels in BIP 329 format.")
+        .font(.hbBody(12))
+        .foregroundStyle(Color.hbTextSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
 
-          if let error = validationError {
-            Text(error)
-              .font(.hbLabel())
-              .foregroundStyle(Color.hbError)
-              .padding(.horizontal, 16)
-          }
-
-          // Save button
-          Button(action: { showSaveConfirmation = true }) {
-            Text("Save Changes")
-              .font(.hbHeadline)
-              .foregroundStyle(.white)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-              .background(Color.hbBitcoinOrange)
-              .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-          }
-          .padding(.horizontal, 16)
-          .padding(.bottom, 32)
+      HStack(spacing: 12) {
+        HBTonalButton(title: "Import File", systemImage: "square.and.arrow.down") {
+          showImportFilePicker = true
         }
-        .padding(.top, 16)
+        HBTonalButton(title: "Export File", systemImage: "square.and.arrow.up", neutral: true, action: exportLabelsToFile)
       }
-      .scrollDismissesKeyboard(.interactively)
-      .onTapGesture {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-      }
-      .background(Color.hbBackground)
-      .navigationTitle("Edit Cosigners")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-            .buttonStyle(HBBarButtonStyle(prominent: false))
+
+      HStack(spacing: 12) {
+        HBTonalButton(title: "Import QR", systemImage: "qrcode.viewfinder") {
+          showImportQRScanner = true
         }
-        .hbHidesGlassBackground()
-      }
-      .sheet(isPresented: $showScanner) {
-        URScannerSheet(expectedTypes: [.hdKey], onCancel: { showScanner = false }) { result in
-          handleScanResult(result)
-          showScanner = false
-        }
-        .birchSheet()
-      }
-      .alert("Save Changes?", isPresented: $showSaveConfirmation) {
-        Button("Save", role: .destructive) { saveChanges() }
-        Button("Cancel", role: .cancel) {}
-      } message: {
-        Text("This will update the wallet descriptors and require a full refresh. Any existing wallet data will be cleared.")
-      }
-    }
-    .onAppear { loadCosigners() }
-  }
-
-  private func cosignerForm(for index: Int) -> some View {
-    VStack(spacing: 16) {
-      // Label
-      VStack(alignment: .leading, spacing: 6) {
-        Text("Label")
-          .font(.hbLabel())
-          .foregroundStyle(Color.hbTextSecondary)
-        TextField("Cosigner name", text: $editableCosigners[index].label)
-          .font(.hbBody())
-          .padding(12)
-          .birchCard(.nested)
-          .foregroundStyle(Color.hbTextPrimary)
-      }
-
-      // Fingerprint
-      VStack(alignment: .leading, spacing: 6) {
-        Text("Master Fingerprint (8 hex chars)")
-          .font(.hbLabel())
-          .foregroundStyle(Color.hbTextSecondary)
-        TextField("e.g. 73c5da0a", text: $editableCosigners[index].fingerprint)
-          .font(.hbMono())
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-          .padding(12)
-          .birchCard(.nested)
-          .foregroundStyle(Color.hbTextPrimary)
-      }
-
-      // Derivation path
-      VStack(alignment: .leading, spacing: 6) {
-        Text("Derivation Path")
-          .font(.hbLabel())
-          .foregroundStyle(Color.hbTextSecondary)
-        Text(editableCosigners[index].derivationPath.isEmpty ? "–" : editableCosigners[index].derivationPath)
-          .font(.hbMono())
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(12)
-          .birchCard(.nested)
-          .foregroundStyle(Color.hbTextPrimary)
-      }
-
-      // Xpub
-      VStack(alignment: .leading, spacing: 6) {
-        HStack {
-          Text("Extended Public Key")
-            .font(.hbLabel())
-            .foregroundStyle(Color.hbTextSecondary)
-
-          Spacer()
-
-          Button(action: {
-            let current = editableCosigners[index].xpub.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !current.isEmpty else { return }
-            let isTestnet = wallet.bitcoinNetwork != .mainnet
-            if let toggled = URService.toggleXpubFormat(current, isTestnet: isTestnet) {
-              editableCosigners[index].xpub = toggled
-            }
-          }) {
-            Image(systemName: "arrow.left.arrow.right")
-              .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(Color.green)
-          }
-          .padding(.trailing, 12)
-
-          Button(action: {
-            if let text = UIPasteboard.general.string {
-              let raw = text.trimmingCharacters(in: .whitespacesAndNewlines)
-              let isTestnet = wallet.bitcoinNetwork != .mainnet
-              if let normalized = URService.normalizeXpub(raw, isTestnet: isTestnet) {
-                editableCosigners[index].xpub = normalized
-              } else {
-                editableCosigners[index].xpub = raw
-              }
-            }
-          }) {
-            Label("Paste", systemImage: "doc.on.clipboard")
-              .font(.hbLabel())
-              .foregroundStyle(Color.hbSteelBlue)
-          }
-        }
-
-        TextEditor(text: $editableCosigners[index].xpub)
-          .font(.hbMono(12))
-          .frame(minHeight: 80)
-          .scrollContentBackground(.hidden)
-          .padding(12)
-          .birchCard(.nested)
-          .foregroundStyle(Color.hbTextPrimary)
-
-        Button(action: { showScanner = true }) {
-          Label("Scan QR Code", systemImage: "qrcode.viewfinder")
-            .font(.hbBody(15))
-            .foregroundStyle(Color.hbBitcoinOrange)
+        HBTonalButton(title: "Export QR", systemImage: "qrcode", neutral: true) {
+          showExportQR = true
         }
       }
     }
     .hbCard()
-    .padding(.horizontal, 16)
+    .fileImporter(
+      isPresented: $showImportFilePicker,
+      allowedContentTypes: [UTType(filenameExtension: "jsonl") ?? .plainText],
+      allowsMultipleSelection: false,
+    ) { result in
+      importLabelsFromFile(result: result)
+    }
+    .alert("Import Labels", isPresented: $showImportResult) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      if let importResult {
+        Text(importResult)
+      }
+    }
+    .sheet(isPresented: $showImportQRScanner) {
+      URScannerSheet(expectedTypes: [.rawBytes], onCancel: { showImportQRScanner = false }) { result in
+        handleQRImportResult(result)
+      }
+      .birchSheet()
+    }
+    .sheet(isPresented: $showExportQR) {
+      LabelsQRSheet(buildExport: buildExportData)
+        .birchSheet()
+    }
   }
 
-  private func loadCosigners() {
-    let sorted = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
-    editableCosigners = sorted.map { cosigner in
-      EditableCosigner(
-        id: cosigner.id,
-        label: cosigner.label,
-        xpub: cosigner.xpub,
-        fingerprint: cosigner.fingerprint,
-        derivationPath: cosigner.derivationPath,
-        orderIndex: cosigner.orderIndex,
+  private func buildExportData() -> Data {
+    let service = BitcoinService.shared
+    let walletID = wallet.id
+    let frozenDescriptor = FetchDescriptor<FrozenUTXO>(predicate: #Predicate { $0.walletID == walletID })
+    let frozenOutpoints = Set(((try? modelContext.fetch(frozenDescriptor)) ?? []).map(\.outpoint))
+
+    return LabelService.exportBIP329(
+      walletID: walletID,
+      context: modelContext,
+      transactions: service.transactions,
+      utxos: service.utxos,
+      frozenOutpoints: frozenOutpoints,
+      receiveAddresses: service.getAddresses(keychain: .external),
+      changeAddresses: service.getAddresses(keychain: .internal),
+      cosigners: wallet.cosigners,
+      requiredSignatures: wallet.requiredSignatures,
+      network: wallet.bitcoinNetwork,
+    )
+  }
+
+  private func exportLabelsToFile() {
+    let data = buildExportData()
+    let sanitizedName = wallet.name.replacingOccurrences(of: " ", with: "-")
+    let fileName = "\(sanitizedName)-labels.jsonl"
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+    try? data.write(to: tempURL)
+
+    let activityVC = UIActivityViewController(
+      activityItems: [tempURL],
+      applicationActivities: nil,
+    )
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          var topVC = windowScene.windows.first?.rootViewController else { return }
+    while let presented = topVC.presentedViewController {
+      topVC = presented
+    }
+    if let popover = activityVC.popoverPresentationController {
+      popover.sourceView = topVC.view
+      popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: 0, width: 0, height: 0)
+    }
+    topVC.present(activityVC, animated: true)
+  }
+
+  private func importLabelsFromFile(result: Result<[URL], Error>) {
+    switch result {
+    case let .success(urls):
+      guard let url = urls.first else { return }
+      guard url.startAccessingSecurityScopedResource() else {
+        importResult = "Unable to access the selected file."
+        showImportResult = true
+        return
+      }
+      defer { url.stopAccessingSecurityScopedResource() }
+
+      guard let data = try? Data(contentsOf: url) else {
+        importResult = "Unable to read the selected file."
+        showImportResult = true
+        return
+      }
+      importLabels(data, fromQR: false)
+
+    case .failure:
+      importResult = "Failed to select a file."
+      showImportResult = true
+    }
+  }
+
+  private func handleQRImportResult(_ result: AppURResult) {
+    showImportQRScanner = false
+
+    guard case let .rawBytes(data) = result else {
+      importResult = "Unexpected QR code type. Expected UR-encoded labels."
+      showImportResult = true
+      return
+    }
+    importLabels(data, fromQR: true)
+  }
+
+  private func importLabels(_ data: Data, fromQR: Bool) {
+    do {
+      let count = try LabelService.importBIP329(
+        data: data,
+        walletID: wallet.id,
+        cosigners: wallet.cosigners,
+        context: modelContext,
+      )
+
+      if count == 0 {
+        importResult = "No new labels found to import."
+      } else {
+        importResult = "Successfully imported \(count) label\(count == 1 ? "" : "s")."
+      }
+    } catch {
+      logger.error("Failed to save imported labels\(fromQR ? " from QR" : ""): \(error.localizedDescription)")
+      importResult = "Failed to save imported labels."
+    }
+    showImportResult = true
+  }
+}
+
+// MARK: - Labels QR Sheet
+
+/// The wallet's BIP 329 labels as an animated `ur:bytes` QR
+struct LabelsQRSheet: View {
+  /// Bytes per UR fragment. The Sparrow labels harness encodes with the same value.
+  static let maxFragmentLen = 400
+
+  let buildExport: () -> Data
+  @Environment(\.dismiss) private var dismiss
+  @State private var exportData: Data?
+
+  var body: some View {
+    NavigationStack {
+      ZStack {
+        Color.hbBackground.ignoresSafeArea()
+
+        VStack(spacing: 16) {
+          if let exportData {
+            URDisplaySheet(data: exportData, urType: "bytes", maxFragmentLen: Self.maxFragmentLen)
+              .padding(5)
+              .background(Color.white)
+              .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
+          } else {
+            VStack(spacing: 12) {
+              ProgressView()
+                .tint(Color.hbBitcoinOrange)
+                .scaleEffect(1.5)
+              Text("Preparing labels...")
+                .font(.hbBody(14))
+                .foregroundStyle(Color.hbTextSecondary)
+            }
+          }
+
+          Text("Scan to import wallet labels")
+            .font(.hbBody(14))
+            .foregroundStyle(Color.hbTextSecondary)
+        }
+        .padding(24)
+      }
+      .navigationTitle("Export Labels")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { dismiss() }
+            .buttonStyle(HBBarButtonStyle(prominent: true))
+        }
+        .hbHidesGlassBackground()
+      }
+    }
+    .task {
+      if exportData == nil {
+        exportData = buildExport()
+      }
+    }
+  }
+}
+
+// MARK: - Edit Cosigners Sheet
+
+/// Edit Cosigners: the Import cosigners form (`CosignerForm`) filled in from the
+/// wallet, with Cancel and Save Changes. Renaming saves straight away; changing a
+/// key, fingerprint or path rebuilds the wallet, so it asks first.
+private struct EditCosignersView: View {
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+  @Bindable var wallet: WalletProfile
+  @State private var form: SetupWizardViewModel
+  @State private var saveError: String?
+  @State private var showChangeKeysConfirmation = false
+
+  private static let topID = "edit-cosigners-top"
+
+  init(wallet: WalletProfile) {
+    self.wallet = wallet
+    _form = State(initialValue: SetupWizardViewModel.forEditing(wallet))
+  }
+
+  private var edited: [(label: String, xpub: String, fingerprint: String, derivationPath: String)] {
+    (0 ..< form.totalCosigners).map {
+      (
+        label: form.cosignerLabels[$0],
+        xpub: form.cosignerXpubs[$0],
+        fingerprint: form.cosignerFingerprints[$0],
+        derivationPath: form.cosignerDerivationPaths[$0],
       )
     }
   }
 
-  private func handleScanResult(_ result: AppURResult) {
-    switch result {
-    case .hdKey(var xpub, let fingerprint, let derivationPath):
-      // Validate derivation path network before accepting the scan
-      if !derivationPath.isEmpty, let error = SetupWizardViewModel.validateDerivationPath(derivationPath, for: wallet.bitcoinNetwork) {
-        validationError = error
-        return
-      }
+  private var hasChanges: Bool {
+    WalletManagerViewModel.cosignerChange(of: wallet, to: edited) != .none
+  }
 
-      let isTestnet = wallet.bitcoinNetwork != .mainnet
-      if let normalized = URService.normalizeXpub(xpub, isTestnet: isTestnet) {
-        xpub = normalized
-      }
+  var body: some View {
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(spacing: 24) {
+          Text("Edit Cosigners")
+            .font(.hbDisplay(28))
+            .foregroundStyle(Color.hbTextPrimary)
+            .id(Self.topID)
 
-      guard editableCosigners.indices.contains(currentIndex) else { return }
-      editableCosigners[currentIndex].xpub = xpub
-      if !fingerprint.isEmpty {
-        editableCosigners[currentIndex].fingerprint = fingerprint
+          CosignerForm(viewModel: form)
+            .padding(.horizontal, 24)
+
+          if let saveError {
+            Text(saveError)
+              .font(.hbLabel())
+              .foregroundStyle(Color.hbError)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(.horizontal, 24)
+          }
+
+          HStack(spacing: 16) {
+            Button(action: { dismiss() }) {
+              Text("Cancel")
+                .hbCompactSecondaryButton()
+            }
+
+            Spacer()
+
+            // Outlined until every cosigner is complete, but never disabled:
+            // Save is what shows the user what is missing
+            Button(action: { save(proxy: proxy) }) {
+              Text("Save Changes")
+                .hbCompactPrimaryButton(form.allCosignersComplete ? .filled : .outlined)
+            }
+          }
+          .padding(.horizontal, 24)
+          .padding(.bottom, 32)
+        }
+        .padding(.top, 24)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: dismissKeyboard)
       }
-      if !derivationPath.isEmpty {
-        editableCosigners[currentIndex].derivationPath = derivationPath
-      }
-    default:
-      validationError = "Unexpected QR code type. Expected crypto-hdkey or crypto-account."
+      .scrollDismissesKeyboard(.interactively)
+    }
+    .background(Color.hbBackground)
+    // A swipe down would throw away the edits; Cancel still can
+    .interactiveDismissDisabled(hasChanges)
+    .alert("Change Cosigner Keys?", isPresented: $showChangeKeysConfirmation) {
+      Button("Change Keys", role: .destructive) { commit() }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This rebuilds the wallet from the new cosigner details. Birch clears its downloaded transactions and UTXOs and refreshes from scratch. A changed key gives the wallet different addresses, so labels and frozen coins on the current transactions, addresses and UTXOs won't match anything, and saved PSBTs can't be signed. Export your labels and output descriptor first if you might need them.")
     }
   }
 
-  private func saveChanges() {
-    let walletManager = WalletManagerViewModel()
-    let edited = editableCosigners.map {
-      (label: $0.label, xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath)
-    }
-    guard walletManager.updateCosigners(of: wallet, to: edited, modelContext: modelContext) else {
-      validationError = walletManager.errorMessage
+  private func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+  }
+
+  /// Save Changes: shows what is missing like Next does, then saves according to
+  /// what changed
+  private func save(proxy: ScrollViewProxy) {
+    dismissKeyboard()
+    let action = form.checkCosigners()
+    guard action == .finish else {
+      CosignerForm.reveal(action, viewModel: form, proxy: proxy, topID: Self.topID)
       return
     }
 
-    validationError = nil
+    switch WalletManagerViewModel.cosignerChange(of: wallet, to: edited) {
+    case .none:
+      dismiss()
+    case .detailsOnly:
+      commit()
+    case .keys:
+      showChangeKeysConfirmation = true
+    }
+  }
+
+  private func commit() {
+    let walletManager = WalletManagerViewModel()
+    guard walletManager.updateCosigners(of: wallet, to: edited, modelContext: modelContext) else {
+      saveError = walletManager.errorMessage
+      return
+    }
+    saveError = nil
     dismiss()
   }
-}
-
-private struct EditableCosigner: Identifiable {
-  let id: UUID
-  var label: String
-  var xpub: String
-  var fingerprint: String
-  var derivationPath: String
-  var orderIndex: Int
 }
 
 // MARK: - Descriptor QR Sheet

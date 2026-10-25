@@ -1,13 +1,11 @@
 import SwiftData
 import SwiftUI
-import UniformTypeIdentifiers
 
 private let logger = AppLog(.transactions)
 
 struct TransactionListView: View {
   @Query private var wallets: [WalletProfile]
   @Query private var walletLabels: [WalletLabel]
-  @Query private var frozenUTXOs: [FrozenUTXO]
   @State private var viewModel = TransactionListViewModel()
   @State private var walletManager = WalletManagerViewModel()
   @State private var showWalletPicker = false
@@ -18,12 +16,6 @@ struct TransactionListView: View {
   @State private var walletToDelete: WalletProfile?
   @State private var showConnectionStatus = false
   @State private var showDashboard = false
-  @State private var showImportFilePicker = false
-  @State private var showImportQRScanner = false
-  @State private var showExportQR = false
-  @State private var exportQRData: Data?
-  @State private var importResult: String?
-  @State private var showImportResult = false
   @State private var walletID: UUID?
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.modelContext) private var modelContext
@@ -52,149 +44,6 @@ struct TransactionListView: View {
     return walletLabels.first(where: { $0.walletID == walletID && $0.type == "tx" && $0.ref == txid })?.label
   }
 
-  private func exportLabelsToFile() {
-    guard let profile = bitcoinService.currentProfile else { return }
-    let walletID = profile.id
-    let cosigners = profile.cosigners
-    let frozenOutpoints = Set(frozenUTXOs.filter { $0.walletID == walletID }.map(\.outpoint))
-    let receiveAddresses = bitcoinService.getAddresses(keychain: .external)
-    let changeAddresses = bitcoinService.getAddresses(keychain: .internal)
-
-    let data = LabelService.exportBIP329(
-      walletID: walletID,
-      context: modelContext,
-      transactions: bitcoinService.transactions,
-      utxos: bitcoinService.utxos,
-      frozenOutpoints: frozenOutpoints,
-      receiveAddresses: receiveAddresses,
-      changeAddresses: changeAddresses,
-      cosigners: cosigners,
-      requiredSignatures: profile.requiredSignatures,
-      network: profile.bitcoinNetwork,
-    )
-
-    let sanitizedName = profile.name.replacingOccurrences(of: " ", with: "-")
-    let fileName = "\(sanitizedName)-labels.jsonl"
-    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-    try? data.write(to: tempURL)
-
-    let activityVC = UIActivityViewController(
-      activityItems: [tempURL],
-      applicationActivities: nil,
-    )
-    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-          var topVC = windowScene.windows.first?.rootViewController else { return }
-    while let presented = topVC.presentedViewController {
-      topVC = presented
-    }
-    if let popover = activityVC.popoverPresentationController {
-      popover.sourceView = topVC.view
-      popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: 0, width: 0, height: 0)
-    }
-    topVC.present(activityVC, animated: true)
-  }
-
-  private func importLabelsFromFile(result: Result<[URL], Error>) {
-    switch result {
-    case let .success(urls):
-      guard let url = urls.first else { return }
-      guard url.startAccessingSecurityScopedResource() else {
-        importResult = "Unable to access the selected file."
-        showImportResult = true
-        return
-      }
-      defer { url.stopAccessingSecurityScopedResource() }
-
-      guard let data = try? Data(contentsOf: url) else {
-        importResult = "Unable to read the selected file."
-        showImportResult = true
-        return
-      }
-
-      guard let profile = bitcoinService.currentProfile else { return }
-
-      do {
-        let count = try LabelService.importBIP329(
-          data: data,
-          walletID: profile.id,
-          cosigners: profile.cosigners,
-          context: modelContext,
-        )
-
-        if count == 0 {
-          importResult = "No new labels found to import."
-        } else {
-          importResult = "Successfully imported \(count) label\(count == 1 ? "" : "s")."
-        }
-      } catch {
-        logger.error("Failed to save imported labels: \(error.localizedDescription)")
-        importResult = "Failed to save imported labels."
-      }
-      showImportResult = true
-
-    case .failure:
-      importResult = "Failed to select a file."
-      showImportResult = true
-    }
-  }
-
-  private func exportLabelsToQR() {
-    exportQRData = nil
-    showExportQR = true
-  }
-
-  private func buildExportData() -> Data {
-    guard let profile = bitcoinService.currentProfile else { return Data() }
-    let walletID = profile.id
-    let frozenOutpoints = Set(frozenUTXOs.filter { $0.walletID == walletID }.map(\.outpoint))
-    let receiveAddresses = bitcoinService.getAddresses(keychain: .external)
-    let changeAddresses = bitcoinService.getAddresses(keychain: .internal)
-
-    return LabelService.exportBIP329(
-      walletID: walletID,
-      context: modelContext,
-      transactions: bitcoinService.transactions,
-      utxos: bitcoinService.utxos,
-      frozenOutpoints: frozenOutpoints,
-      receiveAddresses: receiveAddresses,
-      changeAddresses: changeAddresses,
-      cosigners: profile.cosigners,
-      requiredSignatures: profile.requiredSignatures,
-      network: profile.bitcoinNetwork,
-    )
-  }
-
-  private func handleQRImportResult(_ result: AppURResult) {
-    showImportQRScanner = false
-
-    guard case let .rawBytes(data) = result else {
-      importResult = "Unexpected QR code type. Expected UR-encoded labels."
-      showImportResult = true
-      return
-    }
-
-    guard let profile = bitcoinService.currentProfile else { return }
-
-    do {
-      let count = try LabelService.importBIP329(
-        data: data,
-        walletID: profile.id,
-        cosigners: profile.cosigners,
-        context: modelContext,
-      )
-
-      if count == 0 {
-        importResult = "No new labels found to import."
-      } else {
-        importResult = "Successfully imported \(count) label\(count == 1 ? "" : "s")."
-      }
-    } catch {
-      logger.error("Failed to save imported labels from QR: \(error.localizedDescription)")
-      importResult = "Failed to save imported labels."
-    }
-    showImportResult = true
-  }
-
   var body: some View {
     // Amounts format from the Bitcoin unit setting; read it so a change redraws them
     let _ = denomination
@@ -202,37 +51,17 @@ struct TransactionListView: View {
       VStack(spacing: 0) {
         // Wallet hero header
         VStack(spacing: 12) {
-          // Wallet selector + menu row
+          // Wallet settings + wallet selector + connection status row
           HStack {
-            Menu {
-              Button(action: { showDashboard = true }) {
-                Label("Dashboard", systemImage: "chart.bar.xaxis")
-              }
-              Button(action: { showWalletInfo = true }) {
-                Label("Wallet Settings", systemImage: "slider.horizontal.3")
-              }
-              Menu {
-                Button(action: { showImportFilePicker = true }) {
-                  Label("Labels File Import", systemImage: "square.and.arrow.down")
-                }
-                Button(action: { exportLabelsToFile() }) {
-                  Label("Labels File Export", systemImage: "square.and.arrow.up")
-                }
-                Divider()
-                Button(action: { showImportQRScanner = true }) {
-                  Label("Labels QR Import", systemImage: "qrcode.viewfinder")
-                }
-              } label: {
-                Label("Wallet Labels", systemImage: "tag")
-              }
-            } label: {
-              Image(systemName: "ellipsis")
-                .font(.system(size: 20))
+            Button(action: { showWalletInfo = true }) {
+              Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 18))
                 .foregroundStyle(Color.hbTextSecondary)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
-            .accessibilityIdentifier("walletMenu")
+            .accessibilityLabel("Wallet Settings")
+            .accessibilityIdentifier("walletSettings")
 
             Spacer()
 
@@ -329,6 +158,17 @@ struct TransactionListView: View {
             .font(.hbHeadline)
             .foregroundStyle(Color.hbTextPrimary)
           Spacer()
+          // Rarely used, so it stays small: the frame widens the tap area without
+          // making the row taller.
+          Button(action: { showDashboard = true }) {
+            Image(systemName: "chart.bar.xaxis")
+              .font(.system(size: 15))
+              .foregroundStyle(Color.hbTextPrimary)
+              .frame(minWidth: 44, minHeight: 22, alignment: .trailing)
+              .contentShape(Rectangle())
+          }
+          .accessibilityLabel("Dashboard")
+          .accessibilityIdentifier("dashboardButton")
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -349,10 +189,12 @@ struct TransactionListView: View {
       .sheet(isPresented: $showConnectionStatus) {
         ConnectionStatusView()
           .birchSheet()
+          .birchResizableSheet()
       }
       .sheet(isPresented: $showDashboard) {
         WalletDashboardView()
           .birchSheet()
+          .birchResizableSheet()
       }
       .sheet(isPresented: $showAddWallet, onDismiss: {
         if let active = wallets.first(where: { $0.isActive }),
@@ -385,14 +227,8 @@ struct TransactionListView: View {
               }
           }
           .birchSheet()
+          .birchResizableSheet()
         }
-      }
-      .fileImporter(
-        isPresented: $showImportFilePicker,
-        allowedContentTypes: [UTType(filenameExtension: "jsonl") ?? .plainText],
-        allowsMultipleSelection: false,
-      ) { result in
-        importLabelsFromFile(result: result)
       }
       .alert("Delete Wallet?", isPresented: .init(
         get: { walletToDelete != nil },
@@ -411,65 +247,6 @@ struct TransactionListView: View {
         Button("Cancel", role: .cancel) { walletToDelete = nil }
       } message: {
         Text("Are you sure you want to delete \"\(walletToDelete?.name ?? "")\"? This cannot be undone. You can re-import using your output descriptor.")
-      }
-      .alert("Import Labels", isPresented: $showImportResult) {
-        Button("OK", role: .cancel) {}
-      } message: {
-        if let importResult {
-          Text(importResult)
-        }
-      }
-      .sheet(isPresented: $showImportQRScanner) {
-        URScannerSheet(expectedTypes: [.rawBytes], onCancel: { showImportQRScanner = false }) { result in
-          handleQRImportResult(result)
-        }
-        .birchSheet()
-      }
-      .sheet(isPresented: $showExportQR) {
-        NavigationStack {
-          ZStack {
-            Color.hbBackground.ignoresSafeArea()
-
-            VStack(spacing: 16) {
-              if let data = exportQRData {
-                URDisplaySheet(data: data, urType: "bytes", maxFragmentLen: 400)
-                  .padding(5)
-                  .background(Color.white)
-                  .shadow(color: Color.hbBitcoinOrange.opacity(0.2), radius: 20)
-              } else {
-                VStack(spacing: 12) {
-                  ProgressView()
-                    .tint(Color.hbBitcoinOrange)
-                    .scaleEffect(1.5)
-                  Text("Preparing labels...")
-                    .font(.hbBody(14))
-                    .foregroundStyle(Color.hbTextSecondary)
-                }
-              }
-
-              Text("Scan to import wallet labels")
-                .font(.hbBody(14))
-                .foregroundStyle(Color.hbTextSecondary)
-            }
-            .padding(24)
-          }
-          .navigationTitle("Export Labels")
-          .navigationBarTitleDisplayMode(.inline)
-          .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-              Button("Done") { showExportQR = false }
-                .buttonStyle(HBBarButtonStyle(prominent: true))
-            }
-            .hbHidesGlassBackground()
-          }
-        }
-        .task {
-          if exportQRData == nil {
-            let data = buildExportData()
-            exportQRData = data
-          }
-        }
-        .birchSheet()
       }
     }
     .id(walletID)
@@ -524,6 +301,15 @@ struct TransactionListView: View {
     try? modelContext.save()
     let generator = UIImpactFeedbackGenerator(style: .medium)
     generator.impactOccurred()
+  }
+
+  /// Closes the wallet picker and opens Wallet Settings for `wallet`, which
+  /// needn't be the active one.
+  private func openWalletSettings(_ wallet: WalletProfile) {
+    walletToEdit = wallet
+    walletPickerEditMode = false
+    withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
+    showWalletInfo = true
   }
 
   @ViewBuilder
@@ -595,11 +381,15 @@ struct TransactionListView: View {
                     .foregroundStyle(Color.hbTextPrimary)
                   Spacer()
 
-                  if walletPickerEditMode {
-                    Image(systemName: "chevron.right")
-                      .font(.system(size: 14, weight: .semibold))
+                  Button(action: { openWalletSettings(wallet) }) {
+                    Image(systemName: "slider.horizontal.3")
+                      .font(.system(size: 17))
                       .foregroundStyle(Color.hbTextSecondary)
+                      .frame(width: 40, height: 36, alignment: .trailing)
+                      .contentShape(Rectangle())
                   }
+                  .accessibilityLabel("Settings for \(wallet.name)")
+                  .accessibilityIdentifier("walletPickerSettings")
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 15)
@@ -607,10 +397,7 @@ struct TransactionListView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                   if walletPickerEditMode {
-                    walletToEdit = wallet
-                    walletPickerEditMode = false
-                    withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
-                    showWalletInfo = true
+                    openWalletSettings(wallet)
                   } else {
                     guard !wallet.isActive else {
                       withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
@@ -637,7 +424,7 @@ struct TransactionListView: View {
         .background(Color.hbFloating)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
-        .padding(.horizontal, 35)
+        .padding(.horizontal, 16)
         .padding(.top, 60)
 
         Spacer()

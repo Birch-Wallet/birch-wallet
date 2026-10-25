@@ -537,6 +537,19 @@ struct HBTonalButton: View {
   }
 }
 
+struct BirchResizableSheet: ViewModifier {
+  @State private var detent: PresentationDetent = .large
+
+  func body(content: Content) -> some View {
+    content
+      .presentationDetents([.medium, .large], selection: $detent)
+      .presentationDragIndicator(.visible)
+      .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+        withAnimation { detent = .large }
+      }
+  }
+}
+
 /// A form field that failed validation: a 1.5pt error border on its nested
 /// fill and the reason under it. Nil shows the field as it is.
 struct HBFieldErrorModifier: ViewModifier {
@@ -577,6 +590,12 @@ extension View {
   func birchSheet() -> some View {
     presentationBackground(Color.hbSheet)
       .presentationCornerRadius(12)
+  }
+
+  /// Half and full height with a grabber, opening at full height. The keyboard
+  /// brings it back to full height so a focused field is never hidden.
+  func birchResizableSheet() -> some View {
+    modifier(BirchResizableSheet())
   }
 
   /// `squareTop` squares the top corners, for a card that a tab sits on

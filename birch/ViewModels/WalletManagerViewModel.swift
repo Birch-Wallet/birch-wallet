@@ -41,9 +41,51 @@ final class WalletManagerViewModel {
     }
   }
 
+  /// What saving edited cosigners would change
+  enum CosignerChange: Equatable {
+    case none
+    /// Labels, or how a key is written (a Vpub for its tpub): the descriptors
+    /// stay as they are
+    case detailsOnly
+    /// A key, fingerprint or path: the wallet is rebuilt from the new descriptors
+    case keys
+  }
+
+  /// Compares edited cosigners with the wallet's, slot by slot. Keys compare in
+  /// standard form, so a Vpub and its tpub count as the same key.
+  static func cosignerChange(
+    of wallet: WalletProfile,
+    to edited: [(label: String, xpub: String, fingerprint: String, derivationPath: String)],
+  ) -> CosignerChange {
+    let existing = wallet.cosigners.sorted { $0.orderIndex < $1.orderIndex }
+    guard edited.count == existing.count else { return .keys }
+    let isTestnet = wallet.bitcoinNetwork != .mainnet
+
+    func canonical(_ xpub: String) -> String {
+      let trimmed = xpub.trimmingCharacters(in: .whitespacesAndNewlines)
+      return URService.canonicalXpub(trimmed, isTestnet: isTestnet) ?? trimmed
+    }
+
+    var detailsChanged = false
+    for (cosigner, edit) in zip(existing, edited) {
+      if canonical(cosigner.xpub) != canonical(edit.xpub)
+        || cosigner.fingerprint.lowercased() != edit.fingerprint.lowercased()
+        || cosigner.derivationPath != edit.derivationPath
+      {
+        return .keys
+      }
+      if cosigner.label != edit.label || cosigner.xpub != edit.xpub.trimmingCharacters(in: .whitespacesAndNewlines) {
+        detailsChanged = true
+      }
+    }
+    return detailsChanged ? .detailsOnly : .none
+  }
+
   /// Replaces a wallet's cosigner details and rebuilds its descriptors from them.
   /// Returns false with `errorMessage` set, leaving the wallet as it was, when
-  /// the edited cosigners cannot be saved.
+  /// the edited cosigners cannot be saved. An edit that only renames cosigners or
+  /// rewrites a key in another format saves those and leaves the descriptors and
+  /// the wallet's data alone.
   @discardableResult
   func updateCosigners(
     of wallet: WalletProfile,
@@ -86,6 +128,29 @@ final class WalletManagerViewModel {
         errorMessage = "Cosigner \(i + 1): \(error)"
         return false
       }
+    }
+
+    switch Self.cosignerChange(of: wallet, to: edited) {
+    case .none:
+      errorMessage = nil
+      return true
+    case .detailsOnly:
+      for (cosigner, edit) in zip(existingCosigners, edited) {
+        cosigner.label = edit.label
+        cosigner.xpub = edit.xpub.trimmingCharacters(in: .whitespacesAndNewlines)
+      }
+      do {
+        try modelContext.save()
+      } catch {
+        logger.error("Failed to save cosigner details: \(error)")
+        errorMessage = error.localizedDescription
+        return false
+      }
+      errorMessage = nil
+      logger.info("Cosigner labels saved; descriptors unchanged")
+      return true
+    case .keys:
+      break
     }
 
     // Rebuild descriptors from the edited cosigner data before changing any
