@@ -44,6 +44,9 @@ final class SendViewModel: PSBTFlowManaging {
   /// Fee
   var showFeeSheet: Bool = false
 
+  /// The "fiat is off" callout under the unit pill
+  var showFiatHint: Bool = false
+
   /// Validation
   var showValidationErrors: Bool = false
 
@@ -830,5 +833,6 @@ final class SendViewModel: PSBTFlowManaging {
     showLoadPSBT = false
     showImportPSBTQR = false
     showImportPSBTFile = false
+    showFiatHint = false
   }
 }
