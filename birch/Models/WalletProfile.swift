@@ -47,7 +47,8 @@ final class WalletProfile {
     self.externalDescriptor = externalDescriptor
     self.internalDescriptor = internalDescriptor
     self.network = network.rawValue
-    createdAt = Date()
+    // Wallet Settings shows it, so the screenshot tour freezes it too
+    createdAt = .displayNow
     self.isActive = isActive
     self.addressGapLimit = addressGapLimit
     self.electrumHost = electrumHost

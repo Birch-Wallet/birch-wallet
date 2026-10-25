@@ -160,6 +160,7 @@ struct WalletInfoView: View {
                 .font(.hbBody(15))
                 .foregroundStyle(Color.hbBitcoinOrange)
             }
+            .accessibilityIdentifier("editCosigners")
           }
 
           let sorted = (wallet.cosigners).sorted { $0.orderIndex < $1.orderIndex }

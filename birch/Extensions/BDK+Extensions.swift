@@ -135,8 +135,9 @@ extension String {
 }
 
 extension Date {
-  /// The current time for what screens show: ages, relative times and default
-  /// names. The screenshot tour freezes it (ScreenshotFixtures.now).
+  /// The current time for what screens show: ages, relative times, default
+  /// names and a wallet's creation date. The screenshot tour freezes it
+  /// (ScreenshotFixtures.now).
   static var displayNow: Date {
     #if DEBUG
       if ScreenshotFixtures.isActive {
