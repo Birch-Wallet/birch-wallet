@@ -241,19 +241,18 @@ final class ScreenshotTests: XCTestCase {
       navigateBack()
     }
 
-    // MARK: 07 - Dashboard sheet (via "..." overflow menu)
+    // MARK: 07 - Dashboard sheet (via the Transactions header button)
 
-    let walletMenu = barItem("walletMenu")
-    if walletMenu.waitForExistence(timeout: 3) {
-      walletMenu.tap()
-      let dashboardMenuItem = app.buttons["Dashboard"]
-      if dashboardMenuItem.waitForExistence(timeout: 3) {
-        dashboardMenuItem.tap()
+    let dashboardButton = barItem("dashboardButton")
+    if dashboardButton.waitForExistence(timeout: 3) {
+      dashboardButton.tap()
+      let doneButton = app.buttons["Done"]
+      if doneButton.waitForExistence(timeout: 3) {
         // Let the sheet finish laying out.
         settle()
         snapshot("07-Dashboard")
-        // Dismiss the sheet by swiping the window down.
-        app.windows.firstMatch.swipeDown(velocity: .fast)
+        // Close with Done: a swipe down can stop at the sheet's half-height detent.
+        doneButton.tap()
       }
     }
 

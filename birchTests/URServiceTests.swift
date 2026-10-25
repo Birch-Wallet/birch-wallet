@@ -144,6 +144,50 @@ struct URServiceTests {
     #expect(unwrappedZpub.hasPrefix("xpub"), "Should correctly convert Zpub to xpub")
   }
 
+  /// The key-format button on Import cosigners and Edit Cosigners: tpub ↔ Vpub on
+  /// test networks, xpub ↔ Zpub on mainnet. Only the version bytes change, so it is
+  /// always the same key.
+  @Test func `toggling key format converts between tpub and Vpub and back`() throws {
+    let tpub = "tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH"
+    let vpub = "Vpub5mKYi6ZW8JMuPDDizjMfw5hwjj4xKSkmUSjVDJjrAghaCw7aSJF4v7M4miDJd6uwZcmxK1LcSCsXB7bY4ELTsV3VbCj2LqHq26b8VUzgDWo"
+
+    // tpub → Vpub and Vpub → tpub give the known pair
+    #expect(URService.toggleXpubFormat(tpub, isTestnet: true) == vpub)
+    #expect(URService.toggleXpubFormat(vpub, isTestnet: true) == tpub)
+
+    // A second known pair, from the cosigner edit tests
+    let otherVpub = "Vpub5kv6Y3xqGFyhZQyCz8LzaSwVzAJLJTvHcUewWAhrLRRRjZeYs53qrfspVEBKZw6rvwGy8Z1ef7e7Vzsu3BLF6MkjFXWnLpmftKQT1Eub5Cf"
+    let otherTpub = "tpubDE4AYPPuhwTk7ENvANSMNU84wRecxjikg4e1WFHE4a6fxsNogCqnA7zzxyDoXp93JeyWNViXEKnkqaysaCrZRnTZDLYXnmbt7zrGxWYc3Mx"
+    #expect(URService.toggleXpubFormat(otherTpub, isTestnet: true) == otherVpub)
+    #expect(URService.toggleXpubFormat(otherVpub, isTestnet: true) == otherTpub)
+
+    // Toggling twice is a round trip in either direction
+    let toggledOnce = try #require(URService.toggleXpubFormat(tpub, isTestnet: true))
+    #expect(URService.toggleXpubFormat(toggledOnce, isTestnet: true) == tpub)
+
+    // Both forms are the same key: everything after the 4 version bytes matches,
+    // and both canonicalize to the tpub that goes into the descriptor
+    let tpubBytes = try #require(URService.decodeExtendedPublicKey(tpub))
+    let vpubBytes = try #require(URService.decodeExtendedPublicKey(vpub))
+    #expect(tpubBytes.dropFirst(4) == vpubBytes.dropFirst(4))
+    #expect(tpubBytes.prefix(4) != vpubBytes.prefix(4))
+    #expect(URService.canonicalXpub(vpub, isTestnet: true) == tpub)
+    #expect(URService.canonicalXpub(tpub, isTestnet: true) == tpub)
+
+    // Mainnet: Zpub ↔ xpub round trip, same key
+    let zpub = "Zpub6vZyhw1ShkEwP45J3TumYQietzUhSMreYW7k4sCza1iYaH9LrzR3inCtQ91szWGaMYWVNy74YBE9n1gmPHBzq2wEFGR83SMcFGuAbGkfiwg"
+    let xpub = try #require(URService.toggleXpubFormat(zpub, isTestnet: false))
+    #expect(xpub.hasPrefix("xpub"))
+    #expect(URService.toggleXpubFormat(xpub, isTestnet: false) == zpub)
+    #expect(try #require(URService.decodeExtendedPublicKey(xpub)).dropFirst(4) == #require(URService.decodeExtendedPublicKey(zpub)).dropFirst(4))
+
+    // Not a public key: nothing to toggle
+    let tprv = "tprv8ZgxMBicQKsPdppqwh6vooJ1Du7JdgkXwbp3tvGdwYE58rdVe2Q7sdjiiH7mcanBgkVX9vgNBNzcbZx35fSBK3B6Z19yK2gwh1WDhqfPmgr"
+    #expect(URService.toggleXpubFormat(tprv, isTestnet: true) == nil)
+    #expect(URService.toggleXpubFormat("Vpub5notakey", isTestnet: true) == nil)
+    #expect(URService.toggleXpubFormat(String(tpub.dropLast()), isTestnet: true) == nil)
+  }
+
   @Test func `extended public key decoding accepts only single public keys`() {
     let tpub = "tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH"
     let vpub = "Vpub5mKYi6ZW8JMuPDDizjMfw5hwjj4xKSkmUSjVDJjrAghaCw7aSJF4v7M4miDJd6uwZcmxK1LcSCsXB7bY4ELTsV3VbCj2LqHq26b8VUzgDWo"
