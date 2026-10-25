@@ -8,17 +8,18 @@
   <em>Travel to your private keys and leave your laptop at home.</em>
 </p>
 
+<!-- GitHub caches README images by URL, so bump ?v= (the birch-screenshots commit) when the screenshots on birchwallet.app change -->
 <p align="center">
-  <img src="https://birchwallet.app/assets/screenshots/welcome.png" alt="Welcome" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/wallet-setup.png" alt="Setup Choice" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/multisig-config.png" alt="New Wallet Multisig Config" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/cosigner-import.png" alt="Cosigner Import" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/verify-wallet-top.png" alt="Verify Wallet" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/verify-wallet-backup.png" alt="Backup PDF/QR" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/transactions.png" alt="Transactions" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/send.png" alt="Send" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/receive.png" alt="Receive" width="150" />
-  <img src="https://birchwallet.app/assets/screenshots/utxos.png" alt="UTXO" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/welcome.png?v=ac90fb2" alt="Welcome" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/wallet-setup.png?v=ac90fb2" alt="Setup Choice" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/multisig-config.png?v=ac90fb2" alt="New Wallet Multisig Config" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/cosigner-import.png?v=ac90fb2" alt="Cosigner Import" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/verify-wallet-top.png?v=ac90fb2" alt="Verify Wallet" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/verify-wallet-backup.png?v=ac90fb2" alt="Backup PDF/QR" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/transactions.png?v=ac90fb2" alt="Transactions" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/send.png?v=ac90fb2" alt="Send" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/receive.png?v=ac90fb2" alt="Receive" width="150" />
+  <img src="https://birchwallet.app/assets/screenshots/utxos.png?v=ac90fb2" alt="UTXO" width="150" />
 </p>
 
 ---
