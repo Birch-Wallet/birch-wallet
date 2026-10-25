@@ -11,7 +11,7 @@ struct TransactionItemSelfTransferTests {
       amount: amount,
       prevTxid: prevTxid,
       prevVout: prevVout,
-      isMine: isMine
+      isMine: isMine,
     )
   }
 
@@ -26,13 +26,13 @@ struct TransactionItemSelfTransferTests {
       timestamp: Date(),
       isIncoming: isIncoming,
       inputs: inputs,
-      outputs: outputs
+      outputs: outputs,
     )
   }
 
   // MARK: - Self-Transfer Detection
 
-  @Test func allMineInputsAndOutputsIsSelfTransfer() {
+  @Test func `all mine inputs and outputs is self transfer`() {
     // Consolidation: two wallet UTXOs spent to a single wallet address.
     // BDK nets this to -fee, which previously rendered as "Sent <fee>".
     let tx = makeTransaction(
@@ -44,13 +44,13 @@ struct TransactionItemSelfTransferTests {
       ],
       outputs: [
         makeIO(address: "tb1qmine3", amount: 99500, isMine: true),
-      ]
+      ],
     )
     #expect(tx.isSelfTransfer)
     #expect(tx.selfTransferAmount == 99500, "Should show the amount moved, not the fee")
   }
 
-  @Test func selfTransferWithMultipleOutputs() {
+  @Test func `self transfer with multiple outputs`() {
     // Splitting a UTXO across two wallet addresses (destination + change)
     let tx = makeTransaction(
       amount: -500,
@@ -61,7 +61,7 @@ struct TransactionItemSelfTransferTests {
       outputs: [
         makeIO(address: "tb1qmine2", amount: 70000, isMine: true),
         makeIO(address: "tb1qmine3", amount: 29500, isMine: true),
-      ]
+      ],
     )
     #expect(tx.isSelfTransfer)
     #expect(tx.selfTransferAmount == 99500)
@@ -69,7 +69,7 @@ struct TransactionItemSelfTransferTests {
 
   // MARK: - Non-Self-Transfers
 
-  @Test func externalSendWithChangeIsNotSelfTransfer() {
+  @Test func `external send with change is not self transfer`() {
     // Normal send: recipient output is not ours, change output is
     let tx = makeTransaction(
       amount: -50500,
@@ -80,12 +80,12 @@ struct TransactionItemSelfTransferTests {
       outputs: [
         makeIO(address: "tb1qexternal", amount: 50000, isMine: false),
         makeIO(address: "tb1qchange", amount: 49500, isMine: true),
-      ]
+      ],
     )
     #expect(!tx.isSelfTransfer)
   }
 
-  @Test func incomingReceiveIsNotSelfTransfer() {
+  @Test func `incoming receive is not self transfer`() {
     // Receive: inputs belong to the sender, one output is ours
     let tx = makeTransaction(
       amount: 25000,
@@ -96,12 +96,12 @@ struct TransactionItemSelfTransferTests {
       outputs: [
         makeIO(address: "tb1qmine1", amount: 25000, isMine: true),
         makeIO(address: "tb1qsenderchange", amount: 4500, isMine: false),
-      ]
+      ],
     )
     #expect(!tx.isSelfTransfer)
   }
 
-  @Test func unresolvedInputIsNotSelfTransfer() {
+  @Test func `unresolved input is not self transfer`() {
     // When a previous output can't be resolved, its input defaults to
     // isMine=false, which must fail safe toward "Sent" rather than "Self Transfer"
     let tx = makeTransaction(
@@ -112,12 +112,12 @@ struct TransactionItemSelfTransferTests {
       ],
       outputs: [
         makeIO(address: "tb1qmine1", amount: 99500, isMine: true),
-      ]
+      ],
     )
     #expect(!tx.isSelfTransfer)
   }
 
-  @Test func emptyInputsAndOutputsIsNotSelfTransfer() {
+  @Test func `empty inputs and outputs is not self transfer`() {
     // TransactionItems built without input/output detail (e.g. the send-review
     // draft in SendViewModel) must never classify as self-transfer
     let tx = makeTransaction(amount: -10000, isIncoming: false, inputs: [], outputs: [])

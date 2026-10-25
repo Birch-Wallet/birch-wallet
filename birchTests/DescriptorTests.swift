@@ -8,12 +8,12 @@ import URKit
 struct DescriptorTests {
   // MARK: - Descriptor Construction
 
-  @Test func buildTwoOfThreeDescriptor() throws {
+  @Test func `build two of three descriptor`() throws {
     let external = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realTestnetCosigners,
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     #expect(external.hasPrefix("wsh(sortedmulti(2,"))
@@ -23,19 +23,19 @@ struct DescriptorTests {
     #expect(external.contains("[effda333/48'/1'/0'/2']"))
   }
 
-  @Test func buildChangeDescriptor() throws {
+  @Test func `build change descriptor`() throws {
     let internal_desc = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: Array(Self.realTestnetCosigners.prefix(2)),
       network: .testnet4,
-      isChange: true
+      isChange: true,
     )
 
     #expect(internal_desc.contains("/1/*"))
     #expect(!internal_desc.contains("/0/*"))
   }
 
-  @Test func descriptorKeysAreSortedLexicographically() throws {
+  @Test func `descriptor keys are sorted lexicographically`() throws {
     // Listed as tpubDFH…, tpubDF2…, tpubDFS…
     let cosigners = Self.realTestnetCosigners
 
@@ -43,7 +43,7 @@ struct DescriptorTests {
       requiredSignatures: 2,
       cosigners: cosigners,
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     // Keys should be sorted: tpubDF2…, tpubDFH…, tpubDFS…
@@ -55,14 +55,14 @@ struct DescriptorTests {
     #expect(secondPos < thirdPos)
   }
 
-  @Test func descriptorRoundTrip() throws {
+  @Test func `descriptor round trip`() throws {
     let cosigners = Array(Self.realTestnetCosigners.prefix(2))
 
     let desc1 = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: cosigners,
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     // Parse back via the wizard viewmodel
@@ -83,29 +83,29 @@ struct DescriptorTests {
       requiredSignatures: vm.requiredSignatures,
       cosigners: reparsedCosigners,
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     #expect(desc1 == desc2)
   }
 
-  @Test func descriptorMainnetCoinType() throws {
+  @Test func `descriptor mainnet coin type`() throws {
     let desc = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realMainnetCosigners,
       network: .mainnet,
-      isChange: false
+      isChange: false,
     )
 
     #expect(desc.contains("48'/0'/0'/2'"))
   }
 
-  @Test func descriptorTestnetCoinType() throws {
+  @Test func `descriptor testnet coin type`() throws {
     let desc = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: Array(Self.realTestnetCosigners.prefix(2)),
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     #expect(desc.contains("48'/1'/0'/2'"))
@@ -115,7 +115,7 @@ struct DescriptorTests {
 
   /// The builders place the key text in the descriptor, so they must refuse
   /// anything that is not exactly one extended public key.
-  @Test func buildDescriptorThrowsOnInvalidKey() {
+  @Test func `build descriptor throws on invalid key`() {
     let valid = Self.realTestnetCosigners[0]
     let invalidKeys = [
       "tpubA",
@@ -130,18 +130,18 @@ struct DescriptorTests {
       let cosigners = [valid, (xpub: key, fingerprint: "aabbccdd", derivationPath: "m/48'/1'/0'/2'")]
       #expect(throws: AppError.self, "buildDescriptor should reject \(key)") {
         try BitcoinService.buildDescriptor(
-          requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+          requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
         )
       }
       #expect(throws: AppError.self, "buildCombinedDescriptor should reject \(key)") {
         try BitcoinService.buildCombinedDescriptor(
-          requiredSignatures: 2, cosigners: cosigners, network: .testnet4
+          requiredSignatures: 2, cosigners: cosigners, network: .testnet4,
         )
       }
     }
   }
 
-  @Test func setupWizardBuildDescriptorsRejectsInjectedKey() {
+  @Test func `setup wizard build descriptors rejects injected key`() {
     let cosigners = Self.realTestnetCosigners
 
     let vm = SetupWizardViewModel()
@@ -167,7 +167,7 @@ struct DescriptorTests {
 
   // MARK: - Descriptor Parsing Validation
 
-  @Test func rejectNonWshDescriptor() {
+  @Test func `reject non wsh descriptor`() {
     let vm = SetupWizardViewModel()
     vm.importedDescriptorText = "sh(sortedmulti(2,[aabb/48'/1'/0'/2']tpubA/0/*,[ccdd/48'/1'/0'/2']tpubB/0/*))"
     let result = vm.parseImportedDescriptor()
@@ -175,14 +175,14 @@ struct DescriptorTests {
     #expect(vm.errorMessage != nil)
   }
 
-  @Test func rejectEmptyDescriptor() {
+  @Test func `reject empty descriptor`() {
     let vm = SetupWizardViewModel()
     vm.importedDescriptorText = ""
     let result = vm.parseImportedDescriptor()
     #expect(!result)
   }
 
-  @Test func rejectNonZeroAccountDescriptor() {
+  @Test func `reject non zero account descriptor`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.importedDescriptorText =
@@ -192,7 +192,7 @@ struct DescriptorTests {
     #expect(vm.errorMessage?.contains("account 0") == true)
   }
 
-  @Test func rejectCoinTypeMismatchDescriptor() {
+  @Test func `reject coin type mismatch descriptor`() {
     let vm = SetupWizardViewModel()
     vm.network = .mainnet
     // Testnet coin type (1') origins imported while mainnet is selected
@@ -203,7 +203,7 @@ struct DescriptorTests {
     #expect(vm.errorMessage?.lowercased().contains("testnet") == true)
   }
 
-  @Test func rejectDescriptorWithKeyMissingOrigin() {
+  @Test func `reject descriptor with key missing origin`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     // Second key has no [fp/48'/...] origin info
@@ -254,11 +254,11 @@ struct DescriptorTests {
         descriptor: Descriptor(descriptor: vm.externalDescriptor, networkKind: bdkNetworkKind),
         changeDescriptor: Descriptor(descriptor: vm.internalDescriptor, networkKind: bdkNetworkKind),
         network: BitcoinService.shared.bdkNetwork(from: network),
-        persister: Persister.newInMemory()
+        persister: Persister.newInMemory(),
       )
       return .accepted(
         receive: wallet.peekAddress(keychain: .external, index: 0).address.description,
-        change: wallet.peekAddress(keychain: .internal, index: 0).address.description
+        change: wallet.peekAddress(keychain: .internal, index: 0).address.description,
       )
     } catch {
       return .rejectedByBDK("\(error)")
@@ -288,16 +288,16 @@ struct DescriptorTests {
 
   /// Two valid BIP48 keys plus a raw public key: the cosigner list would show
   /// 2-of-2 while the stored wallet is 2-of-3.
-  @Test func rejectDescriptorWithHiddenRawKey() {
+  @Test func `reject descriptor with hidden raw key`() {
     let outcome = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*,\(Self.rawPublicKey)))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*,\(Self.rawPublicKey)))",
     )
     #expect(outcome.isRejectedByBirch, "Hidden raw key: \(outcome)")
   }
 
   /// One valid BIP48 key plus an extended private key: the cosigner list would
   /// show 1-of-1 and a watch-only app would be holding a private key.
-  @Test func rejectDescriptorWithHiddenPrivateKey() {
+  @Test func `reject descriptor with hidden private key`() {
     let descriptor = "wsh(sortedmulti(1,\(Self.originKey(0))/0/*,\(Self.testnetPrivateKey)/0/*))"
 
     let outcome = importOutcome(descriptor)
@@ -310,50 +310,50 @@ struct DescriptorTests {
     #expect(vm.errorMessage?.lowercased().contains("private key") == true)
   }
 
-  @Test func rejectDescriptorWithMixedSuffixes() {
+  @Test func `reject descriptor with mixed suffixes`() {
     let receiveAndChange = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/1/*))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/1/*))",
     )
     #expect(receiveAndChange.isRejectedByBirch, "Mixed /0/* and /1/*: \(receiveAndChange)")
 
     let multipathAndSingle = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/<0;1>/*,\(Self.originKey(1))/0/*))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/<0;1>/*,\(Self.originKey(1))/0/*))",
     )
     #expect(multipathAndSingle.isRejectedByBirch, "Mixed <0;1>/* and /0/*: \(multipathAndSingle)")
   }
 
-  @Test func rejectDescriptorWithNonStandardSuffix() {
+  @Test func `reject descriptor with non standard suffix`() {
     let otherChain = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/5/*,\(Self.originKey(1))/5/*))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/5/*,\(Self.originKey(1))/5/*))",
     )
     #expect(otherChain.isRejectedByBirch, "Suffix /5/*: \(otherChain)")
 
     let extraStep = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/0/*,\(Self.originKey(1))/0/0/*))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/0/*,\(Self.originKey(1))/0/0/*))",
     )
     #expect(extraStep.isRejectedByBirch, "Suffix /0/0/*: \(extraStep)")
   }
 
-  @Test func rejectDescriptorWithFixedChildKey() {
+  @Test func `reject descriptor with fixed child key`() {
     let outcome = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/0,\(Self.originKey(1))/0/0))"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/0,\(Self.originKey(1))/0/0))",
     )
     #expect(outcome.isRejectedByBirch, "Fixed child keys: \(outcome)")
   }
 
-  @Test func rejectDescriptorWithTrailingText() {
+  @Test func `reject descriptor with trailing text`() {
     let extraKey = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*)),\(Self.originKey(2))/0/*"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*)),\(Self.originKey(2))/0/*",
     )
     #expect(extraKey.isRejectedByBirch, "Key after the closing parentheses: \(extraKey)")
 
     let garbage = importOutcome(
-      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*))extra"
+      "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*))extra",
     )
     #expect(garbage.isRejectedByBirch, "Text after the closing parentheses: \(garbage)")
   }
 
-  @Test func rejectDescriptorWithInvalidOrRepeatedKey() {
+  @Test func `reject descriptor with invalid or repeated key`() {
     let corrupted = String(Self.originKey(1).dropLast()) + "R"
     let badChecksum = importOutcome("wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(corrupted)/0/*))")
     #expect(badChecksum.isRejectedByBirch, "Key with a bad checksum: \(badChecksum)")
@@ -364,7 +364,7 @@ struct DescriptorTests {
 
   /// What is stored is the descriptor rebuilt from the parsed cosigners, not
   /// the pasted text.
-  @Test func importStoresCanonicalDescriptor() throws {
+  @Test func `import stores canonical descriptor`() throws {
     let cosigners = Self.realTestnetCosigners
     // Multipath, h notation, an upper-case fingerprint, keys out of BIP67 order
     let pasted = "wsh(sortedmulti(2,"
@@ -383,10 +383,10 @@ struct DescriptorTests {
       (xpub: vm.cosignerXpubs[i], fingerprint: vm.cosignerFingerprints[i], derivationPath: vm.cosignerDerivationPaths[i])
     }
     let external = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: parsed, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: parsed, network: .testnet4, isChange: false,
     )
     let change = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: parsed, network: .testnet4, isChange: true
+      requiredSignatures: 2, cosigners: parsed, network: .testnet4, isChange: true,
     )
 
     #expect(vm.externalDescriptor == external)
@@ -394,9 +394,9 @@ struct DescriptorTests {
   }
 
   /// Every supported suffix form imports to the same stored wallet.
-  @Test func importAcceptsEverySupportedSuffixForm() throws {
+  @Test func `import accepts every supported suffix form`() throws {
     let expected = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: Array(Self.realTestnetCosigners.prefix(2)), network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: Array(Self.realTestnetCosigners.prefix(2)), network: .testnet4, isChange: false,
     )
 
     for suffix in ["/<0;1>/*", "/<1;0>/*", "/{0,1}/*", "/{1,0}/*", "/0/*", "/1/*", ""] {
@@ -421,7 +421,7 @@ struct DescriptorTests {
 
   /// A BIP48 origin is only a label. The key under it must itself be four steps
   /// from the master key with a last step of 2'.
-  @Test func rejectDescriptorWithKeyNotAtBIP48Path() {
+  @Test func `reject descriptor with key not at BIP 48 path`() {
     let descriptor = "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,[367c9cfa/48'/1'/0'/2']\(Self.accountLevelKey)/0/*))"
 
     let outcome = importOutcome(descriptor)
@@ -438,24 +438,24 @@ struct DescriptorTests {
   /// The builders check that a key is a single valid extended public key, not
   /// where it sits. Placement is enforced where keys enter the app, so a wallet
   /// saved before that rule existed can still build and export its descriptor.
-  @Test func buildersDoNotRecheckKeyPlacement() throws {
+  @Test func `builders do not recheck key placement`() throws {
     let cosigners = [
       Self.realTestnetCosigners[0],
       (xpub: Self.accountLevelKey, fingerprint: "367c9cfa", derivationPath: "m/48'/1'/0'/2'"),
     ]
 
     let external = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
     )
     #expect(external.contains("[367c9cfa/48'/1'/0'/2']\(Self.accountLevelKey)/0/*"))
     #expect(try BitcoinService.buildCombinedDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4,
     ).contains(Self.accountLevelKey))
   }
 
   /// "h" is hardened notation only inside a key origin. A key that ends in "h"
   /// must be left as it is, whatever follows it ("/", "," or ")").
-  @Test func importAcceptsKeyEndingInH() throws {
+  @Test func `import accepts key ending in H`() throws {
     let other = Self.realTestnetCosigners[0]
     let expected = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
@@ -464,7 +464,7 @@ struct DescriptorTests {
         (xpub: Self.keyEndingInH, fingerprint: "367c9cfa", derivationPath: "m/48'/1'/0'/2'"),
       ],
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     for hardened in ["'", "h"] {
@@ -489,7 +489,7 @@ struct DescriptorTests {
 
   /// Import runs on the main thread from pasted or scanned text, so text built
   /// to make the parser work hard must still be rejected at once.
-  @Test func importRejectsOversizedHostileInputQuickly() {
+  @Test func `import rejects oversized hostile input quickly`() {
     let hostileInputs = [
       String(repeating: "h/", count: 100_000),
       "wsh(sortedmulti(2," + String(repeating: "h/", count: 100_000) + "))",
@@ -511,7 +511,7 @@ struct DescriptorTests {
 
   /// sortedmulti can have at most 20 keys. Birch turns away a longer list before
   /// reading any key, and still imports 20, so it refuses only what BDK would.
-  @Test func importAcceptsTwentyKeysAndRejectsMore() throws {
+  @Test func `import accepts twenty keys and rejects more`() throws {
     let networkKind = BitcoinService.shared.bdkNetworkKind(from: .testnet4)
     let keys = try (1 ... 21).map { seed in
       let mnemonic = try Mnemonic.fromEntropy(entropy: Data(repeating: UInt8(seed), count: 16))
@@ -536,7 +536,7 @@ struct DescriptorTests {
 
   /// The descriptor offered as a backup describes the wallet that was stored:
   /// importing the backup again gives the same descriptors and addresses.
-  @Test func importedBackupMatchesWallet() {
+  @Test func `imported backup matches wallet`() {
     let descriptor = "wsh(sortedmulti(2,\(Self.originKey(0))/0/*,\(Self.originKey(1))/0/*,\(Self.originKey(2))/0/*))"
 
     let vm = SetupWizardViewModel()
@@ -574,11 +574,11 @@ struct DescriptorTests {
      fingerprint: "effda333", derivationPath: "m/48'/1'/0'/2'"),
   ]
 
-  @Test func combinedDescriptorHasChecksum() throws {
+  @Test func `combined descriptor has checksum`() throws {
     let desc = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realTestnetCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     // BIP-380 checksum is 8 characters after a '#'
@@ -588,26 +588,26 @@ struct DescriptorTests {
     #expect(parts[1].count == 8, "Checksum should be 8 characters, got '\(parts[1])'")
   }
 
-  @Test func combinedDescriptorChecksumIsDeterministic() throws {
+  @Test func `combined descriptor checksum is deterministic`() throws {
     let desc1 = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realTestnetCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
     let desc2 = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realTestnetCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     #expect(desc1 == desc2, "Same inputs should produce the same checksummed descriptor")
   }
 
-  @Test func combinedDescriptorChecksumPreservesContent() throws {
+  @Test func `combined descriptor checksum preserves content`() throws {
     let desc = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.realTestnetCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     #expect(desc.hasPrefix("wsh(sortedmulti(2,"), "Should still start with wsh(sortedmulti(2,")
@@ -634,11 +634,11 @@ struct DescriptorTests {
   private static let convertedTpub =
     "tpubDE4AYPPuhwTk7ENvANSMNU84wRecxjikg4e1WFHE4a6fxsNogCqnA7zzxyDoXp93JeyWNViXEKnkqaysaCrZRnTZDLYXnmbt7zrGxWYc3Mx"
 
-  @Test func combinedDescriptorNormalizesVpubToTpub() throws {
+  @Test func `combined descriptor normalizes vpub to tpub`() throws {
     let desc = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.mixedFormatCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     // No SLIP132-tagged keys should remain in the assembled descriptor.
@@ -651,19 +651,19 @@ struct DescriptorTests {
     #expect(desc.contains("[d03ce438/48'/1'/0'/2']\(Self.convertedTpub)"), "Converted tpub should retain the original fingerprint/origin")
   }
 
-  @Test func singleChainDescriptorNormalizesVpubToTpub() throws {
+  @Test func `single chain descriptor normalizes vpub to tpub`() throws {
     let external = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
       cosigners: Self.mixedFormatCosigners,
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
 
     #expect(!external.contains("Vpub"), "External descriptor should not contain Vpub")
     #expect(external.contains(Self.convertedTpub), "External descriptor should contain the converted tpub")
   }
 
-  @Test func descriptorBuiltFromMixedFormatsMatchesAllTpubVersion() throws {
+  @Test func `descriptor built from mixed formats matches all tpub version`() throws {
     // Building the descriptor from the Vpub-mixed list should produce the same
     // result as building it from the equivalent all-tpub list — proving the
     // SLIP132 input is fully normalized away.
@@ -676,12 +676,12 @@ struct DescriptorTests {
     let fromMixed = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.mixedFormatCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
     let fromAllTpub = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: allTpubCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     #expect(fromMixed == fromAllTpub, "Descriptor built from Vpub+tpub mix should equal all-tpub descriptor")
@@ -689,7 +689,7 @@ struct DescriptorTests {
 
   // MARK: - Permutation Independence (BIP-67 canonical ordering)
 
-  @Test func anyPermutationOfCosignersProducesSameDescriptor() throws {
+  @Test func `any permutation of cosigners produces same descriptor`() throws {
     let cosigners = Self.mixedFormatCosigners
     let permutations: [[(xpub: String, fingerprint: String, derivationPath: String)]] = [
       [cosigners[0], cosigners[1], cosigners[2]],
@@ -701,18 +701,18 @@ struct DescriptorTests {
     ]
 
     let reference = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4, isChange: false,
     )
 
     for (i, perm) in permutations.enumerated() {
       let desc = try BitcoinService.buildDescriptor(
-        requiredSignatures: 2, cosigners: perm, network: .testnet4, isChange: false
+        requiredSignatures: 2, cosigners: perm, network: .testnet4, isChange: false,
       )
       #expect(desc == reference, "Permutation \(i) should produce the same descriptor")
     }
   }
 
-  @Test func anyPermutationOfCosignersProducesSameCombinedDescriptor() throws {
+  @Test func `any permutation of cosigners produces same combined descriptor`() throws {
     let cosigners = Self.mixedFormatCosigners
     let permutations: [[(xpub: String, fingerprint: String, derivationPath: String)]] = [
       [cosigners[0], cosigners[1], cosigners[2]],
@@ -721,18 +721,18 @@ struct DescriptorTests {
     ]
 
     let reference = try BitcoinService.buildCombinedDescriptor(
-      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4
+      requiredSignatures: 2, cosigners: permutations[0], network: .testnet4,
     )
 
     for (i, perm) in permutations.enumerated() {
       let desc = try BitcoinService.buildCombinedDescriptor(
-        requiredSignatures: 2, cosigners: perm, network: .testnet4
+        requiredSignatures: 2, cosigners: perm, network: .testnet4,
       )
       #expect(desc == reference, "Combined permutation \(i) should produce the same descriptor")
     }
   }
 
-  @Test func setupWizardBuildDescriptorsMatchesBitcoinService() throws {
+  @Test func `setup wizard build descriptors matches bitcoin service`() throws {
     let cosigners = Self.mixedFormatCosigners
 
     let vm = SetupWizardViewModel()
@@ -748,10 +748,10 @@ struct DescriptorTests {
     vm.buildDescriptors()
 
     let serviceExternal = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: false,
     )
     let serviceInternal = try BitcoinService.buildDescriptor(
-      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true
+      requiredSignatures: 2, cosigners: cosigners, network: .testnet4, isChange: true,
     )
 
     #expect(vm.externalDescriptor == serviceExternal,
@@ -760,7 +760,7 @@ struct DescriptorTests {
             "SetupWizardViewModel should produce the same internal descriptor as BitcoinService")
   }
 
-  @Test func setupWizardPermutationIndependence() {
+  @Test func `setup wizard permutation independence`() {
     let cosigners = Self.mixedFormatCosigners
 
     let vm1 = SetupWizardViewModel()
@@ -794,7 +794,7 @@ struct DescriptorTests {
             "Reversed cosigner order should produce the same internal descriptor")
   }
 
-  @Test func realCosignersPinnedDescriptor() throws {
+  @Test func `real cosigners pinned descriptor`() throws {
     let expected = "wsh(sortedmulti(2," +
       "[f9755e5b/48'/1'/0'/2']tpubDE2JvCZ3g8tEX3yegvXFn9cpzUyA2EEg6EwS7sAHcPER9yA6nFKdGPyLzsswYWa3SvEbKFmUiyFe9QQrpVpKwxojCud4ThNEv8R3j411Lcs/<0;1>/*," +
       "[d03ce438/48'/1'/0'/2']tpubDE4AYPPuhwTk7ENvANSMNU84wRecxjikg4e1WFHE4a6fxsNogCqnA7zzxyDoXp93JeyWNViXEKnkqaysaCrZRnTZDLYXnmbt7zrGxWYc3Mx/<0;1>/*," +
@@ -803,14 +803,14 @@ struct DescriptorTests {
     let desc = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.mixedFormatCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     let rawDesc = String(desc.prefix(while: { $0 != "#" }))
     #expect(rawDesc == expected, "Descriptor body should match the pinned expected value")
   }
 
-  @Test func descriptorSortsByNormalizedXpubForBIP67() throws {
+  @Test func `descriptor sorts by normalized xpub for BIP 67`() throws {
     // The user-supplied example: cosigners entered in [Vpub, tpub, tpub] order
     // with fingerprints [d03ce438, f9755e5b, acc95047]. After normalization,
     // BIP67 lexicographic sort by tpub puts them in this fingerprint order:
@@ -820,7 +820,7 @@ struct DescriptorTests {
     let desc = try BitcoinService.buildCombinedDescriptor(
       requiredSignatures: 2,
       cosigners: Self.mixedFormatCosigners,
-      network: .testnet4
+      network: .testnet4,
     )
 
     let fp1 = desc.range(of: "[f9755e5b/48'/1'/0'/2']")
@@ -845,7 +845,7 @@ struct DescriptorTests {
     return desc
   }
 
-  @Test func checksumDoesNotAffectUREncoding() throws {
+  @Test func `checksum does not affect UR encoding`() throws {
     guard let desc = realURDescriptor() else {
       Issue.record("Failed to decode test UR to descriptor")
       return
@@ -863,11 +863,11 @@ struct DescriptorTests {
     // The CBOR data should be identical — checksum is stripped before encoding
     #expect(
       urWithChecksum.cbor.cborData == urWithoutChecksum.cbor.cborData,
-      "Checksum should not affect the UR CBOR encoding"
+      "Checksum should not affect the UR CBOR encoding",
     )
   }
 
-  @Test func checksumDoesNotAffectAnimatedQRFrames() throws {
+  @Test func `checksum does not affect animated QR frames`() throws {
     guard let desc = realURDescriptor() else {
       Issue.record("Failed to decode test UR to descriptor")
       return
@@ -887,7 +887,7 @@ struct DescriptorTests {
     // Same number of parts
     #expect(
       encoderWith.seqLen == encoderWithout.seqLen,
-      "Both should produce the same number of UR parts"
+      "Both should produce the same number of UR parts",
     )
 
     // Same part content
@@ -896,7 +896,7 @@ struct DescriptorTests {
       let partWithout = encoderWithout.nextPart()
       #expect(
         partWith == partWithout,
-        "UR part \(i) should be identical regardless of checksum"
+        "UR part \(i) should be identical regardless of checksum",
       )
     }
   }

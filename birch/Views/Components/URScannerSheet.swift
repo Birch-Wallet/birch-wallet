@@ -30,7 +30,7 @@ struct URScannerSheet: View {
     preferMacroCamera: Bool = false,
     expectedTypes: Set<ScanExpectedType> = [],
     onCancel: (() -> Void)? = nil,
-    onResult: @escaping (AppURResult) -> Void
+    onResult: @escaping (AppURResult) -> Void,
   ) {
     self.onResult = onResult
     self.onCancel = onCancel
@@ -63,7 +63,7 @@ struct URScannerSheet: View {
               }
               .onEnded { _ in
                 baseZoom = currentZoom
-              }
+              },
           )
 
         if displayProgress > 0, displayProgress < 1 {
@@ -194,7 +194,7 @@ struct URScannerSheet: View {
     let discovery = AVCaptureDevice.DiscoverySession(
       deviceTypes: preferredTypes,
       mediaType: .video,
-      position: .back
+      position: .back,
     )
     if let macroDevice = discovery.devices.first {
       videoSession.setCaptureDevice(macroDevice)
@@ -262,7 +262,7 @@ struct ScannerOverlay: View {
       let cornerLength: CGFloat = 24
       let origin = CGPoint(
         x: (geo.size.width - size) / 2,
-        y: (geo.size.height - size) / 2
+        y: (geo.size.height - size) / 2,
       )
 
       Path { path in

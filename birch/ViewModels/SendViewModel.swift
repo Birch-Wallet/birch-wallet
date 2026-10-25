@@ -104,7 +104,7 @@ final class SendViewModel: PSBTFlowManaging {
     }
   }
 
-  init(bitcoinService: (any BitcoinServiceProtocol)? = nil) {
+  init(bitcoinService: any BitcoinServiceProtocol? = nil) {
     self.bitcoinService = bitcoinService ?? BitcoinService.shared
   }
 
@@ -181,8 +181,7 @@ final class SendViewModel: PSBTFlowManaging {
       return
     }
     showValidationErrors = true
-    guard hasValidRecipients, isValidFeeRate, !isBalanceExceeded, !hasSendMaxZeroAmount else { return }
-    guard recipients.allSatisfy({ $0.isAddressFormatValid(network: currentNetwork) }) else { return }
+    guard hasValidRecipients, isValidFeeRate, !isBalanceExceeded, !hasSendMaxZeroAmount, recipients.allSatisfy({ $0.isAddressFormatValid(network: currentNetwork) }) else { return }
     showValidationErrors = false
     Task { await buildDraftPSBT() }
   }
@@ -208,7 +207,7 @@ final class SendViewModel: PSBTFlowManaging {
         amount: r.amountValue ?? 0,
         prevTxid: nil,
         prevVout: nil,
-        isMine: false
+        isMine: false,
       )
     }
     return TransactionItem(
@@ -219,7 +218,7 @@ final class SendViewModel: PSBTFlowManaging {
       timestamp: nil,
       isIncoming: false,
       inputs: [],
-      outputs: outputs
+      outputs: outputs,
     )
   }
 
@@ -309,7 +308,7 @@ final class SendViewModel: PSBTFlowManaging {
       return new
     }
     let candidate = InputLimits.sanitizeDecimal(
-      new, old: old, max: InputLimits.maxFiatAmount, fractionDigits: InputLimits.fiatFractionDigits
+      new, old: old, max: InputLimits.maxFiatAmount, fractionDigits: InputLimits.fiatFractionDigits,
     )
     guard let value = Self.fiatValue(candidate), value > 0 else { return candidate }
     return fiatService.fiatToSats(value) != nil ? candidate : old
@@ -428,7 +427,7 @@ final class SendViewModel: PSBTFlowManaging {
     let otherAmounts = InputLimits.sum(
       recipients.enumerated()
         .filter { $0.offset != index }
-        .map { $0.element.amountValue ?? 0 }
+        .map { $0.element.amountValue ?? 0 },
     )
     let reserved = InputLimits.sum([otherAmounts, estimateFee()])
     let maxAmount = spendableBalance > reserved ? spendableBalance - reserved : 0
@@ -521,7 +520,7 @@ final class SendViewModel: PSBTFlowManaging {
     inputCount = result.inputCount
     psbtVerification = PSBTVerificationState(
       findings: bitcoinService.verifyPSBT(result.bytes),
-      inputCount: result.inputCount
+      inputCount: result.inputCount,
     )
     changeVerification = bitcoinService.changeVerification(result.bytes)
     if let signerInfo = bitcoinService.psbtSignerInfo(result.bytes) {
@@ -537,7 +536,7 @@ final class SendViewModel: PSBTFlowManaging {
         recipients: recipientList,
         feeRate: feeRateValue,
         utxos: selectedUTXOOutpoints,
-        unspendable: frozenOutpoints
+        unspendable: frozenOutpoints,
       )
       applyPSBTResult(result)
       currentStep = .review
@@ -565,7 +564,7 @@ final class SendViewModel: PSBTFlowManaging {
         recipients: recipientList,
         feeRate: feeRateValue,
         utxos: selectedUTXOOutpoints,
-        unspendable: frozenOutpoints
+        unspendable: frozenOutpoints,
       )
       applyPSBTResult(result)
       signaturesCollected = 0
@@ -667,7 +666,7 @@ final class SendViewModel: PSBTFlowManaging {
       inputCount: inputCount,
       manualUTXOSelection: manualUTXOSelection,
       selectedUTXOIds: utxoIdsString,
-      inputOutpoints: outpoints
+      inputOutpoints: outpoints,
     )
     context.insert(saved)
     do {
@@ -699,7 +698,7 @@ final class SendViewModel: PSBTFlowManaging {
       if summary.fee != saved.totalFee || summary.changeAmount != saved.changeAmount {
         logger.warning(
           "Saved PSBT '\(saved.name)' metadata differs from its bytes: "
-            + "fee \(saved.totalFee) -> \(summary.fee), change \(saved.changeAmount ?? 0) -> \(summary.changeAmount ?? 0)"
+            + "fee \(saved.totalFee) -> \(summary.fee), change \(saved.changeAmount ?? 0) -> \(summary.changeAmount ?? 0)",
         )
       }
       // The stored fee rate is what the user actually chose; re-deriving it from an
@@ -725,7 +724,7 @@ final class SendViewModel: PSBTFlowManaging {
     // PSBT was saved.
     psbtVerification = PSBTVerificationState(
       findings: bitcoinService.verifyPSBT(saved.psbtBytes),
-      inputCount: inputCount
+      inputCount: inputCount,
     )
     changeVerification = bitcoinService.changeVerification(saved.psbtBytes)
 
@@ -759,7 +758,7 @@ final class SendViewModel: PSBTFlowManaging {
       totalCosigners = bitcoinService.totalCosigners
       psbtVerification = PSBTVerificationState(
         findings: result.findings,
-        inputCount: result.inputCount
+        inputCount: result.inputCount,
       )
       changeVerification = bitcoinService.changeVerification(result.psbtBytes)
 
@@ -790,7 +789,7 @@ final class SendViewModel: PSBTFlowManaging {
         address: r.address.trimmingCharacters(in: .whitespacesAndNewlines),
         amountSats: r.amountSats,
         isSendMax: r.isSendMax,
-        label: r.label
+        label: r.label,
       )
     }
     return (try? JSONEncoder().encode(savedRecipients)) ?? Data()

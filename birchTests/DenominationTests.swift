@@ -5,14 +5,14 @@ import Testing
 struct DenominationTests {
   // MARK: - Formatting
 
-  @Test func satsAreGroupedWithUnit() {
+  @Test func `sats are grouped with unit`() {
     #expect(Denomination.sats.format(0) == "0 sats")
     #expect(Denomination.sats.format(999) == "999 sats")
     #expect(Denomination.sats.format(1_234_567) == "1,234,567 sats")
     #expect(Denomination.sats.format(1_234_567, includeUnit: false) == "1,234,567")
   }
 
-  @Test func btcAlwaysShowsEightDecimals() {
+  @Test func `btc always shows eight decimals`() {
     #expect(Denomination.btc.format(0) == "0.00000000 BTC")
     #expect(Denomination.btc.format(1) == "0.00000001 BTC")
     #expect(Denomination.btc.format(50000) == "0.00050000 BTC")
@@ -22,12 +22,12 @@ struct DenominationTests {
     #expect(Denomination.btc.format(123_456_789, includeUnit: false) == "1.23456789")
   }
 
-  @Test func alternateIsTheOtherUnit() {
+  @Test func `alternate is the other unit`() {
     #expect(Denomination.sats.alternate == .btc)
     #expect(Denomination.btc.alternate == .sats)
   }
 
-  @Test func feesStayInSatsWhateverTheUnit() {
+  @Test func `fees stay in sats whatever the unit`() {
     let defaults = UserDefaults.standard
     let previous = defaults.string(forKey: Constants.denominationKey)
     defer { defaults.set(previous, forKey: Constants.denominationKey) }
@@ -47,7 +47,7 @@ struct DenominationTests {
 
   // MARK: - Parsing
 
-  @Test func parsesBTCIntoSats() {
+  @Test func `parses BTC into sats`() {
     #expect(Denomination.parseBTC("1") == 100_000_000)
     #expect(Denomination.parseBTC("0.0005") == 50000)
     #expect(Denomination.parseBTC("0.00000001") == 1)
@@ -59,7 +59,7 @@ struct DenominationTests {
     #expect(Denomination.parseBTC("1000000") == InputLimits.maxAmountSats)
   }
 
-  @Test func rejectsInvalidBTC() {
+  @Test func `rejects invalid BTC`() {
     #expect(Denomination.parseBTC("") == nil)
     #expect(Denomination.parseBTC(".") == nil)
     #expect(Denomination.parseBTC("0.000000001") == nil)
@@ -72,7 +72,7 @@ struct DenominationTests {
     #expect(Denomination.parseBTC("999999999") == nil)
   }
 
-  @Test func roundTripsThroughFormatAndParse() {
+  @Test func `round trips through format and parse`() {
     for sats: UInt64 in [1, 29, 546, 50000, 99_999_999, 100_000_001, InputLimits.maxAmountSats] {
       #expect(Denomination.parseBTC(Denomination.btc.format(sats, includeUnit: false)) == sats)
     }
@@ -80,13 +80,13 @@ struct DenominationTests {
 
   // MARK: - BIP-21
 
-  @Test func bip21AmountConvertsExactly() {
+  @Test func `bip 21 amount converts exactly`() {
     var recipient = Recipient()
     recipient.parseBIP21("bitcoin:tb1qexampleaddress0000000000000000000000?amount=0.00000029")
     #expect(recipient.amountSats == "29")
   }
 
-  @Test func bip21RejectsHostileAmounts() {
+  @Test func `bip 21 rejects hostile amounts`() {
     for amount in ["1e30", "-1", "nan", "inf", "21000000", "184467440737.09551616"] {
       var recipient = Recipient()
       recipient.parseBIP21("bitcoin:tb1qexampleaddress0000000000000000000000?amount=\(amount)")

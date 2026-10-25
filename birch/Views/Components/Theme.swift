@@ -29,7 +29,7 @@ struct HBTheme {
     success: Color(.systemGreen),
     error: Color(.systemRed),
     secondaryAccent: Color(.systemBlue),
-    colorScheme: nil
+    colorScheme: nil,
   )
 
   static let dark = HBTheme(
@@ -44,7 +44,7 @@ struct HBTheme {
     success: Color(red: 0.176, green: 0.545, blue: 0.341),
     error: Color(red: 0.851, green: 0.267, blue: 0.267),
     secondaryAccent: Color(red: 0.290, green: 0.565, blue: 0.851),
-    colorScheme: .dark
+    colorScheme: .dark,
   )
 
   static let light = HBTheme(
@@ -59,7 +59,7 @@ struct HBTheme {
     success: Color(red: 0.204, green: 0.780, blue: 0.349),
     error: Color(red: 1.000, green: 0.231, blue: 0.188),
     secondaryAccent: Color(red: 0.290, green: 0.565, blue: 0.851),
-    colorScheme: .light
+    colorScheme: .light,
   )
 
   static let birchDark = HBTheme(
@@ -74,7 +74,7 @@ struct HBTheme {
     success: Color(red: 0.416, green: 0.478, blue: 0.322),
     error: Color(red: 0.690, green: 0.235, blue: 0.157),
     secondaryAccent: Color(red: 0.416, green: 0.478, blue: 0.322),
-    colorScheme: .dark
+    colorScheme: .dark,
   )
 
   static let birchLight = HBTheme(
@@ -89,7 +89,7 @@ struct HBTheme {
     success: Color(red: 0.278, green: 0.373, blue: 0.224),
     error: Color(red: 0.600, green: 0.180, blue: 0.120),
     secondaryAccent: Color(red: 0.278, green: 0.373, blue: 0.224),
-    colorScheme: .light
+    colorScheme: .light,
   )
 
   // MARK: Lifted surface roles
@@ -278,7 +278,7 @@ extension Color {
         red: CGFloat((hex >> 16) & 0xFF) / 255,
         green: CGFloat((hex >> 8) & 0xFF) / 255,
         blue: CGFloat(hex & 0xFF) / 255,
-        alpha: 1
+        alpha: 1,
       )
     }
     return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? uiColor(dark) : uiColor(light) })
@@ -336,12 +336,12 @@ struct BirchCard: ViewModifier {
         level == .card ? Color.hbSurface : Color.hbSurfaceElevated,
         in: squareTop
           ? AnyShape(UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius, style: .continuous))
-          : AnyShape(.rect(cornerRadius: radius, style: .continuous))
+          : AnyShape(.rect(cornerRadius: radius, style: .continuous)),
       )
       .shadow(
         color: .black.opacity(scheme == .dark || level == .nested ? 0 : 0.06),
         radius: 8,
-        y: 3
+        y: 3,
       )
   }
 }
@@ -365,7 +365,7 @@ struct BirchSelected: ViewModifier {
               if ring {
                 shape.strokeBorder(Color.hbBitcoinOrange, lineWidth: 1.5)
               }
-            }
+            },
         )
     } else {
       content.birchCard()
@@ -402,7 +402,7 @@ private struct HBBarButtonBody<Label: View>: View {
       .frame(minHeight: 34)
       .background(
         prominent ? Color.hbBitcoinOrange : Color.hbSurface,
-        in: .rect(cornerRadius: 8, style: .continuous)
+        in: .rect(cornerRadius: 8, style: .continuous),
       )
       .shadow(color: .black.opacity(scheme == .dark || prominent ? 0 : 0.06), radius: 8, y: 3)
       .opacity(isPressed ? 0.7 : 1)
@@ -443,7 +443,7 @@ struct HBPrimaryButtonModifier: ViewModifier {
       .padding(.vertical, 16)
       .background(
         isEnabled ? Color.hbBitcoinOrange : Color.hbBorder,
-        in: .rect(cornerRadius: 12, style: .continuous)
+        in: .rect(cornerRadius: 12, style: .continuous),
       )
   }
 }
@@ -530,7 +530,7 @@ struct HBTonalButton: View {
       .frame(maxWidth: .infinity, minHeight: 44)
       .background(
         neutral ? Color.hbSurfaceElevated : Color.hbBitcoinOrange.opacity(0.12),
-        in: .rect(cornerRadius: 12, style: .continuous)
+        in: .rect(cornerRadius: 12, style: .continuous),
       )
       .contentShape(.rect(cornerRadius: 12, style: .continuous))
     }
@@ -701,7 +701,7 @@ struct WalletIdenticon: View {
             x: CGFloat(col) * cellW,
             y: CGFloat(row) * cellH,
             width: cellW,
-            height: cellH
+            height: cellH,
           )
           context.fill(Path(rect), with: .color(palette[colorIndex].opacity(opacity)))
         }

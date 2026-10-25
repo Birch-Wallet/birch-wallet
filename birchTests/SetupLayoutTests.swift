@@ -8,7 +8,7 @@ struct SetupLayoutTests {
     CGSize(width: 440, height: 956), // iPhone 17 Pro Max
     CGSize(width: 600, height: 900), // iPad form sheet
   ])
-  func phoneSizedSpaceIsCompact(size: CGSize) {
+  func `phone sized space is compact`(size: CGSize) {
     #expect(SetupLayout.resolve(size: size) == .compact)
   }
 
@@ -16,7 +16,7 @@ struct SetupLayoutTests {
     CGSize(width: 744, height: 1133), // iPad mini portrait
     CGSize(width: 1032, height: 1376), // iPad Pro 13" portrait
   ])
-  func wideTallSpaceIsReadableColumn(size: CGSize) {
+  func `wide tall space is readable column`(size: CGSize) {
     #expect(SetupLayout.resolve(size: size) == .column)
   }
 
@@ -24,18 +24,18 @@ struct SetupLayoutTests {
     CGSize(width: 1376, height: 1032), // iPad Pro 13" landscape
     CGSize(width: 870, height: 669), // open iPhone Duo, inside the side status bar
   ])
-  func wideShortSpaceIsTwoColumns(size: CGSize) {
+  func `wide short space is two columns`(size: CGSize) {
     #expect(SetupLayout.resolve(size: size) == .twoColumn)
   }
 
-  @Test func withoutFoldGapIsCenteredWithMargins() {
+  @Test func `without fold gap is centered with margins`() {
     let columns = SetupLayout.columns(width: 1376, division: nil)
     #expect(columns.leading == SetupLayout.leadingMargin ... 664)
     #expect(columns.trailing == 712 ... 1376 - SetupLayout.trailingMargin)
     #expect(columns.trailing.lowerBound - columns.leading.upperBound == SetupLayout.columnGap)
   }
 
-  @Test func gapIsCenteredOnFoldAndClearsIt() {
+  @Test func `gap is centered on fold and clears it`() {
     let fold = CGRect(x: 451, y: 0, width: 48, height: 669)
     let columns = SetupLayout.columns(width: 870, division: fold)
     #expect((columns.leading.upperBound + columns.trailing.lowerBound) / 2 == fold.midX)
@@ -45,7 +45,7 @@ struct SetupLayoutTests {
   }
 
   /// A fold narrower than the minimum gap still gets the full gap.
-  @Test func hairlineFoldKeepsMinimumGap() {
+  @Test func `hairline fold keeps minimum gap`() {
     let fold = CGRect(x: 475, y: 0, width: 0, height: 669)
     let columns = SetupLayout.columns(width: 951, division: fold)
     #expect(columns.trailing.lowerBound - columns.leading.upperBound == SetupLayout.columnGap)

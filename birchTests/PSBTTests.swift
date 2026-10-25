@@ -14,7 +14,7 @@ struct PSBTTests {
 
   // MARK: - Existing Tests
 
-  @Test func psbtBase64RoundTrip() {
+  @Test func `psbt base 64 round trip`() {
     // A minimal valid base64 string
     let original = "cHNidP8BAFICAAAAAZ38ZijCcnkzwmZ2"
     guard let data = Data(base64Encoded: original) else {
@@ -25,7 +25,7 @@ struct PSBTTests {
     #expect(reencoded == original)
   }
 
-  @Test func psbtDataPreservesContent() {
+  @Test func `psbt data preserves content`() {
     // Test that raw PSBT bytes survive encode/decode
     let testBytes: [UInt8] = [0x70, 0x73, 0x62, 0x74, 0xFF] // "psbt" magic + separator
     let data = Data(testBytes)
@@ -34,7 +34,7 @@ struct PSBTTests {
     #expect(decoded == data)
   }
 
-  @Test func loadTestPSBTFixture() {
+  @Test func `load test PSBT fixture`() {
     // Test that the fixture file can be loaded
     let bundle = Bundle(for: BundleToken.self)
     if let path = bundle.path(forResource: "test_psbt_unsigned", ofType: "txt") {
@@ -52,7 +52,7 @@ struct PSBTTests {
 
   // MARK: - Fixture-Based Tests
 
-  @Test func psbtMagicBytes() {
+  @Test func `psbt magic bytes`() {
     guard let base64 = loadFixture("test_psbt_unsigned"),
           let data = Data(base64Encoded: base64)
     else {
@@ -65,7 +65,7 @@ struct PSBTTests {
     #expect(prefix == magic, "PSBT should start with magic bytes 0x70736274FF")
   }
 
-  @Test func psbtBase64RoundTripWithFixture() {
+  @Test func `psbt base 64 round trip with fixture`() {
     guard let base64 = loadFixture("test_psbt_unsigned"),
           let data = Data(base64Encoded: base64)
     else {
@@ -84,7 +84,7 @@ struct PSBTTests {
     #expect(redecoded == data, "Double round-trip should preserve bytes")
   }
 
-  @Test func partialFixtureHasMagicBytes() {
+  @Test func `partial fixture has magic bytes`() {
     guard let base64 = loadFixture("test_psbt_partial"),
           let data = Data(base64Encoded: base64)
     else {
@@ -96,7 +96,7 @@ struct PSBTTests {
     #expect(prefix == magic, "Partial PSBT should start with magic bytes")
   }
 
-  @Test func partialFixtureDiffersFromUnsigned() {
+  @Test func `partial fixture differs from unsigned`() {
     guard let unsignedBase64 = loadFixture("test_psbt_unsigned"),
           let partialBase64 = loadFixture("test_psbt_partial")
     else {

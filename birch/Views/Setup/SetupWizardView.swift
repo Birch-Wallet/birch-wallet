@@ -75,7 +75,7 @@ struct SetupWizardView: View {
           if !$0 {
             viewModel.errorMessage = nil
           }
-        }
+        },
       )) {
         Button("OK") { viewModel.errorMessage = nil }
       } message: {

@@ -26,7 +26,7 @@ struct PSBTValidatorTests {
     let bundle = Bundle(for: ValidatorBundleToken.self)
     guard let path = bundle.path(forResource: name, ofType: "txt"),
           let base64 = try? String(contentsOfFile: path, encoding: .utf8)
-          .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     else { return nil }
     return Data(base64Encoded: base64)
   }
@@ -74,13 +74,13 @@ struct PSBTValidatorTests {
 
   // MARK: - Baseline
 
-  @Test("A PSBT whose amounts match wallet state produces no findings")
-  func honestPSBTPasses() throws {
+  @Test
+  func `A PSBT whose amounts match wallet state produces no findings`() throws {
     #expect(try verify(fixture(), against: truth).isEmpty)
   }
 
-  @Test("The fixture parses and both UTXO representations agree")
-  func fixtureIsWellFormed() throws {
+  @Test
+  func `The fixture parses and both UTXO representations agree`() throws {
     let (psbt, tx) = try parse(fixture())
     #expect(psbt.input().count == 2)
     #expect(tx.input().count == 2)
@@ -92,8 +92,8 @@ struct PSBTValidatorTests {
 
   // MARK: - Lying amounts
 
-  @Test("An inflated witness_utxo amount is critical")
-  func inflatedAmountIsCritical() throws {
+  @Test
+  func `An inflated witness_utxo amount is critical`() throws {
     // Strip non_witness_utxo first so witness_utxo is the only declaration —
     // this is exactly the payload compact-QR mode sends to a signer.
     let witnessOnly = try PSBTCompactor.compact(fixture())
@@ -106,8 +106,8 @@ struct PSBTValidatorTests {
     #expect(findings.first?.outpoint == input0)
   }
 
-  @Test("A deflated witness_utxo amount — the fee-inflation direction — is critical")
-  func deflatedAmountIsCritical() throws {
+  @Test
+  func `A deflated witness_utxo amount — the fee-inflation direction — is critical`() throws {
     // The fixture's outputs total 99,500 sats, so the deflation has to stay above
     // that to remain extractable — see `extremeDeflationIsRejectedBeforeVerification`
     // for what happens past that point.
@@ -120,8 +120,8 @@ struct PSBTValidatorTests {
     #expect(findings.first?.outpoint == input0)
   }
 
-  @Test("Only the lying input is reported")
-  func onlyTheLyingInputIsReported() throws {
+  @Test
+  func `Only the lying input is reported`() throws {
     let witnessOnly = try PSBTCompactor.compact(fixture())
     let lying = try rewritingWitnessAmount(in: witnessOnly, from: input1Sats, to: 39900)
 
@@ -137,8 +137,8 @@ struct PSBTValidatorTests {
   // turns each of these into a critical `psbt.unextractable` finding, so the
   // outcome for the user is the same: the operation is blocked.
 
-  @Test("A deflation large enough to invert the fee is rejected by extraction")
-  func extremeDeflationIsRejectedBeforeVerification() throws {
+  @Test
+  func `A deflation large enough to invert the fee is rejected by extraction`() throws {
     let witnessOnly = try PSBTCompactor.compact(fixture())
     let lying = try rewritingWitnessAmount(in: witnessOnly, from: input0Sats, to: 6000)
 
@@ -147,8 +147,8 @@ struct PSBTValidatorTests {
     #expect(throws: (any Error).self) { try psbt.extractTx() }
   }
 
-  @Test("An input stripped of all UTXO data is rejected by extraction")
-  func missingUtxoDataIsRejectedBeforeVerification() throws {
+  @Test
+  func `An input stripped of all UTXO data is rejected by extraction`() throws {
     let noNonWitness = try PSBTCompactor.compact(fixture())
     let stripped = try removingWitnessUtxo(input0Sats, from: noNonWitness)
 
@@ -157,8 +157,8 @@ struct PSBTValidatorTests {
     #expect(throws: (any Error).self) { try psbt.extractTx() }
   }
 
-  @Test("witness_utxo and non_witness_utxo disagreeing is critical")
-  func utxoDisagreementIsCritical() throws {
+  @Test
+  func `witness_utxo and non_witness_utxo disagreeing is critical`() throws {
     // Both representations present, only the witness one rewritten: two signers
     // reading different fields would be shown different amounts.
     let lying = try rewritingWitnessAmount(in: fixture(), from: input0Sats, to: 90000)
@@ -171,8 +171,8 @@ struct PSBTValidatorTests {
 
   // MARK: - Embedded previous transaction
 
-  @Test("An embedded previous transaction must hash to the outpoint being spent")
-  func previousTransactionTxidIsChecked() throws {
+  @Test
+  func `An embedded previous transaction must hash to the outpoint being spent`() throws {
     // Flip one byte inside input 0's embedded previous transaction. Its txid changes;
     // every length, and the referenced output's value, stay as they were.
     let original = try fixture()
@@ -187,8 +187,8 @@ struct PSBTValidatorTests {
     #expect(findings.first?.outpoint == input0)
   }
 
-  @Test("An input with only a non_witness_utxo verifies from the embedded transaction")
-  func nonWitnessOnlyInputVerifies() throws {
+  @Test
+  func `An input with only a non_witness_utxo verifies from the embedded transaction`() throws {
     var stripped = try removingWitnessUtxo(input0Sats, from: fixture())
     stripped = try removingWitnessUtxo(input1Sats, from: stripped)
 
@@ -199,8 +199,8 @@ struct PSBTValidatorTests {
 
   // MARK: - Unverifiable inputs never block
 
-  @Test("An outpoint the wallet does not know is a warning, not a failure")
-  func unknownOutpointIsWarning() throws {
+  @Test
+  func `An outpoint the wallet does not know is a warning, not a failure`() throws {
     let partial = PSBTGroundTruth(knownOutputAmounts: [input0: input0Sats])
 
     let findings = try verify(fixture(), against: partial)
@@ -211,16 +211,16 @@ struct PSBTValidatorTests {
     #expect(!findings.hasCritical)
   }
 
-  @Test("An unsynced wallet warns on every input and blocks nothing")
-  func emptyGroundTruthOnlyWarns() throws {
+  @Test
+  func `An unsynced wallet warns on every input and blocks nothing`() throws {
     let findings = try verify(fixture(), against: PSBTGroundTruth(knownOutputAmounts: [:]))
     #expect(findings.count == 2)
     #expect(findings.warnings.count == 2)
     #expect(!findings.hasCritical)
   }
 
-  @Test("A lie is still caught when other inputs are unverifiable")
-  func mismatchWinsOverUnverifiable() throws {
+  @Test
+  func `A lie is still caught when other inputs are unverifiable`() throws {
     let witnessOnly = try PSBTCompactor.compact(fixture())
     let lying = try rewritingWitnessAmount(in: witnessOnly, from: input0Sats, to: 90000)
     let partial = PSBTGroundTruth(knownOutputAmounts: [input0: input0Sats])
@@ -242,8 +242,8 @@ struct PSBTValidatorTests {
     return (tx, outs[0].scriptPubkey.toBytes(), outs[1].scriptPubkey.toBytes())
   }
 
-  @Test("An internal-keychain output is change")
-  func internalKeychainOutputIsChange() throws {
+  @Test
+  func `An internal-keychain output is change`() throws {
     let (tx, _, walletScript) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
@@ -258,8 +258,8 @@ struct PSBTValidatorTests {
     #expect(outputs[1].isMine)
   }
 
-  @Test("An external-keychain output is a self-transfer, not change")
-  func externalKeychainOutputIsSelfTransfer() throws {
+  @Test
+  func `An external-keychain output is a self-transfer, not change`() throws {
     let (tx, externalScript, _) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
@@ -271,8 +271,8 @@ struct PSBTValidatorTests {
     #expect(outputs.allSatisfy { $0.role != .change }, "Nothing here is change")
   }
 
-  @Test("An output the wallet cannot place is external, whatever the PSBT claims")
-  func unrecognisedScriptIsExternalDespiteDerivationData() throws {
+  @Test
+  func `An output the wallet cannot place is external, whatever the PSBT claims`() throws {
     // Output 1 carries bip32Derivation in the fixture. The old rule keyed off exactly
     // that field, so it would have called this output change; the wallet's own index
     // is the only thing that decides now.
@@ -284,8 +284,8 @@ struct PSBTValidatorTests {
     #expect(outputs.allSatisfy { !$0.isMine })
   }
 
-  @Test("Every wallet-owned output is reported, not just the last one")
-  func multipleWalletOutputsAreAllReported() throws {
+  @Test
+  func `Every wallet-owned output is reported, not just the last one`() throws {
     let (tx, _, _) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { _ in KeychainAndIndex(keychain: .internal, index: 0) }
@@ -294,8 +294,8 @@ struct PSBTValidatorTests {
     #expect(outputs.map(\.index) == [0, 1])
   }
 
-  @Test("Classified outputs carry the index the wallet derived them from")
-  func classifiedOutputsCarryTheirDerivation() throws {
+  @Test
+  func `Classified outputs carry the index the wallet derived them from`() throws {
     let (tx, _, walletScript) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
@@ -306,33 +306,33 @@ struct PSBTValidatorTests {
     #expect(outputs[0].derivation == nil, "An unrecognised script has no derivation")
   }
 
-  @Test("The change path is rendered the way a signing device shows it")
-  func changeDerivationPathIsRendered() {
+  @Test
+  func `The change path is rendered the way a signing device shows it`() {
     let path = PSBTValidator.derivationPathDescription(
       accountOrigin: PSBTGroundTruth.accountOrigin(for: .mainnet),
       keychain: .internal,
-      index: 5
+      index: 5,
     )
     #expect(path == "m/48'/0'/0'/2'/1/5")
   }
 
-  @Test("A receive path renders on chain 0")
-  func receiveDerivationPathIsRendered() {
+  @Test
+  func `A receive path renders on chain 0`() {
     let path = PSBTValidator.derivationPathDescription(
       accountOrigin: PSBTGroundTruth.accountOrigin(for: .testnet4),
       keychain: .external,
-      index: 12
+      index: 12,
     )
     #expect(path == "m/48'/1'/0'/2'/0/12")
   }
 
-  @Test("With no account origin there is no path to show")
-  func noAccountOriginMeansNoPath() {
+  @Test
+  func `With no account origin there is no path to show`() {
     #expect(PSBTValidator.derivationPathDescription(accountOrigin: [], keychain: .internal, index: 0) == nil)
   }
 
-  @Test("Addresses are derived for the network in use")
-  func addressesUseTheGivenNetwork() throws {
+  @Test
+  func `Addresses are derived for the network in use`() throws {
     let (tx, _, _) = try fixtureOutputs()
 
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { _ in nil }
@@ -357,13 +357,13 @@ struct PSBTValidatorTests {
   /// Ground truth for a testnet BIP-48 account-0 wallet (48'/1'/0'/2').
   private func derivationTruth(
     fingerprints: Set<String>? = nil,
-    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil }
+    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil },
   ) -> PSBTGroundTruth {
     PSBTGroundTruth(
       knownOutputAmounts: [:],
       accountOrigin: PSBTGroundTruth.accountOrigin(for: .testnet4),
       cosignerFingerprints: fingerprints ?? [cosignerA, cosignerB],
-      scriptAt: scriptAt
+      scriptAt: scriptAt,
     )
   }
 
@@ -375,8 +375,8 @@ struct PSBTValidatorTests {
       role: role,
       derivation: role == .external ? nil : KeychainAndIndex(
         keychain: role == .change ? .internal : .external,
-        index: 0
-      )
+        index: 0,
+      ),
     )
   }
 
@@ -385,7 +385,7 @@ struct PSBTValidatorTests {
     _ path: String,
     role: PSBTOutputInfo.Role = .change,
     outputScript: UInt8 = 0xAA,
-    truth: PSBTGroundTruth? = nil
+    truth: PSBTGroundTruth? = nil,
   ) throws -> PSBTFinding? {
     try PSBTValidator.verifyOutputDerivation(
       output: output(role),
@@ -394,22 +394,22 @@ struct PSBTValidatorTests {
         "pubkeyA": keySource(cosignerA, path),
         "pubkeyB": keySource(cosignerB, path),
       ],
-      against: truth ?? derivationTruth(scriptAt: { _, _ in script(outputScript) })
+      against: truth ?? derivationTruth(scriptAt: { _, _ in script(outputScript) }),
     )
   }
 
-  @Test("A standard change path that derives the right script passes")
-  func standardChangePathPasses() throws {
+  @Test
+  func `A standard change path that derives the right script passes`() throws {
     #expect(try checkPath("m/48'/1'/0'/2'/1/0") == nil)
   }
 
-  @Test("A standard receive path on a self-transfer passes")
-  func standardReceivePathPasses() throws {
+  @Test
+  func `A standard receive path on a self-transfer passes`() throws {
     #expect(try checkPath("m/48'/1'/0'/2'/0/7", role: .selfTransfer) == nil)
   }
 
-  @Test("Extra derivation depth is critical")
-  func extraDepthIsCritical() throws {
+  @Test
+  func `Extra derivation depth is critical`() throws {
     // The attack shape: valid account origin, then an unexpected extra level. No
     // restore from the descriptor would ever look here.
     let finding = try checkPath("m/48'/1'/0'/2'/127/1/0")
@@ -417,30 +417,30 @@ struct PSBTValidatorTests {
     #expect(finding?.code == PSBTFinding.Code.outputDerivationDepth)
   }
 
-  @Test("A chain other than receive or change is critical")
-  func wrongChainIsCritical() throws {
+  @Test
+  func `A chain other than receive or change is critical`() throws {
     let finding = try checkPath("m/48'/1'/0'/2'/2/0")
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationChain)
   }
 
-  @Test("A path outside this wallet's account is critical")
-  func wrongAccountOriginIsCritical() throws {
+  @Test
+  func `A path outside this wallet's account is critical`() throws {
     // Right depth, wrong account: BIP-84 single-sig rather than BIP-48 account 0.
     let finding = try checkPath("m/84'/1'/0'/0'/1/0")
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationOrigin)
   }
 
-  @Test("A hardened address index is critical")
-  func hardenedIndexIsCritical() throws {
+  @Test
+  func `A hardened address index is critical`() throws {
     let finding = try checkPath("m/48'/1'/0'/2'/1/0'")
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationHardenedIndex)
   }
 
-  @Test("Cosigners claiming different indexes is critical")
-  func cosignersDisagreeingIsCritical() throws {
+  @Test
+  func `Cosigners claiming different indexes is critical`() throws {
     let finding = try PSBTValidator.verifyOutputDerivation(
       output: output(.change),
       script: script(0xAA),
@@ -448,14 +448,14 @@ struct PSBTValidatorTests {
         "pubkeyA": keySource(cosignerA, "m/48'/1'/0'/2'/1/0"),
         "pubkeyB": keySource(cosignerB, "m/48'/1'/0'/2'/1/9"),
       ],
-      against: derivationTruth(scriptAt: { _, _ in script(0xAA) })
+      against: derivationTruth(scriptAt: { _, _ in script(0xAA) }),
     )
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationDisagreement)
   }
 
-  @Test("A plausible path that derives a different script is critical")
-  func forgedPathIsCritical() throws {
+  @Test
+  func `A plausible path that derives a different script is critical`() throws {
     // Well-formed path, real cosigner fingerprints — but the wallet's own key at that
     // path produces a different address, so the output is not ours. This is the case
     // shape checks alone cannot catch.
@@ -463,58 +463,58 @@ struct PSBTValidatorTests {
       "m/48'/1'/0'/2'/1/4",
       role: .external,
       outputScript: 0xAA,
-      truth: derivationTruth(scriptAt: { _, _ in script(0xBB) })
+      truth: derivationTruth(scriptAt: { _, _ in script(0xBB) }),
     )
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.outputDerivationScriptMismatch)
   }
 
-  @Test("A genuine address beyond the gap limit warns rather than blocking")
-  func beyondGapLimitWarns() throws {
+  @Test
+  func `A genuine address beyond the gap limit warns rather than blocking`() throws {
     // Path checks out and the script matches what this wallet derives — the wallet
     // just has not revealed that far, so it could not recognise it as its own.
     let finding = try checkPath(
       "m/48'/1'/0'/2'/1/900000",
       role: .external,
-      truth: derivationTruth(scriptAt: { _, _ in script(0xAA) })
+      truth: derivationTruth(scriptAt: { _, _ in script(0xAA) }),
     )
     #expect(finding?.severity == .warning)
     #expect(finding?.code == PSBTFinding.Code.outputBeyondGapLimit)
   }
 
-  @Test("Derivation data for keys this wallet does not hold warns")
-  func unknownFingerprintWarns() throws {
+  @Test
+  func `Derivation data for keys this wallet does not hold warns`() throws {
     let finding = try checkPath(
       "m/48'/1'/0'/2'/1/0",
       role: .external,
-      truth: derivationTruth(fingerprints: ["deadbeef"])
+      truth: derivationTruth(fingerprints: ["deadbeef"]),
     )
     #expect(finding?.severity == .warning)
     #expect(finding?.code == PSBTFinding.Code.outputUnknownFingerprint)
   }
 
-  @Test("Fingerprint comparison ignores case")
-  func fingerprintCaseIsIgnored() throws {
+  @Test
+  func `Fingerprint comparison ignores case`() throws {
     let finding = try PSBTValidator.verifyOutputDerivation(
       output: output(.change),
       script: script(0xAA),
       derivations: ["pubkeyA": keySource("AABBCCDD", "m/48'/1'/0'/2'/1/0")],
-      against: derivationTruth(fingerprints: ["aabbccdd"], scriptAt: { _, _ in script(0xAA) })
+      against: derivationTruth(fingerprints: ["aabbccdd"], scriptAt: { _, _ in script(0xAA) }),
     )
     #expect(finding == nil, "An uppercase fingerprint is the same fingerprint")
   }
 
-  @Test("Without a known account origin nothing is claimed either way")
-  func noAccountOriginSkipsTheCheck() throws {
+  @Test
+  func `Without a known account origin nothing is claimed either way`() throws {
     let finding = try checkPath(
       "m/48'/1'/0'/2'/127/1/0",
-      truth: PSBTGroundTruth(knownOutputAmounts: [:])
+      truth: PSBTGroundTruth(knownOutputAmounts: [:]),
     )
     #expect(finding == nil)
   }
 
-  @Test("The fixture's own output derivations pass end to end")
-  func fixtureDerivationsPass() throws {
+  @Test
+  func `The fixture's own output derivations pass end to end`() throws {
     let (tx, _, walletScript) = try fixtureOutputs()
     let psbt = try Psbt(psbtBase64: fixture().base64EncodedString())
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { script in
@@ -526,20 +526,20 @@ struct PSBTValidatorTests {
       psbt: psbt,
       tx: tx,
       outputs: outputs,
-      against: derivationTruth(scriptAt: { _, _ in Script(rawOutputScript: walletScript) })
+      against: derivationTruth(scriptAt: { _, _ in Script(rawOutputScript: walletScript) }),
     )
     #expect(findings.isEmpty)
   }
 
-  @Test("An output with no derivation data is not second-guessed")
-  func outputsWithoutDerivationDataAreIgnored() throws {
+  @Test
+  func `An output with no derivation data is not second-guessed`() throws {
     let (tx, _, _) = try fixtureOutputs()
     let psbt = try Psbt(psbtBase64: fixture().base64EncodedString())
     // Output 0 carries no bip32Derivation at all — an ordinary recipient.
     let outputs = PSBTValidator.classifyOutputs(tx: tx, network: .testnet) { _ in nil }
 
     let findings = PSBTValidator.verifyOutputDerivations(
-      psbt: psbt, tx: tx, outputs: [outputs[0]], against: derivationTruth()
+      psbt: psbt, tx: tx, outputs: [outputs[0]], against: derivationTruth(),
     )
     #expect(findings.isEmpty)
   }
@@ -563,18 +563,18 @@ struct PSBTValidatorTests {
     return patched
   }
 
-  @Test("Verified keys come from the witness script the output commits to")
-  func verifiedPubkeysAreTakenFromTheCommittedScript() throws {
+  @Test
+  func `Verified keys come from the witness script the output commits to`() throws {
     let (psbt, tx) = try parse(fixture())
     let verified = try #require(
-      PSBTValidator.verifiedPubkeys(input: psbt.input()[0], txIn: tx.input()[0])
+      PSBTValidator.verifiedPubkeys(input: psbt.input()[0], txIn: tx.input()[0]),
     )
 
     #expect(verified == [scriptPubkeyA, scriptPubkeyB])
   }
 
-  @Test("A witness script that does not hash to the spent output is critical")
-  func witnessScriptMismatchIsCritical() throws {
+  @Test
+  func `A witness script that does not hash to the spent output is critical`() throws {
     // Flip the first byte of input 0's witness script (OP_2 → OP_3). Lengths are
     // untouched, but it no longer hashes to the P2WSH commitment in the output being
     // spent, so nothing the script says about keys can be trusted.
@@ -594,42 +594,42 @@ struct PSBTValidatorTests {
     #expect(findings[0].outpoint == input0)
   }
 
-  @Test("An honest PSBT raises no signature findings")
-  func honestPSBTHasNoSignatureFindings() throws {
+  @Test
+  func `An honest PSBT raises no signature findings`() throws {
     let (psbt, tx) = try parse(fixture())
     #expect(PSBTValidator.verifySignatures(psbt: psbt, tx: tx).isEmpty)
   }
 
-  @Test("SIGHASH_ALL is the only accepted flag")
-  func sighashAllPasses() {
+  @Test
+  func `SIGHASH_ALL is the only accepted flag`() {
     #expect(PSBTValidator.verifySighash(of: signature(flag: 0x01), pubkey: "02aa", outpoint: "aa:0") == nil)
   }
 
-  @Test("SIGHASH_NONE is critical — it commits to no outputs at all")
-  func sighashNoneIsCritical() {
+  @Test
+  func `SIGHASH_NONE is critical — it commits to no outputs at all`() {
     let finding = PSBTValidator.verifySighash(of: signature(flag: 0x02), pubkey: "02aa", outpoint: "aa:0")
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.inputNonDefaultSighash)
     #expect(finding?.message.contains("SIGHASH_NONE") == true)
   }
 
-  @Test("Other non-default sighash flags are critical too", arguments: [
+  @Test(arguments: [
     UInt8(0x03), UInt8(0x81), UInt8(0x82), UInt8(0x83), UInt8(0x00),
   ])
-  func otherSighashFlagsAreCritical(flag: UInt8) {
+  func `Other non-default sighash flags are critical too`(flag: UInt8) {
     let finding = PSBTValidator.verifySighash(of: signature(flag: flag), pubkey: "02aa", outpoint: "aa:0")
     #expect(finding?.severity == .critical)
     #expect(finding?.code == PSBTFinding.Code.inputNonDefaultSighash)
   }
 
-  @Test("A signature too short to be real is critical")
-  func shortSignatureIsMalformed() {
+  @Test
+  func `A signature too short to be real is critical`() {
     let finding = PSBTValidator.verifySighash(of: Data([0x30, 0x01]), pubkey: "02aa", outpoint: "aa:0")
     #expect(finding?.code == PSBTFinding.Code.inputMalformedSignature)
   }
 
-  @Test("An input asking signers for a non-default sighash is critical")
-  func declaredNonDefaultSighashIsCritical() throws {
+  @Test
+  func `An input asking signers for a non-default sighash is critical`() throws {
     // PSBT_IN_SIGHASH_TYPE (key 0x03) carrying SIGHASH_NONE as a 4-byte LE value.
     let entry = Data([0x01, 0x03, 0x04, 0x02, 0x00, 0x00, 0x00])
     let patched = try insertingIntoFirstInput(entry, of: fixture())
@@ -641,8 +641,8 @@ struct PSBTValidatorTests {
     #expect(findings[0].message.contains("SIGHASH_NONE") == true)
   }
 
-  @Test("An input declaring SIGHASH_ALL explicitly is fine")
-  func declaredSighashAllPasses() throws {
+  @Test
+  func `An input declaring SIGHASH_ALL explicitly is fine`() throws {
     let entry = Data([0x01, 0x03, 0x04, 0x01, 0x00, 0x00, 0x00])
     let patched = try insertingIntoFirstInput(entry, of: fixture())
 
@@ -652,13 +652,13 @@ struct PSBTValidatorTests {
 
   // MARK: - Cosigner signing status
 
-  @Test("A cosigner entered in uppercase is still matched")
-  func signerStatusIgnoresFingerprintCase() {
+  @Test
+  func `A cosigner entered in uppercase is still matched`() {
     // BDK and PSBTs emit lowercase hex; the cosigner was typed in uppercase. These
     // are the same key, and a raw comparison used to report "not signed".
     let status = PSBTValidator.cosignerSignStatus(
       signerFingerprints: ["aabbccdd"],
-      cosigners: [(label: "Coldcard", fingerprint: "AABBCCDD")]
+      cosigners: [(label: "Coldcard", fingerprint: "AABBCCDD")],
     )
 
     #expect(status.count == 1)
@@ -666,23 +666,23 @@ struct PSBTValidatorTests {
     #expect(status[0].fingerprint == "AABBCCDD", "Display keeps what the user typed")
   }
 
-  @Test("Mixed case on either side matches")
-  func signerStatusHandlesMixedCase() {
+  @Test
+  func `Mixed case on either side matches`() {
     let status = PSBTValidator.cosignerSignStatus(
       signerFingerprints: ["AaBbCcDd"],
-      cosigners: [(label: "A", fingerprint: "aAbBcCdD")]
+      cosigners: [(label: "A", fingerprint: "aAbBcCdD")],
     )
     #expect(status[0].hasSigned)
   }
 
-  @Test("Cosigners that did not sign stay unsigned")
-  func signerStatusLeavesNonSignersAlone() {
+  @Test
+  func `Cosigners that did not sign stay unsigned`() {
     let status = PSBTValidator.cosignerSignStatus(
       signerFingerprints: ["aabbccdd"],
       cosigners: [
         (label: "Signed", fingerprint: "AABBCCDD"),
         (label: "Not signed", fingerprint: "11223344"),
-      ]
+      ],
     )
 
     #expect(status[0].hasSigned)
@@ -690,38 +690,38 @@ struct PSBTValidatorTests {
     #expect(status.map(\.label) == ["Signed", "Not signed"], "Order is preserved")
   }
 
-  @Test("Surrounding whitespace does not break matching")
-  func signerStatusToleratesWhitespace() {
+  @Test
+  func `Surrounding whitespace does not break matching`() {
     let status = PSBTValidator.cosignerSignStatus(
       signerFingerprints: ["aabbccdd"],
-      cosigners: [(label: "A", fingerprint: " AABBCCDD ")]
+      cosigners: [(label: "A", fingerprint: " AABBCCDD ")],
     )
     #expect(status[0].hasSigned)
   }
 
-  @Test("No signatures means nobody is marked as having signed")
-  func signerStatusWithNoSignatures() {
+  @Test
+  func `No signatures means nobody is marked as having signed`() {
     let status = PSBTValidator.cosignerSignStatus(
       signerFingerprints: [],
-      cosigners: [(label: "A", fingerprint: "aabbccdd")]
+      cosigners: [(label: "A", fingerprint: "aabbccdd")],
     )
     #expect(!status[0].hasSigned)
   }
 
   // MARK: - Ground truth assembly
 
-  @Test("Ground truth covers unspent outputs")
-  func groundTruthFromUTXOs() {
+  @Test
+  func `Ground truth covers unspent outputs`() {
     let utxo = UTXOItem(
       txid: "aa", vout: 1, amount: 500, isConfirmed: true,
-      keychain: .external, derivationIndex: 0
+      keychain: .external, derivationIndex: 0,
     )
     let truth = PSBTGroundTruth.from(utxos: [utxo], transactions: [], network: .testnet4)
     #expect(truth.knownOutputAmounts["aa:1"] == 500)
   }
 
-  @Test("Ground truth covers outputs already spent — the RBF case")
-  func groundTruthCoversSpentOutputs() {
+  @Test
+  func `Ground truth covers outputs already spent — the RBF case`() {
     // A bump PSBT spends the original transaction's inputs, which are no longer
     // unspent. Without the transaction half of the map they would be unverifiable.
     let previous = TransactionItem(
@@ -734,7 +734,7 @@ struct PSBTValidatorTests {
       outputs: [
         .init(address: "addr0", amount: 111, prevTxid: nil, prevVout: nil, isMine: false),
         .init(address: "addr1", amount: 222, prevTxid: nil, prevVout: nil, isMine: true),
-      ]
+      ],
     )
 
     let truth = PSBTGroundTruth.from(utxos: [], transactions: [previous], network: .testnet4)

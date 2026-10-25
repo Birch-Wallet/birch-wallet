@@ -55,9 +55,7 @@ enum Denomination: String, CaseIterable {
     guard parts.count <= 2 else { return nil }
     let wholePart = String(parts[0])
     let fractionPart = parts.count == 2 ? String(parts[1]) : ""
-    guard !(wholePart.isEmpty && fractionPart.isEmpty) else { return nil }
-    guard wholePart.allSatisfy(\.isASCIIDigit), fractionPart.allSatisfy(\.isASCIIDigit) else { return nil }
-    guard wholePart.count <= 8, fractionPart.count <= 8 else { return nil }
+    guard !(wholePart.isEmpty && fractionPart.isEmpty), wholePart.allSatisfy(\.isASCIIDigit), fractionPart.allSatisfy(\.isASCIIDigit), wholePart.count <= 8, fractionPart.count <= 8 else { return nil }
     let whole = wholePart.isEmpty ? 0 : (UInt64(wholePart) ?? 0)
     let fraction = UInt64(fractionPart + String(repeating: "0", count: 8 - fractionPart.count)) ?? 0
     let sats = whole * satsPerBTC + fraction

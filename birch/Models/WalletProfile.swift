@@ -38,7 +38,7 @@ final class WalletProfile {
     electrumSSL: Int = 0,
     electrumAllowInsecureSSL: Bool = false,
     blockExplorerHost: String = "",
-    privacyMode: Bool = false
+    privacyMode: Bool = false,
   ) {
     self.id = id
     self.name = name

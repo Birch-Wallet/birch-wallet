@@ -4,7 +4,7 @@ import Foundation
 import Testing
 
 struct ElectrumConfigTests {
-  @Test func defaultTestnet4Config() {
+  @Test func `default testnet 4 config`() {
     let config = ElectrumConfig(network: .testnet4)
     #expect(config.host == "testnet4.mempool.space")
     #expect(config.port == 40002)
@@ -12,26 +12,26 @@ struct ElectrumConfigTests {
     #expect(config.url == "ssl://testnet4.mempool.space:40002")
   }
 
-  @Test func defaultMainnetConfig() {
+  @Test func `default mainnet config`() {
     let config = ElectrumConfig(network: .mainnet)
     #expect(config.host == "") // Mainnet requires user-provided server
     #expect(config.port == 50002)
     #expect(config.useSSL == true)
   }
 
-  @Test func defaultTestnet3Config() {
+  @Test func `default testnet 3 config`() {
     let config = ElectrumConfig(network: .testnet3)
     #expect(config.host == "electrum.blockstream.info")
     #expect(config.port == 60002)
     #expect(config.useSSL == true)
   }
 
-  @Test func customConfig() {
+  @Test func `custom config`() {
     let config = ElectrumConfig(host: "myserver.com", port: 12345, useSSL: true)
     #expect(config.url == "ssl://myserver.com:12345")
   }
 
-  @Test func networkDefaultURLs() {
+  @Test func `network default URLs`() {
     for network in BitcoinNetwork.allCases {
       let config = ElectrumConfig(network: network)
       #expect(config.port > 0)
@@ -53,7 +53,7 @@ struct ElectrumConfigTests {
     }
   }
 
-  @Test func networkSwitchUpdatesDefaults() {
+  @Test func `network switch updates defaults`() {
     let testnet4Config = ElectrumConfig(network: .testnet4)
     let mainnetConfig = ElectrumConfig(network: .mainnet)
 
@@ -61,7 +61,7 @@ struct ElectrumConfigTests {
     #expect(testnet4Config.url != mainnetConfig.url)
   }
 
-  @Test func fetchRealFeeRatesFromMempoolSpace() throws {
+  @Test func `fetch real fee rates from mempool space`() throws {
     // Connect directly to testnet4 mempool space
     let config = ElectrumConfig(host: "testnet4.mempool.space", port: 40002, useSSL: true)
     let client = try ElectrumClient(url: config.url)

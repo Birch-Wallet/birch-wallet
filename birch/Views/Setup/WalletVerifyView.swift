@@ -208,7 +208,7 @@ struct WalletVerifyView: View {
     .sheet(isPresented: $showDescriptorPDF) {
       DescriptorPDFView(
         walletName: viewModel.walletName.isEmpty ? "My Wallet" : viewModel.walletName,
-        descriptor: viewModel.externalDescriptor
+        descriptor: viewModel.externalDescriptor,
       )
       .birchSheet()
     }
@@ -311,7 +311,7 @@ private struct DescriptorQRSheet: View {
           fileName: "\(walletName) Output Descriptor",
           maxFragmentLen: 160,
           fps: qrFrameRate,
-          loopCount: 3
+          loopCount: 3,
         )
         await MainActor.run {
           isExporting = false
@@ -328,7 +328,7 @@ private struct DescriptorQRSheet: View {
   private func presentShareSheet(url: URL) {
     let activityVC = UIActivityViewController(
       activityItems: [url],
-      applicationActivities: nil
+      applicationActivities: nil,
     )
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
           var topVC = windowScene.windows.first?.rootViewController else { return }

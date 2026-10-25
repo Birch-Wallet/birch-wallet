@@ -29,7 +29,7 @@ struct PSBTInspectorView: View {
     compactEnabled: Bool,
     cosigners: [(label: String, fingerprint: String)],
     requiredSignatures: Int?,
-    networkName: String?
+    networkName: String?,
   ) {
     self.psbtBytes = psbtBytes
     self.compactEnabled = compactEnabled
@@ -49,7 +49,7 @@ struct PSBTInspectorView: View {
       compactEnabled: compactEnabled,
       cosigners: cosigners,
       requiredSignatures: requiredSignatures,
-      networkName: profile?.bitcoinNetwork.displayName
+      networkName: profile?.bitcoinNetwork.displayName,
     )
   }
 
@@ -101,7 +101,7 @@ struct PSBTInspectorView: View {
           compactEnabled: compact,
           cosigners: cosigners,
           requiredSignatures: required,
-          networkName: network
+          networkName: network,
         ))
       } catch let error as PSBTParseError {
         return .failure(error)
@@ -283,7 +283,7 @@ struct PSBTInspectorView: View {
               expandedSections.insert(section.id)
             }
           }
-        }
+        },
       ) {
         ForEach(section.fields) { field in
           PSBTFieldRow(
@@ -292,7 +292,7 @@ struct PSBTInspectorView: View {
             isMatched: model.matches(field, lens: lens),
             isOpen: openFieldID == field.id,
             scale: scale,
-            maxRowHeight: maxRowHeight
+            maxRowHeight: maxRowHeight,
           ) {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
               openFieldID = openFieldID == field.id ? nil : field.id
@@ -417,7 +417,7 @@ private struct PSBTSectionView<Rows: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(
               RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.hbBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                .strokeBorder(Color.hbBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3])),
             )
         }
         VStack(alignment: .leading, spacing: 2) {

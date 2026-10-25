@@ -88,7 +88,7 @@ struct ElectrumServerSetupSection: View {
                 if $0 != 2 {
                   viewModel.electrumAllowInsecureSSL = false
                 }
-              }
+              },
             )) {
               Text("TCP").tag(1)
               Text("SSL").tag(2)
@@ -106,7 +106,7 @@ struct ElectrumServerSetupSection: View {
               } else {
                 viewModel.electrumAllowInsecureSSL = false
               }
-            }
+            },
           )) {
             Text("Allow insecure SSL")
               .font(.hbBody(13))
@@ -196,14 +196,13 @@ struct ElectrumServerSetupSection: View {
       do {
         let height = try await BitcoinService.shared.testElectrumConnection(config: config)
         // Verify network for mainnet, testnet3, testnet4 (skip signet)
-        if expectedNetwork != .signet {
-          if let detected = try? await BitcoinService.shared.detectElectrumNetwork(config: config),
-             detected != expectedNetwork
-          {
-            connectionTestResult = "Warning: Server is \(detected.displayName), expected \(expectedNetwork.displayName)"
-            isTestingConnection = false
-            return
-          }
+        if expectedNetwork != .signet,
+           let detected = try? await BitcoinService.shared.detectElectrumNetwork(config: config),
+           detected != expectedNetwork
+        {
+          connectionTestResult = "Warning: Server is \(detected.displayName), expected \(expectedNetwork.displayName)"
+          isTestingConnection = false
+          return
         }
         connectionTestResult = "Success — Chain Tip Height \(height)"
       } catch {
@@ -314,7 +313,7 @@ struct WalletNameNetworkCard: View {
         if !$0 {
           pendingNetwork = nil
         }
-      })
+      }),
     ) {
       Button("Cancel", role: .cancel) { pendingNetwork = nil }
       Button("Change and Clear Keys", role: .destructive) {
@@ -340,7 +339,7 @@ struct WalletNameNetworkCard: View {
         } else {
           viewModel.changeNetwork(to: newNetwork)
         }
-      }
+      },
     )
   }
 }

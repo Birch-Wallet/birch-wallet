@@ -68,7 +68,7 @@ struct DescriptorPDFView: View {
 
     let activityVC = UIActivityViewController(
       activityItems: [tempURL],
-      applicationActivities: nil
+      applicationActivities: nil,
     )
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
           var topVC = windowScene.windows.first?.rootViewController else { return }

@@ -13,20 +13,20 @@ struct BumpFeeViewModelTests {
       confirmations: 0,
       timestamp: nil,
       isIncoming: false,
-      vsize: vsize
+      vsize: vsize,
     )
   }
 
   // MARK: - Initial State
 
-  @Test func initialStep() {
+  @Test func `initial step`() {
     let vm = BumpFeeViewModel(transaction: makeTransaction())
     #expect(vm.currentStep == .feeInput)
   }
 
   // MARK: - Fee Rate Validation (Integer-Only)
 
-  @Test func isValidFeeRateRequiresHigherThanOriginal() {
+  @Test func `is valid fee rate requires higher than original`() {
     // Transaction with fee=500 sats, vsize=200 → feeRate = 2.5 sat/vB
     let vm = BumpFeeViewModel(transaction: makeTransaction(fee: 500, vsize: 200))
 
@@ -41,7 +41,7 @@ struct BumpFeeViewModelTests {
     #expect(vm.isValidFeeRate == true, "10 is higher than 2.5")
   }
 
-  @Test func feeRateEdgeCases() {
+  @Test func `fee rate edge cases`() {
     // Transaction with fee=500, vsize=200 → originalFeeRate = 2.5 sat/vB
     let vm = BumpFeeViewModel(transaction: makeTransaction())
 
@@ -61,7 +61,7 @@ struct BumpFeeViewModelTests {
     #expect(vm.isValidFeeRate == false, "Empty should be invalid")
   }
 
-  @Test func feeRateValueParsesAsDouble() {
+  @Test func `fee rate value parses as double`() {
     let vm = BumpFeeViewModel(transaction: makeTransaction())
 
     vm.newFeeRate = "5"
@@ -76,7 +76,7 @@ struct BumpFeeViewModelTests {
 
   // MARK: - Needs More Signatures Boundary
 
-  @Test func needsMoreSignatures() {
+  @Test func `needs more signatures`() {
     let vm = BumpFeeViewModel(transaction: makeTransaction())
     vm.requiredSignatures = 2
 
@@ -95,7 +95,7 @@ struct BumpFeeViewModelTests {
 
   // MARK: - Signature Progress
 
-  @Test func signatureProgressString() {
+  @Test func `signature progress string`() {
     let vm = BumpFeeViewModel(transaction: makeTransaction())
     vm.requiredSignatures = 3
     vm.signaturesCollected = 1
@@ -104,7 +104,7 @@ struct BumpFeeViewModelTests {
 
   // MARK: - Fee Rate Without Original
 
-  @Test func isValidFeeRateWithoutOriginal() {
+  @Test func `is valid fee rate without original`() {
     // Transaction without vsize → no originalFeeRate
     let tx = TransactionItem(
       id: "test",
@@ -112,7 +112,7 @@ struct BumpFeeViewModelTests {
       fee: 200,
       confirmations: 0,
       timestamp: nil,
-      isIncoming: false
+      isIncoming: false,
     )
     let vm = BumpFeeViewModel(transaction: tx)
     #expect(vm.originalFeeRate == nil)
@@ -121,7 +121,7 @@ struct BumpFeeViewModelTests {
     #expect(vm.isValidFeeRate == true, "Any rate > 0 is valid without original")
   }
 
-  @Test func feeRateAboveMaximumIsInvalid() {
+  @Test func `fee rate above maximum is invalid`() {
     let vm = BumpFeeViewModel(transaction: makeTransaction())
 
     vm.newFeeRate = "10000"

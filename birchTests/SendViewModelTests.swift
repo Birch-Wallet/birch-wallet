@@ -6,14 +6,14 @@ import Testing
 struct SendViewModelTests {
   // MARK: - Initial State
 
-  @Test func initialStepIsRecipients() {
+  @Test func `initial step is recipients`() {
     let vm = SendViewModel()
     #expect(vm.currentStep == .recipients)
   }
 
   // MARK: - Balance Validation
 
-  @Test func tryReviewBlocksWhenBalanceExceeded() {
+  @Test func `try review blocks when balance exceeded`() {
     let vm = SendViewModel()
     vm.availableBalance = 1000
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "950")]
@@ -23,7 +23,7 @@ struct SendViewModelTests {
     #expect(vm.currentStep == .recipients)
   }
 
-  @Test func tryReviewAllowsWhenBalanceNotExceeded() {
+  @Test func `try review allows when balance not exceeded`() {
     let vm = SendViewModel()
     vm.availableBalance = 100_000
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "1000")]
@@ -32,14 +32,14 @@ struct SendViewModelTests {
     #expect(vm.showValidationErrors == false)
   }
 
-  @Test func isBalanceExceededSkipsSendMax() {
+  @Test func `is balance exceeded skips send max`() {
     let vm = SendViewModel()
     vm.availableBalance = 100
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "99999", isSendMax: true)]
     #expect(!vm.isBalanceExceeded)
   }
 
-  @Test func isBalanceExceededWithManualUTXOSelection() {
+  @Test func `is balance exceeded with manual UTXO selection`() {
     let vm = SendViewModel()
     // Selecting a UTXO the wallet doesn't hold leaves selectedUTXOTotal = 0
     vm.selectedUTXOIds = ["missing:0"]
@@ -51,7 +51,7 @@ struct SendViewModelTests {
 
   // MARK: - Existing Validation (regression tests)
 
-  @Test func tryReviewBlocksEmptyAddress() {
+  @Test func `try review blocks empty address`() {
     let vm = SendViewModel()
     vm.availableBalance = 100_000
     vm.recipients = [Recipient(address: "", amountSats: "1000")]
@@ -60,7 +60,7 @@ struct SendViewModelTests {
     #expect(vm.currentStep == .recipients)
   }
 
-  @Test func tryReviewBlocksInvalidFeeRate() {
+  @Test func `try review blocks invalid fee rate`() {
     let vm = SendViewModel()
     vm.availableBalance = 100_000
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "1000")]
@@ -69,7 +69,7 @@ struct SendViewModelTests {
     #expect(vm.currentStep == .recipients)
   }
 
-  @Test func tryReviewBlocksZeroAmount() {
+  @Test func `try review blocks zero amount`() {
     let vm = SendViewModel()
     vm.availableBalance = 100_000
     vm.recipients = [Recipient(address: "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", amountSats: "0")]
@@ -78,7 +78,7 @@ struct SendViewModelTests {
     #expect(vm.currentStep == .recipients)
   }
 
-  @Test func totalSendAmountSumsRecipients() {
+  @Test func `total send amount sums recipients`() {
     let vm = SendViewModel()
     vm.recipients = [
       Recipient(address: "tb1q1", amountSats: "1000"),
@@ -90,7 +90,7 @@ struct SendViewModelTests {
 
   // MARK: - Frozen UTXO Guard
 
-  @Test func frozenUTXOGuardRejectsFrozenInput() {
+  @Test func `frozen UTXO guard rejects frozen input`() {
     let vm = SendViewModel()
     vm.frozenOutpoints = ["abc123:0"]
     let error = vm.validateUTXOInputs(outpoints: [(txid: "abc123", vout: 0)])
@@ -98,14 +98,14 @@ struct SendViewModelTests {
     #expect(error?.contains("frozen") == true)
   }
 
-  @Test func frozenUTXOGuardAllowsUnfrozenInput() {
+  @Test func `frozen UTXO guard allows unfrozen input`() {
     let vm = SendViewModel()
     vm.frozenOutpoints = ["abc123:0"]
     let error = vm.validateUTXOInputs(outpoints: [(txid: "def456", vout: 1)])
     #expect(error == nil)
   }
 
-  @Test func frozenUTXOGuardAllowsNilOutpoints() {
+  @Test func `frozen UTXO guard allows nil outpoints`() {
     let vm = SendViewModel()
     vm.frozenOutpoints = ["abc123:0"]
     let error = vm.validateUTXOInputs(outpoints: nil)
@@ -114,7 +114,7 @@ struct SendViewModelTests {
 
   // MARK: - Needs More Signatures Boundary
 
-  @Test func needsMoreSignaturesBoundary() {
+  @Test func `needs more signatures boundary`() {
     let vm = SendViewModel()
     vm.requiredSignatures = 2
 
@@ -133,7 +133,7 @@ struct SendViewModelTests {
 
   // MARK: - Reset
 
-  @Test func resetClearsAllState() {
+  @Test func `reset clears all state`() {
     let vm = SendViewModel()
     // Set a bunch of state
     vm.currentStep = .broadcast
@@ -183,7 +183,7 @@ struct SendViewModelTests {
 
   // MARK: - Fee Rate Validation
 
-  @Test func feeRateEdgeCases() {
+  @Test func `fee rate edge cases`() {
     let vm = SendViewModel()
 
     vm.feeRateSatVb = "0"
@@ -208,7 +208,7 @@ struct SendViewModelTests {
     #expect(vm.isValidFeeRate == true, "High rate is valid")
   }
 
-  @Test func feeRateValueParsesAsDouble() {
+  @Test func `fee rate value parses as double`() {
     let vm = SendViewModel()
 
     vm.feeRateSatVb = "5"
@@ -223,7 +223,7 @@ struct SendViewModelTests {
 
   // MARK: - BIP-21 URI Parsing
 
-  @Test func parseBIP21PlainAddress() {
+  @Test func `parse BIP 21 plain address`() {
     let vm = SendViewModel()
     vm.recipients = [Recipient()]
     vm.parseBIP21("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", forRecipientAt: 0)
@@ -231,7 +231,7 @@ struct SendViewModelTests {
     #expect(vm.recipients[0].amountSats == "")
   }
 
-  @Test func parseBIP21WithAmount() {
+  @Test func `parse BIP 21 with amount`() {
     let vm = SendViewModel()
     vm.recipients = [Recipient()]
     vm.parseBIP21("bitcoin:tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx?amount=0.001", forRecipientAt: 0)
@@ -239,7 +239,7 @@ struct SendViewModelTests {
     #expect(vm.recipients[0].amountSats == "100000") // 0.001 BTC = 100,000 sats
   }
 
-  @Test func parseBIP21WithoutAmount() {
+  @Test func `parse BIP 21 without amount`() {
     let vm = SendViewModel()
     vm.recipients = [Recipient()]
     vm.parseBIP21("bitcoin:tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", forRecipientAt: 0)
@@ -248,7 +248,7 @@ struct SendViewModelTests {
 
   // MARK: - Manual UTXO Selection
 
-  @Test func manualUTXOSelectionWithUnknownSelection() {
+  @Test func `manual UTXO selection with unknown selection`() {
     let vm = SendViewModel()
     vm.selectedUTXOIds = ["missing:0"]
     // Selection doesn't match any wallet UTXO → selectedUTXOTotal = 0
@@ -260,7 +260,7 @@ struct SendViewModelTests {
     #expect(vm.isBalanceExceeded)
   }
 
-  @Test func frozenUTXOMixedInputs() {
+  @Test func `frozen UTXO mixed inputs`() {
     let vm = SendViewModel()
     vm.frozenOutpoints = ["frozen1:0", "frozen2:1"]
     // Mix of frozen and unfrozen
@@ -276,7 +276,7 @@ struct SendViewModelTests {
 
   // MARK: - Create PSBT Validation
 
-  @Test func createPSBTRejectsInvalidRecipients() async {
+  @Test func `create PSBT rejects invalid recipients`() async {
     let vm = SendViewModel()
     vm.availableBalance = 100_000
 
@@ -296,7 +296,7 @@ struct SendViewModelTests {
 
   // MARK: - Has Any Input Detection
 
-  @Test func hasAnyInputDetection() {
+  @Test func `has any input detection`() {
     let vm = SendViewModel()
 
     // Default empty state
@@ -323,7 +323,7 @@ struct SendViewModelTests {
 
   // MARK: - Signature Progress
 
-  @Test func signatureProgressString() {
+  @Test func `signature progress string`() {
     let vm = SendViewModel()
     vm.requiredSignatures = 3
     vm.signaturesCollected = 1
@@ -332,7 +332,7 @@ struct SendViewModelTests {
 
   // MARK: - Finalize Once Guard
 
-  @Test func finalizeTxSkipsWhenAlreadyFinalized() {
+  @Test func `finalize tx skips when already finalized`() {
     let vm = SendViewModel()
     vm.finalizedTxBytes = Data([0x01, 0x02, 0x03])
     // finalizeTx should be a no-op when already finalized
@@ -343,7 +343,7 @@ struct SendViewModelTests {
 
   // MARK: - Self Recipient Detection
 
-  @Test func isSelfRecipientChecksWalletOwnership() {
+  @Test func `is self recipient checks wallet ownership`() {
     let mock = MockBitcoinService()
     mock.walletAddresses = ["tb1qmine"]
     let vm = SendViewModel(bitcoinService: mock)
@@ -358,7 +358,7 @@ struct SendViewModelTests {
 
   // MARK: - Input Limits (no traps)
 
-  @Test func amountAboveLimitIsInvalidNotOverflowing() {
+  @Test func `amount above limit is invalid not overflowing`() {
     let vm = SendViewModel()
     vm.feeRateSatVb = "1"
     vm.recipients = [
@@ -374,7 +374,7 @@ struct SendViewModelTests {
     _ = vm.previewTransaction
   }
 
-  @Test func capAmountsAcrossManyRecipientsDoNotOverflow() {
+  @Test func `cap amounts across many recipients do not overflow`() {
     let vm = SendViewModel()
     vm.feeRateSatVb = "10000"
     vm.recipients = (0 ..< 50).map { _ in
@@ -387,7 +387,7 @@ struct SendViewModelTests {
     #expect(vm.recipients[49].amountSats == "0")
   }
 
-  @Test func extremeFeeRatesDoNotTrap() {
+  @Test func `extreme fee rates do not trap`() {
     let vm = SendViewModel()
     #expect(vm.estimatedFee(for: .infinity) > 0)
     #expect(vm.estimatedFee(for: 1e300) == vm.estimatedFee(for: InputLimits.maxFeeRate))

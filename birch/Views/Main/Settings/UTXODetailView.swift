@@ -177,7 +177,7 @@ struct UTXODetailView: View {
 
           DetailRow(
             label: utxo.keychain == .external ? "Receive Address Index" : "Change Address Index",
-            value: "\(utxo.derivationIndex)"
+            value: "\(utxo.derivationIndex)",
           )
 
           DetailRow(label: "Output Index", value: "\(utxo.vout)")

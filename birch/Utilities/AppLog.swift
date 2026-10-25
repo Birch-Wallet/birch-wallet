@@ -162,7 +162,7 @@ final class LogFileStore: @unchecked Sendable {
   init(
     directory: URL,
     maxFileSize: UInt64 = 5 * 1024 * 1024, // 5 MB
-    archiveMaxAge: TimeInterval = 7 * 24 * 3600 // 7 days
+    archiveMaxAge: TimeInterval = 7 * 24 * 3600, // 7 days
   ) {
     self.directory = directory
     self.maxFileSize = maxFileSize

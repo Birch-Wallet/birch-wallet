@@ -37,7 +37,7 @@ struct WalletInfoView: View {
     return try? BitcoinService.buildCombinedDescriptor(
       requiredSignatures: wallet.requiredSignatures,
       cosigners: cosignerData,
-      network: wallet.bitcoinNetwork
+      network: wallet.bitcoinNetwork,
     )
   }
 
@@ -229,7 +229,7 @@ struct WalletInfoView: View {
                 if $0 != 2 {
                   wallet.electrumAllowInsecureSSL = false
                 }
-              }
+              },
             )) {
               Text("TCP").tag(1)
               Text("SSL").tag(2)
@@ -246,7 +246,7 @@ struct WalletInfoView: View {
                 } else {
                   wallet.electrumAllowInsecureSSL = false
                 }
-              }
+              },
             )) {
               Text("Allow insecure SSL")
                 .font(.hbBody(13))
@@ -423,7 +423,7 @@ struct WalletInfoView: View {
             set: { new in
               logger.info("Privacy mode \(new ? "enabled" : "disabled")")
               wallet.privacyMode = new
-            }
+            },
           )) {
             VStack(alignment: .leading, spacing: 2) {
               Text("Privacy Mode")
@@ -784,7 +784,7 @@ private struct EditCosignersView: View {
         xpub: cosigner.xpub,
         fingerprint: cosigner.fingerprint,
         derivationPath: cosigner.derivationPath,
-        orderIndex: cosigner.orderIndex
+        orderIndex: cosigner.orderIndex,
       )
     }
   }
@@ -793,11 +793,9 @@ private struct EditCosignersView: View {
     switch result {
     case .hdKey(var xpub, let fingerprint, let derivationPath):
       // Validate derivation path network before accepting the scan
-      if !derivationPath.isEmpty {
-        if let error = SetupWizardViewModel.validateDerivationPath(derivationPath, for: wallet.bitcoinNetwork) {
-          validationError = error
-          return
-        }
+      if !derivationPath.isEmpty, let error = SetupWizardViewModel.validateDerivationPath(derivationPath, for: wallet.bitcoinNetwork) {
+        validationError = error
+        return
       }
 
       let isTestnet = wallet.bitcoinNetwork != .mainnet
@@ -921,7 +919,7 @@ private struct DescriptorQRSheet: View {
           fileName: "\(walletName) Output Descriptor",
           maxFragmentLen: 160,
           fps: qrFrameRate,
-          loopCount: 3
+          loopCount: 3,
         )
         await MainActor.run {
           isExporting = false
@@ -938,7 +936,7 @@ private struct DescriptorQRSheet: View {
   private func presentShareSheet(url: URL) {
     let activityVC = UIActivityViewController(
       activityItems: [url],
-      applicationActivities: nil
+      applicationActivities: nil,
     )
     guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
           var topVC = windowScene.windows.first?.rootViewController else { return }

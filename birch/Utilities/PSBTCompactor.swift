@@ -61,7 +61,7 @@ enum PSBTCompactor {
   /// are skipped. Returns the value of the key-type-0x00 entry seen (used to
   /// grab the global unsigned tx), or Data() if none; nil on parse failure.
   private static func copyMap(
-    _ bytes: [UInt8], _ offset: inout Int, into output: inout [UInt8], drop: DropKey?
+    _ bytes: [UInt8], _ offset: inout Int, into output: inout [UInt8], drop: DropKey?,
   ) -> Data? {
     var keyTypeZeroValue = Data()
     while true {

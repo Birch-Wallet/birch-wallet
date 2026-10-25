@@ -101,7 +101,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
 
   // needsMoreSignatures and signatureProgress provided by PSBTFlowManaging
 
-  init(transaction: TransactionItem, bitcoinService: (any BitcoinServiceProtocol)? = nil) {
+  init(transaction: TransactionItem, bitcoinService: any BitcoinServiceProtocol? = nil) {
     let service = bitcoinService ?? BitcoinService.shared
     originalTxid = transaction.id
     originalFee = transaction.fee ?? 0
@@ -115,7 +115,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   }
 
   /// Initialize from a saved RBF PSBT to resume signing
-  init(savedPSBT: SavedPSBT, bitcoinService: (any BitcoinServiceProtocol)? = nil) {
+  init(savedPSBT: SavedPSBT, bitcoinService: any BitcoinServiceProtocol? = nil) {
     let service = bitcoinService ?? BitcoinService.shared
     originalTxid = savedPSBT.originalTxid ?? ""
     originalFee = 0
@@ -144,7 +144,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     // Re-check the stored bytes against current wallet state before resuming signing.
     psbtVerification = PSBTVerificationState(
       findings: service.verifyPSBT(savedPSBT.psbtBytes),
-      inputCount: inputCount
+      inputCount: inputCount,
     )
 
     if let signerInfo = service.psbtSignerInfo(savedPSBT.psbtBytes) {
@@ -182,7 +182,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     do {
       let result = try await bitcoinService.createBumpFeePSBT(
         txid: originalTxid,
-        feeRate: feeRateValue
+        feeRate: feeRateValue,
       )
       psbtBase64 = result.base64
       psbtBytes = result.bytes
@@ -192,7 +192,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
       inputCount = result.inputCount
       psbtVerification = PSBTVerificationState(
         findings: bitcoinService.verifyPSBT(result.bytes),
-        inputCount: result.inputCount
+        inputCount: result.inputCount,
       )
       signaturesCollected = 0
       if let signerInfo = bitcoinService.psbtSignerInfo(result.bytes) {
@@ -289,7 +289,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
       inputCount: inputCount,
       manualUTXOSelection: false,
       selectedUTXOIds: "",
-      inputOutpoints: outpoints
+      inputOutpoints: outpoints,
     )
     saved.originalTxid = originalTxid
     context.insert(saved)

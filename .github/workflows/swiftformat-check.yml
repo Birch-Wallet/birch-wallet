@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  SWIFTFORMAT_VERSION: 0.62.1
+  SWIFTFORMAT_VERSION: 0.64.1
 
 jobs:
   swiftformat:

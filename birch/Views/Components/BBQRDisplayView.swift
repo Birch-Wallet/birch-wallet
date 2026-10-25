@@ -57,12 +57,12 @@ struct BBQRDisplayView: View {
       let options = SplitOptions(
         encoding: .zlib,
         minVersion: .v01,
-        maxVersion: maxVersion
+        maxVersion: maxVersion,
       )
       let split = try Split.tryFromData(
         bytes: data,
         fileType: fileType,
-        options: options
+        options: options,
       )
       frames = split.parts()
       // Every frame is rendered once, up front, so advancing the animation later is

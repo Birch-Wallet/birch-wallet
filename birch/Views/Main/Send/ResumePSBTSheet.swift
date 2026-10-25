@@ -128,7 +128,7 @@ struct ResumePSBTSheet: View {
         valueRow(
           "Signatures",
           value: "\(details.signaturesCollected) of \(savedPSBT.requiredSignatures)",
-          font: .hbMono(15)
+          font: .hbMono(15),
         )
       }
     }
@@ -296,7 +296,7 @@ private extension ResumePSBTSheet {
       let stored = (try? JSONDecoder().decode([SavedRecipient].self, from: saved.recipientsJSON)) ?? []
       let labels = Dictionary(
         stored.filter { !$0.label.isEmpty }.map { ($0.address, $0.label) },
-        uniquingKeysWith: { first, _ in first }
+        uniquingKeysWith: { first, _ in first },
       )
 
       if let summary = service.summarizePSBT(saved.psbtBytes) {

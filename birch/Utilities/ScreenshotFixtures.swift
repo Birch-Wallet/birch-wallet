@@ -43,7 +43,7 @@ import Foundation
       from utxos: [UTXOItem],
       amount: UInt64,
       feeRate: Double,
-      outputs: Int
+      outputs: Int,
     ) -> [(txid: String, vout: UInt32)] {
       var picked: [UTXOItem] = []
       var total: UInt64 = 0

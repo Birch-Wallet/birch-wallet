@@ -129,7 +129,7 @@ struct PSBTGroundTruth {
     knownOutputAmounts: [String: UInt64],
     accountOrigin: [UInt32] = [],
     cosignerFingerprints: Set<String> = [],
-    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil }
+    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil },
   ) {
     self.knownOutputAmounts = knownOutputAmounts
     self.accountOrigin = accountOrigin
@@ -164,7 +164,7 @@ struct PSBTGroundTruth {
     transactions: [TransactionItem],
     network: BitcoinNetwork,
     cosignerFingerprints: Set<String> = [],
-    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil }
+    scriptAt: @escaping (KeychainKind, UInt32) -> Script? = { _, _ in nil },
   ) -> PSBTGroundTruth {
     var amounts = Dictionary(uniqueKeysWithValues: utxos.map { ($0.id, $0.amount) })
     for tx in transactions {
@@ -176,7 +176,7 @@ struct PSBTGroundTruth {
       knownOutputAmounts: amounts,
       accountOrigin: accountOrigin(for: network),
       cosignerFingerprints: cosignerFingerprints,
-      scriptAt: scriptAt
+      scriptAt: scriptAt,
     )
   }
 }
@@ -251,7 +251,7 @@ enum PSBTValidator {
   static func verifyInputAmounts(
     psbt: Psbt,
     tx: Transaction,
-    against truth: PSBTGroundTruth
+    against truth: PSBTGroundTruth,
   ) -> [PSBTFinding] {
     let psbtInputs = psbt.input()
     let txInputs = tx.input()
@@ -259,7 +259,7 @@ enum PSBTValidator {
     guard psbtInputs.count == txInputs.count else {
       return [.critical(
         Code.inputCountMismatch,
-        "PSBT carries \(psbtInputs.count) input records but its transaction spends \(txInputs.count) inputs"
+        "PSBT carries \(psbtInputs.count) input records but its transaction spends \(txInputs.count) inputs",
       )]
     }
 
@@ -269,7 +269,7 @@ enum PSBTValidator {
         input: psbtInputs[index],
         txIn: txIn,
         outpoint: outpoint,
-        known: truth.knownOutputAmounts[outpoint]
+        known: truth.knownOutputAmounts[outpoint],
       )
     }
   }
@@ -350,7 +350,7 @@ enum PSBTValidator {
         findings.append(.critical(
           Code.inputWitnessScriptMismatch,
           outpoint: outpoint,
-          "Input \(outpoint) carries a witness script that does not match the output being spent. The script that governs this input is not the one in this PSBT."
+          "Input \(outpoint) carries a witness script that does not match the output being spent. The script that governs this input is not the one in this PSBT.",
         ))
         continue
       }
@@ -360,7 +360,7 @@ enum PSBTValidator {
           findings.append(.critical(
             Code.inputForeignSignature,
             outpoint: outpoint,
-            "Input \(outpoint) carries a signature from a key that is not part of the script securing it. It cannot contribute to spending this input."
+            "Input \(outpoint) carries a signature from a key that is not part of the script securing it. It cannot contribute to spending this input.",
           ))
           continue
         }
@@ -376,7 +376,7 @@ enum PSBTValidator {
         findings.append(.critical(
           Code.inputNonDefaultSighash,
           outpoint: outpoint,
-          "Input \(outpoint) asks signers to use \(declared) rather than SIGHASH_ALL. Only SIGHASH_ALL commits to every output of this transaction."
+          "Input \(outpoint) asks signers to use \(declared) rather than SIGHASH_ALL. Only SIGHASH_ALL commits to every output of this transaction.",
         ))
       }
     }
@@ -392,7 +392,7 @@ enum PSBTValidator {
       return .critical(
         Code.inputMalformedSignature,
         outpoint: outpoint,
-        "Input \(outpoint) carries a signature from \(pubkey.prefix(16))… that is too short to be valid."
+        "Input \(outpoint) carries a signature from \(pubkey.prefix(16))… that is too short to be valid.",
       )
     }
 
@@ -401,7 +401,7 @@ enum PSBTValidator {
     return .critical(
       Code.inputNonDefaultSighash,
       outpoint: outpoint,
-      "Input \(outpoint) is signed with \(sighashName(flag)) instead of SIGHASH_ALL. That signature does not commit to all of this transaction's outputs, so the coins could be redirected."
+      "Input \(outpoint) is signed with \(sighashName(flag)) instead of SIGHASH_ALL. That signature does not commit to all of this transaction's outputs, so the coins could be redirected.",
     )
   }
 
@@ -428,14 +428,14 @@ enum PSBTValidator {
   ///   as stored so the UI still shows what the user typed.
   static func cosignerSignStatus(
     signerFingerprints: Set<String>,
-    cosigners: [(label: String, fingerprint: String)]
+    cosigners: [(label: String, fingerprint: String)],
   ) -> [(label: String, fingerprint: String, hasSigned: Bool)] {
     let signed = Set(signerFingerprints.map(CosignerInfo.normalizedFingerprint))
     return cosigners.map { cosigner in
       (
         label: cosigner.label,
         fingerprint: cosigner.fingerprint,
-        hasSigned: signed.contains(CosignerInfo.normalizedFingerprint(cosigner.fingerprint))
+        hasSigned: signed.contains(CosignerInfo.normalizedFingerprint(cosigner.fingerprint)),
       )
     }
   }
@@ -453,7 +453,7 @@ enum PSBTValidator {
   static func classifyOutputs(
     tx: Transaction,
     network: Network,
-    derivationOf: (Script) -> KeychainAndIndex?
+    derivationOf: (Script) -> KeychainAndIndex?,
   ) -> [PSBTOutputInfo] {
     tx.output().enumerated().map { index, txOut in
       let derivation = derivationOf(txOut.scriptPubkey)
@@ -468,7 +468,7 @@ enum PSBTValidator {
         address: (try? Address.fromScript(script: txOut.scriptPubkey, network: network))?.description ?? "Unknown",
         amount: txOut.value.toSat(),
         role: role,
-        derivation: derivation
+        derivation: derivation,
       )
     }
   }
@@ -477,7 +477,7 @@ enum PSBTValidator {
   static func derivationPathDescription(
     accountOrigin: [UInt32],
     keychain: KeychainKind,
-    index: UInt32
+    index: UInt32,
   ) -> String? {
     guard !accountOrigin.isEmpty else { return nil }
     let chain: UInt32 = keychain == .internal ? 1 : 0
@@ -500,7 +500,7 @@ enum PSBTValidator {
     psbt: Psbt,
     tx: Transaction,
     outputs: [PSBTOutputInfo],
-    against truth: PSBTGroundTruth
+    against truth: PSBTGroundTruth,
   ) -> [PSBTFinding] {
     guard !truth.accountOrigin.isEmpty else { return [] }
 
@@ -517,7 +517,7 @@ enum PSBTValidator {
         output: output,
         script: txOutputs[output.index].scriptPubkey,
         derivations: derivations,
-        against: truth
+        against: truth,
       )
     }
   }
@@ -528,7 +528,7 @@ enum PSBTValidator {
     output: PSBTOutputInfo,
     script: Script,
     derivations: [String: KeySource],
-    against truth: PSBTGroundTruth
+    against truth: PSBTGroundTruth,
   ) -> PSBTFinding? {
     // No claim, or no known account shape to compare a claim against.
     guard !derivations.isEmpty, !truth.accountOrigin.isEmpty else { return nil }
@@ -547,14 +547,14 @@ enum PSBTValidator {
       guard path.count == expectedDepth else {
         return .critical(
           Code.outputDerivationDepth,
-          "\(label) claims the derivation path \(pathDescription(path)), which has \(path.count) levels. This wallet's keys live \(expectedDepth) levels deep, so restoring from your descriptor would never find coins sent there."
+          "\(label) claims the derivation path \(pathDescription(path)), which has \(path.count) levels. This wallet's keys live \(expectedDepth) levels deep, so restoring from your descriptor would never find coins sent there.",
         )
       }
 
       guard Array(path.prefix(originDepth)) == truth.accountOrigin else {
         return .critical(
           Code.outputDerivationOrigin,
-          "\(label) claims the derivation path \(pathDescription(path)), which is not under this wallet's account \(pathDescription(truth.accountOrigin)). Coins sent there would not be covered by your descriptor."
+          "\(label) claims the derivation path \(pathDescription(path)), which is not under this wallet's account \(pathDescription(truth.accountOrigin)). Coins sent there would not be covered by your descriptor.",
         )
       }
 
@@ -562,14 +562,14 @@ enum PSBTValidator {
       guard chain == 0 || chain == 1 else {
         return .critical(
           Code.outputDerivationChain,
-          "\(label) claims chain \(chain) in \(pathDescription(path)). This wallet only derives addresses on chain 0 (receive) and chain 1 (change), so coins sent there would not be found by a restore."
+          "\(label) claims chain \(chain) in \(pathDescription(path)). This wallet only derives addresses on chain 0 (receive) and chain 1 (change), so coins sent there would not be found by a restore.",
         )
       }
 
       guard path[originDepth + 1] < hardened else {
         return .critical(
           Code.outputDerivationHardenedIndex,
-          "\(label) claims a hardened address index in \(pathDescription(path)). Hardened indexes cannot be derived from the cosigner xpubs in your descriptor."
+          "\(label) claims a hardened address index in \(pathDescription(path)). Hardened indexes cannot be derived from the cosigner xpubs in your descriptor.",
         )
       }
 
@@ -582,7 +582,7 @@ enum PSBTValidator {
     guard suffixes.count == 1, let suffix = suffixes.first else {
       return .critical(
         Code.outputDerivationDisagreement,
-        "\(label) gives its cosigners different address indexes. Every key of a wallet-owned output must derive from the same path."
+        "\(label) gives its cosigners different address indexes. Every key of a wallet-owned output must derive from the same path.",
       )
     }
 
@@ -593,7 +593,7 @@ enum PSBTValidator {
         ? nil
         : .warning(
           Code.outputUnknownFingerprint,
-          "\(label) carries key origins this wallet does not recognise. It is being treated as an ordinary recipient."
+          "\(label) carries key origins this wallet does not recognise. It is being treated as an ordinary recipient.",
         )
     }
 
@@ -605,14 +605,14 @@ enum PSBTValidator {
     guard let expected = truth.scriptAt(keychain, index) else {
       return output.isMine ? nil : .warning(
         Code.outputUnknownFingerprint,
-        "\(label) claims to be yours at \(pathDescription(truth.accountOrigin + suffix)), but this wallet could not check that claim."
+        "\(label) claims to be yours at \(pathDescription(truth.accountOrigin + suffix)), but this wallet could not check that claim.",
       )
     }
 
     guard expected.toBytes() == script.toBytes() else {
       return .critical(
         Code.outputDerivationScriptMismatch,
-        "\(label) claims to be your \(keychain == .internal ? "change" : "receive") address at \(pathDescription(truth.accountOrigin + suffix)), but that path produces a different address in this wallet. The output is not yours."
+        "\(label) claims to be your \(keychain == .internal ? "change" : "receive") address at \(pathDescription(truth.accountOrigin + suffix)), but that path produces a different address in this wallet. The output is not yours.",
       )
     }
 
@@ -621,7 +621,7 @@ enum PSBTValidator {
     guard output.isMine else {
       return .warning(
         Code.outputBeyondGapLimit,
-        "\(label) is your \(keychain == .internal ? "change" : "receive") address at index \(index), beyond the addresses this wallet has revealed. The funds are recoverable from your descriptor, but refresh the wallet so it tracks them."
+        "\(label) is your \(keychain == .internal ? "change" : "receive") address at index \(index), beyond the addresses this wallet has revealed. The funds are recoverable from your descriptor, but refresh the wallet so it tracks them.",
       )
     }
 
@@ -641,7 +641,7 @@ enum PSBTValidator {
     input: Input,
     txIn: TxIn,
     outpoint: String,
-    known: UInt64?
+    known: UInt64?,
   ) -> PSBTFinding? {
     let vout = txIn.previousOutput.vout
     var nonWitnessValue: UInt64?
@@ -655,7 +655,7 @@ enum PSBTValidator {
         return .critical(
           Code.inputPrevTxidMismatch,
           outpoint: outpoint,
-          "Input \(outpoint) carries a previous transaction that hashes to \(embeddedTxid) — that is not the transaction being spent"
+          "Input \(outpoint) carries a previous transaction that hashes to \(embeddedTxid) — that is not the transaction being spent",
         )
       }
 
@@ -664,7 +664,7 @@ enum PSBTValidator {
         return .critical(
           Code.inputPrevoutOutOfRange,
           outpoint: outpoint,
-          "Input \(outpoint) spends output \(vout) of a transaction that only has \(previousOutputs.count) outputs"
+          "Input \(outpoint) spends output \(vout) of a transaction that only has \(previousOutputs.count) outputs",
         )
       }
       nonWitnessValue = previousOutputs[Int(vout)].value.toSat()
@@ -679,7 +679,7 @@ enum PSBTValidator {
       return .critical(
         Code.inputUtxoDisagreement,
         outpoint: outpoint,
-        "Input \(outpoint) declares \(witnessValue.formattedSats) in witness_utxo but \(nonWitnessValue.formattedSats) in non_witness_utxo"
+        "Input \(outpoint) declares \(witnessValue.formattedSats) in witness_utxo but \(nonWitnessValue.formattedSats) in non_witness_utxo",
       )
     }
 
@@ -688,7 +688,7 @@ enum PSBTValidator {
       return .critical(
         Code.inputMissingUtxo,
         outpoint: outpoint,
-        "Input \(outpoint) carries no UTXO data, so the amount it contributes cannot be checked"
+        "Input \(outpoint) carries no UTXO data, so the amount it contributes cannot be checked",
       )
     }
 
@@ -696,7 +696,7 @@ enum PSBTValidator {
       return .warning(
         Code.inputAmountUnverifiable,
         outpoint: outpoint,
-        "Input \(outpoint) declares \(declared.formattedSats), which this wallet cannot confirm — the output is not in its history. Refresh the wallet, or treat the fee shown as unverified."
+        "Input \(outpoint) declares \(declared.formattedSats), which this wallet cannot confirm — the output is not in its history. Refresh the wallet, or treat the fee shown as unverified.",
       )
     }
 
@@ -704,7 +704,7 @@ enum PSBTValidator {
       return .critical(
         Code.inputAmountMismatch,
         outpoint: outpoint,
-        "Input \(outpoint) declares \(declared.formattedSats) but this wallet knows that output holds \(known.formattedSats)"
+        "Input \(outpoint) declares \(declared.formattedSats) but this wallet knows that output holds \(known.formattedSats)",
       )
     }
 

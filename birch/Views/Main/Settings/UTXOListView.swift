@@ -29,7 +29,7 @@ struct UTXOListView: View {
       to: viewModel.outputs,
       isFrozen: { frozen.contains($0.id) },
       label: { labels["utxo:\($0.id)"] },
-      date: { viewModel.bestDate(for: $0) }
+      date: { viewModel.bestDate(for: $0) },
     )
 
     VStack(spacing: 0) {
@@ -51,7 +51,7 @@ struct UTXOListView: View {
         ContentUnavailableView(
           "No UTXOs",
           systemImage: "bitcoinsign.circle",
-          description: Text("UTXOs will appear after refreshing your wallet")
+          description: Text("UTXOs will appear after refreshing your wallet"),
         )
       } else if visible.isEmpty {
         ContentUnavailableView {
@@ -156,7 +156,7 @@ struct UTXOListView: View {
           }
           statusCapsule(
             utxo.isConfirmed ? "Confirmed" : "Unconfirmed",
-            color: utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange
+            color: utxo.isConfirmed ? Color.hbSuccess : Color.hbBitcoinOrange,
           )
         }
       }
@@ -237,7 +237,7 @@ struct UTXOListView: View {
     guard let walletID else { return [:] }
     return Dictionary(
       walletLabels.filter { $0.walletID == walletID }.map { ("\($0.type):\($0.ref)", $0.label) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
   }
 

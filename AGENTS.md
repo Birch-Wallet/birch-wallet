@@ -65,7 +65,7 @@ This includes the screenshot tour (about 3 minutes), which syncs a testnet4 wall
 ```bash
 swiftformat .
 ```
-(Config in `.swiftformat`: 2-space indent, Unix line endings, Swift 5.9 rules)
+(Config in `.swiftformat`: 2-space indent, Unix line endings, Swift 6.4 compiler in Swift 5 language mode. CI pins SwiftFormat 0.64.1 in `.github/workflows/swiftformat-check.yml`.)
 
 **Normal development:** Open `birch.xcodeproj` in Xcode. SPM dependencies resolve automatically.
 

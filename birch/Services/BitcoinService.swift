@@ -251,7 +251,7 @@ final class BitcoinService {
         descriptor: externalDesc,
         changeDescriptor: changeDesc,
         network: network,
-        persister: persister
+        persister: persister,
       )
       // Reveal address #0 for both keychains so incremental syncs always cover it.
       // Without this, startSyncWithRevealedSpks() has nothing to sync against on a
@@ -396,7 +396,7 @@ final class BitcoinService {
             request: fullScanRequest,
             stopGap: UInt64(gapLimit),
             batchSize: 50,
-            fetchPrevTxouts: true
+            fetchPrevTxouts: true,
           )
         }.value
 
@@ -434,7 +434,7 @@ final class BitcoinService {
           try client.sync(
             request: syncRequest,
             batchSize: 50,
-            fetchPrevTxouts: true
+            fetchPrevTxouts: true,
           )
         }.value
 
@@ -490,7 +490,7 @@ final class BitcoinService {
         "Sync completed successfully in \(duration)s (\(lastSyncType.description)): "
           + "balance \(balanceBefore) -> \(balance) sats (\(balanceDeltaStr)), "
           + "txs \(txCountBefore) -> \(transactions.count), "
-          + "utxos \(utxoCountBefore) -> \(utxos.count), tip \(chainTipHeight)"
+          + "utxos \(utxoCountBefore) -> \(utxos.count), tip \(chainTipHeight)",
       )
     } catch {
       // If the wallet was replaced mid-sync (switch or reload), this failure —
@@ -570,7 +570,7 @@ final class BitcoinService {
       let connection = NWConnection(
         host: NWEndpoint.Host(host),
         port: NWEndpoint.Port(rawValue: port)!,
-        using: .tls
+        using: .tls,
       )
 
       connection.stateUpdateHandler = { state in
@@ -582,11 +582,11 @@ final class BitcoinService {
           connection.cancel()
           if case let .tls(osStatus) = error, osStatus == errSecCertificateExpired {
             continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "SSL certificate expired on \(host):\(port)."
+              "SSL certificate expired on \(host):\(port).",
             ))
           } else {
             continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate."
+              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
             ))
           }
         case let .failed(error):
@@ -594,11 +594,11 @@ final class BitcoinService {
           let desc = error.localizedDescription
           if desc.contains("certificate") || desc.contains("SSL") || desc.contains("trust") {
             continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate."
+              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
             ))
           } else {
             continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "Connection to \(host):\(port) failed: \(desc)"
+              "Connection to \(host):\(port) failed: \(desc)",
             ))
           }
         case .cancelled:
@@ -626,7 +626,7 @@ final class BitcoinService {
     // Build lookup for O(1) input resolution instead of O(n) per input
     let txLookup = Dictionary(
       txList.map { ($0.transaction.computeTxid().description, $0.transaction) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
     // The server's tip, or failing that the wallet's own: applying a scan moves
     // BDK's checkpoint to the tip the server reported, even when the header fetch
@@ -695,7 +695,7 @@ final class BitcoinService {
           amount: txOut.value.toSat(),
           prevTxid: nil,
           prevVout: nil,
-          isMine: mine
+          isMine: mine,
         )
       }
 
@@ -722,7 +722,7 @@ final class BitcoinService {
           amount: inputAmount,
           prevTxid: prevTxid,
           prevVout: prevVout,
-          isMine: mine
+          isMine: mine,
         )
       }
 
@@ -738,7 +738,7 @@ final class BitcoinService {
         vsize: txVsize,
         firstSeen: firstSeen,
         inputs: inputs,
-        outputs: outputs
+        outputs: outputs,
       )
     }.sorted {
       let isUnconfirmed0 = $0.confirmations == 0
@@ -751,7 +751,7 @@ final class BitcoinService {
 
     let txDates = Dictionary(
       transactions.map { ($0.id, $0.timestamp ?? $0.firstSeen ?? .distantPast) },
-      uniquingKeysWith: { first, _ in first }
+      uniquingKeysWith: { first, _ in first },
     )
     outputs = wallet.listOutput().map { output in
       let confirmed = switch output.chainPosition {
@@ -765,7 +765,7 @@ final class BitcoinService {
         isConfirmed: confirmed,
         keychain: output.keychain == .external ? .external : .internal,
         derivationIndex: output.derivationIndex,
-        isSpent: output.isSpent
+        isSpent: output.isSpent,
       )
     }.sorted { u0, u1 in
       let isUnconfirmed0 = !u0.isConfirmed
@@ -864,7 +864,7 @@ final class BitcoinService {
   static func availableReceiveAddress(
     in wallet: Wallet,
     from start: UInt32,
-    taken: Set<String>
+    taken: Set<String>,
   ) -> (info: AddressInfo, didReveal: Bool) {
     var info = wallet.peekAddress(keychain: .external, index: start)
     while taken.contains(info.address.description) {
@@ -897,7 +897,7 @@ final class BitcoinService {
         index: i,
         address: addr,
         isUsed: isUsed,
-        isChange: keychain == .internal
+        isChange: keychain == .internal,
       ))
       i += 1
     }
@@ -957,7 +957,7 @@ final class BitcoinService {
         .fixed
       }
       logger.info(
-        "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB"
+        "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB",
       )
       return fees
     } catch {
@@ -985,7 +985,7 @@ final class BitcoinService {
     return RecommendedFees(
       fast: decoded.fastestFee,
       medium: decoded.halfHourFee,
-      slow: decoded.economyFee
+      slow: decoded.economyFee,
     )
   }
 
@@ -1044,7 +1044,7 @@ final class BitcoinService {
       return RecommendedFees(
         fast: fast,
         medium: medium,
-        slow: slow
+        slow: slow,
       )
     }.value
   }
@@ -1065,7 +1065,7 @@ final class BitcoinService {
   private func makeFeeRate(satPerVb feeRate: Double) throws -> FeeRate {
     guard feeRate.isFinite, feeRate > 0, feeRate <= InputLimits.maxFeeRate else {
       throw AppError.psbtCreationFailed(
-        "Fee rate must be between 0 and \(formatFeeRate(InputLimits.maxFeeRate)) sat/vB"
+        "Fee rate must be between 0 and \(formatFeeRate(InputLimits.maxFeeRate)) sat/vB",
       )
     }
     let satKwu = max(UInt64(round(feeRate * 250.0)), 1)
@@ -1076,7 +1076,7 @@ final class BitcoinService {
     recipients: [(address: String, amount: UInt64, isSendMax: Bool)],
     feeRate: Double,
     utxos: [(txid: String, vout: UInt32)]? = nil,
-    unspendable: Set<String> = []
+    unspendable: Set<String> = [],
   ) async throws -> PSBTResult {
     guard let wallet else { throw AppError.walletNotLoaded }
 
@@ -1114,7 +1114,7 @@ final class BitcoinService {
             from: self.utxos.filter { !unspendable.contains($0.id) },
             amount: InputLimits.sum(recipients.map(\.amount)),
             feeRate: feeRate,
-            outputs: recipients.count + 1
+            outputs: recipients.count + 1,
           )
         }
       }
@@ -1158,7 +1158,7 @@ final class BitcoinService {
       .joined(separator: ", ")
     logger.info(
       "Created PSBT: \(inputCount) inputs, \(recipients.count) recipients [\(recipientSummary)], "
-        + "fee \(fee) sats @ \(feeRate) sat/vB\(changeAddress.map { ", change \(changeAmount ?? 0) sats to \($0)" } ?? "")"
+        + "fee \(fee) sats @ \(feeRate) sat/vB\(changeAddress.map { ", change \(changeAmount ?? 0) sats to \($0)" } ?? "")",
     )
     return PSBTResult(base64: base64, bytes: bytes, fee: fee, changeAmount: changeAmount, changeAddress: changeAddress, inputCount: inputCount)
   }
@@ -1320,7 +1320,7 @@ final class BitcoinService {
       PSBTValidator.derivationPathDescription(
         accountOrigin: truth.accountOrigin,
         keychain: $0.keychain,
-        index: $0.index
+        index: $0.index,
       )
     }
 
@@ -1332,7 +1332,7 @@ final class BitcoinService {
          output: change,
          script: txOutputs[change.index].scriptPubkey,
          derivations: psbtOutputs[change.index].bip32Derivation,
-         against: truth
+         against: truth,
        )
     {
       status = finding.severity == .critical ? .failed(finding.message) : .warning(finding.message)
@@ -1342,7 +1342,7 @@ final class BitcoinService {
       address: change.address,
       amount: change.amount,
       derivationPath: path,
-      status: status
+      status: status,
     )
   }
 
@@ -1389,7 +1389,7 @@ final class BitcoinService {
         psbtLogger.warning("PSBT has more than one change output; listing \(output.address) as a recipient")
       }
       recipients.append(
-        SavedRecipient(address: output.address, amountSats: "\(output.amount)", isSendMax: false, label: "")
+        SavedRecipient(address: output.address, amountSats: "\(output.amount)", isSendMax: false, label: ""),
       )
     }
 
@@ -1399,7 +1399,7 @@ final class BitcoinService {
       inputCount: psbt.input().count,
       changeAmount: changeAmount,
       changeAddress: changeAddress,
-      recipients: recipients
+      recipients: recipients,
     )
   }
 
@@ -1414,7 +1414,7 @@ final class BitcoinService {
       transactions: transactions,
       network: currentProfile?.bitcoinNetwork ?? .testnet4,
       cosignerFingerprints: Set((currentProfile?.cosigners ?? []).map(\.fingerprint)),
-      scriptAt: scriptLookup
+      scriptAt: scriptLookup,
     )
   }
 
@@ -1442,7 +1442,7 @@ final class BitcoinService {
     guard let tx = try? psbt.extractTx() else {
       return [.critical(
         PSBTFinding.Code.psbtUnextractable,
-        "This PSBT's transaction could not be read — an input may be missing its UTXO data, or the fee it implies is impossible"
+        "This PSBT's transaction could not be read — an input may be missing its UTXO data, or the fee it implies is impossible",
       )]
     }
     return verifyPSBT(psbt, tx: tx)
@@ -1604,7 +1604,7 @@ final class BitcoinService {
       inputCount: summary.inputCount,
       recipients: summary.recipients,
       feeRateSatVb: summary.feeRateSatVb,
-      findings: findings
+      findings: findings,
     )
   }
 
@@ -1665,13 +1665,13 @@ final class BitcoinService {
     let cosigners = profile.cosigners.sorted(by: { $0.orderIndex < $1.orderIndex })
     let cosignerStatus = PSBTValidator.cosignerSignStatus(
       signerFingerprints: signerFingerprints,
-      cosigners: cosigners.map { (label: $0.label, fingerprint: $0.fingerprint) }
+      cosigners: cosigners.map { (label: $0.label, fingerprint: $0.fingerprint) },
     )
 
     return PSBTSignerInfo(
       totalSignatures: signerFingerprints.count,
       signerFingerprints: signerFingerprints,
-      cosignerSignStatus: cosignerStatus
+      cosignerSignStatus: cosignerStatus,
     )
   }
 
@@ -1692,7 +1692,7 @@ final class BitcoinService {
   /// does not show.
   private static func canonicalCosigners(
     _ cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
-    network: BitcoinNetwork
+    network: BitcoinNetwork,
   ) throws -> [(xpub: String, fingerprint: String, derivationPath: String)] {
     let isTestnet = network != .mainnet
 
@@ -1710,7 +1710,7 @@ final class BitcoinService {
     requiredSignatures: Int,
     cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
     network: BitcoinNetwork,
-    isChange: Bool
+    isChange: Bool,
   ) throws -> String {
     let chain = isChange ? "1" : "0"
     let coinType = network.coinType
@@ -1728,7 +1728,7 @@ final class BitcoinService {
   static func buildCombinedDescriptor(
     requiredSignatures: Int,
     cosigners: [(xpub: String, fingerprint: String, derivationPath: String)],
-    network: BitcoinNetwork
+    network: BitcoinNetwork,
   ) throws -> String {
     let coinType = network.coinType
 

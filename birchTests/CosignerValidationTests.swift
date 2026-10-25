@@ -4,65 +4,65 @@ import Testing
 
 @MainActor
 struct CosignerValidationTests {
-  @Test func validFingerprint() {
+  @Test func `valid fingerprint`() {
     let vm = SetupWizardViewModel()
     #expect(vm.validateFingerprint("73c5da0a") == nil)
     #expect(vm.validateFingerprint("AABBCCDD") == nil)
     #expect(vm.validateFingerprint("00000000") == nil)
   }
 
-  @Test func fingerprintTooShort() {
+  @Test func `fingerprint too short`() {
     let vm = SetupWizardViewModel()
     let error = vm.validateFingerprint("73c5da")
     #expect(error != nil)
     #expect(error?.contains("8") == true)
   }
 
-  @Test func fingerprintTooLong() {
+  @Test func `fingerprint too long`() {
     let vm = SetupWizardViewModel()
     let error = vm.validateFingerprint("73c5da0a1b")
     #expect(error != nil)
   }
 
-  @Test func fingerprintNonHex() {
+  @Test func `fingerprint non hex`() {
     let vm = SetupWizardViewModel()
     let error = vm.validateFingerprint("73c5dazz")
     #expect(error != nil)
     #expect(error?.contains("hex") == true)
   }
 
-  @Test func emptyFingerprint() {
+  @Test func `empty fingerprint`() {
     let vm = SetupWizardViewModel()
     let error = vm.validateFingerprint("")
     #expect(error != nil)
   }
 
-  @Test func validTestnetXpub() {
+  @Test func `valid testnet xpub`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
 
     let error = vm.validateCosignerXpub(
       "tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ",
-      at: 0
+      at: 0,
     )
     #expect(error == nil)
   }
 
-  @Test func rejectMainnetXpubOnTestnet() {
+  @Test func `reject mainnet xpub on testnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
 
     let error = vm.validateCosignerXpub(
       "xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz",
-      at: 0
+      at: 0,
     )
     #expect(error != nil)
     #expect(error?.contains("tpub") == true)
   }
 
-  @Test func rejectDuplicateXpub() {
+  @Test func `reject duplicate xpub`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     let xpub = "tpubDFH9dgzveyD8zTbPUFuLrGmCydNvxehyNdUXKJAQN8x4aZ4j6UZqGfnqFrD4NqyaTVGKbvEW54tsvPTK2UoSbCC1PJY8iCNiwTL3RWZEheQ"
@@ -73,7 +73,7 @@ struct CosignerValidationTests {
     #expect(error?.contains("Duplicate") == true)
   }
 
-  @Test func rejectEmptyXpub() {
+  @Test func `reject empty xpub`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -92,7 +92,7 @@ struct CosignerValidationTests {
   /// A cosigner field must hold exactly one key. Text that starts with a valid
   /// tpub and then carries descriptor syntax would add a second, hidden key to
   /// the wallet if it were spliced into the descriptor.
-  @Test func rejectXpubWithInjectedSecondKey() {
+  @Test func `reject xpub with injected second key`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -101,7 +101,7 @@ struct CosignerValidationTests {
     #expect(vm.validateCosignerXpub(injected, at: 0) != nil)
   }
 
-  @Test func rejectXpubWithBadChecksum() {
+  @Test func `reject xpub with bad checksum`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -111,7 +111,7 @@ struct CosignerValidationTests {
     #expect(vm.validateCosignerXpub(corrupted, at: 0) != nil)
   }
 
-  @Test func rejectTruncatedXpub() {
+  @Test func `reject truncated xpub`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -126,7 +126,7 @@ struct CosignerValidationTests {
   private static let vpubAsTpub =
     "tpubDE4AYPPuhwTk7ENvANSMNU84wRecxjikg4e1WFHE4a6fxsNogCqnA7zzxyDoXp93JeyWNViXEKnkqaysaCrZRnTZDLYXnmbt7zrGxWYc3Mx"
 
-  @Test func acceptVpubCosigner() {
+  @Test func `accept vpub cosigner`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -134,7 +134,7 @@ struct CosignerValidationTests {
     #expect(vm.validateCosignerXpub(Self.vpub, at: 0) == nil)
   }
 
-  @Test func acceptXpubWithSurroundingWhitespace() throws {
+  @Test func `accept xpub with surrounding whitespace`() throws {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = ["", ""]
@@ -150,7 +150,7 @@ struct CosignerValidationTests {
         (xpub: Self.tpub2, fingerprint: "0f056943", derivationPath: "m/48'/1'/0'/2'"),
       ],
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
     let withoutPadding = try BitcoinService.buildDescriptor(
       requiredSignatures: 2,
@@ -159,12 +159,12 @@ struct CosignerValidationTests {
         (xpub: Self.tpub2, fingerprint: "0f056943", derivationPath: "m/48'/1'/0'/2'"),
       ],
       network: .testnet4,
-      isChange: false
+      isChange: false,
     )
     #expect(withPadding == withoutPadding)
   }
 
-  @Test func rejectDuplicateAcrossFormats() {
+  @Test func `reject duplicate across formats`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     vm.cosignerXpubs = [Self.vpub, ""]
@@ -195,7 +195,7 @@ struct CosignerValidationTests {
      "tpubD7uZy8aqfprHyVC1KErPPMtwqV5rzncNvDVBxvuwT6XChzVws9iSEVVwfYmxxYXajCvmAWs1EBmVGMzwtyk1gnEEr4q1tiQawE8kjBfLo8Q"),
   ]
 
-  @Test func acceptKeyAtBIP48Path() {
+  @Test func `accept key at BIP 48 path`() {
     // Testnet: tpub and SLIP132 Vpub, both depth 4 with a last step of 2'
     #expect(SetupWizardViewModel.validateXpub(Self.tpub1, for: .testnet4) == nil)
     #expect(SetupWizardViewModel.validateXpub(Self.vpub, for: .testnet4) == nil)
@@ -206,7 +206,7 @@ struct CosignerValidationTests {
     #expect(SetupWizardViewModel.validateXpub(mainnetKey, for: .mainnet) == nil)
   }
 
-  @Test func rejectKeyNotAtBIP48Path() {
+  @Test func `reject key not at BIP 48 path`() {
     for (name, xpub) in Self.keysOffTheBIP48Path {
       let error = SetupWizardViewModel.validateXpub(xpub, for: .testnet4)
       #expect(error != nil, "\(name) should be rejected")
@@ -220,7 +220,7 @@ struct CosignerValidationTests {
     }
   }
 
-  @Test func rejectMainnetKeyNotAtBIP48Path() {
+  @Test func `reject mainnet key not at BIP 48 path`() {
     // Account-level key (depth 3, last step 0')
     let accountKey = "xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz"
     let accountError = SetupWizardViewModel.validateXpub(accountKey, for: .mainnet)
@@ -234,11 +234,11 @@ struct CosignerValidationTests {
   }
 
   /// Only for a key that is already part of a saved wallet (see CosignerEditTests).
-  @Test func placementCheckCanBeSkippedForKeyAlreadySaved() {
+  @Test func `placement check can be skipped for key already saved`() {
     for (name, xpub) in Self.keysOffTheBIP48Path {
       #expect(
         SetupWizardViewModel.validateXpub(xpub, for: .testnet4, checkingPlacement: false) == nil,
-        "\(name) is still a valid extended public key"
+        "\(name) is still a valid extended public key",
       )
     }
     // Skipping placement never skips the structural checks
@@ -247,7 +247,7 @@ struct CosignerValidationTests {
 
   /// The wizard builds descriptors only from cosigners that pass every check,
   /// even when the list was filled in without going through the entry screen.
-  @Test func wizardBuildsDescriptorsOnlyFromStandardCosigners() {
+  @Test func `wizard builds descriptors only from standard cosigners`() {
     func wizard(_ change: (SetupWizardViewModel) -> Void) -> SetupWizardViewModel {
       let vm = SetupWizardViewModel()
       vm.network = .testnet4
@@ -286,19 +286,19 @@ struct CosignerValidationTests {
 
   // MARK: - Derivation Path Network Validation
 
-  @Test func validTestnetDerivationPath() {
+  @Test func `valid testnet derivation path`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     #expect(vm.validateDerivationPath("m/48'/1'/0'/2'") == nil)
   }
 
-  @Test func validMainnetDerivationPath() {
+  @Test func `valid mainnet derivation path`() {
     let vm = SetupWizardViewModel()
     vm.network = .mainnet
     #expect(vm.validateDerivationPath("m/48'/0'/0'/2'") == nil)
   }
 
-  @Test func rejectTestnetPathOnMainnet() {
+  @Test func `reject testnet path on mainnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .mainnet
     let error = vm.validateDerivationPath("m/48'/1'/0'/2'")
@@ -308,7 +308,7 @@ struct CosignerValidationTests {
     #expect(lower.contains("mainnet"))
   }
 
-  @Test func rejectMainnetPathOnTestnet() {
+  @Test func `reject mainnet path on testnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     let error = vm.validateDerivationPath("m/48'/0'/0'/2'")
@@ -318,7 +318,7 @@ struct CosignerValidationTests {
     #expect(lower.contains("testnet"))
   }
 
-  @Test func rejectNonZeroAccountOnTestnet() {
+  @Test func `reject non zero account on testnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     let error = vm.validateDerivationPath("m/48'/1'/1'/2'")
@@ -326,7 +326,7 @@ struct CosignerValidationTests {
     #expect(error?.contains("account 0") == true)
   }
 
-  @Test func rejectNonZeroAccountOnMainnet() {
+  @Test func `reject non zero account on mainnet`() {
     let vm = SetupWizardViewModel()
     vm.network = .mainnet
     let error = vm.validateDerivationPath("m/48'/0'/5'/2'")
@@ -334,7 +334,7 @@ struct CosignerValidationTests {
     #expect(error?.contains("account 0") == true)
   }
 
-  @Test func rejectInvalidBIP48Format() {
+  @Test func `reject invalid BIP 48 format`() {
     let vm = SetupWizardViewModel()
     vm.network = .testnet4
     // Wrong script type
@@ -347,13 +347,13 @@ struct CosignerValidationTests {
     #expect(vm.validateDerivationPath("") != nil)
   }
 
-  @Test func cosignerInfoValidation() {
+  @Test func `cosigner info validation`() {
     let valid = CosignerInfo(
       label: "Test",
       xpub: "tpubDFH9dgzveyD8",
       fingerprint: "73c5da0a",
       derivationPath: "m/48'/1'/0'/2'",
-      orderIndex: 0
+      orderIndex: 0,
     )
     #expect(valid.isValidFingerprint)
 
@@ -362,7 +362,7 @@ struct CosignerValidationTests {
       xpub: "tpubDFH9dgzveyD8",
       fingerprint: "73c5da",
       derivationPath: "m/48'/1'/0'/2'",
-      orderIndex: 0
+      orderIndex: 0,
     )
     #expect(!invalidFP.isValidFingerprint)
   }

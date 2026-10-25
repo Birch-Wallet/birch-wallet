@@ -59,7 +59,7 @@ final class MockBitcoinService: BitcoinServiceProtocol {
     recipients _: [(address: String, amount: UInt64, isSendMax: Bool)],
     feeRate _: Double,
     utxos _: [(txid: String, vout: UInt32)]?,
-    unspendable _: Set<String>
+    unspendable _: Set<String>,
   ) async throws -> BitcoinService.PSBTResult {
     createPSBTCallCount += 1
     if let error = createPSBTError {
@@ -115,7 +115,7 @@ final class MockBitcoinService: BitcoinServiceProtocol {
       throw error
     }
     return getFeeRatesResult ?? BitcoinService.RecommendedFees(
-      fast: 5.0, medium: 2.0, slow: 1.0
+      fast: 5.0, medium: 2.0, slow: 1.0,
     )
   }
 

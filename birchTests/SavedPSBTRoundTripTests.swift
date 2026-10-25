@@ -40,11 +40,11 @@ struct SavedPSBTRoundTripTests {
       inputCount: 2,
       manualUTXOSelection: false,
       selectedUTXOIds: "",
-      inputOutpoints: ""
+      inputOutpoints: "",
     )
   }
 
-  @Test func swiftDataRoundTripKeepsNonWitnessUtxo() throws {
+  @Test func `swift data round trip keeps non witness utxo`() throws {
     let original = try loadFixture("test_psbt_nonwitness")
     let before = try nonWitnessUtxoCount(original)
     #expect(before > 0)

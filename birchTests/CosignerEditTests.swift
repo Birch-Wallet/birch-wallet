@@ -56,14 +56,14 @@ struct CosignerEditTests {
       requiredSignatures: 2,
       cosigners: cosigners.map { (xpub: $0.xpub, fingerprint: $0.fingerprint, derivationPath: $0.derivationPath) },
       network: .testnet4,
-      isChange: isChange
+      isChange: isChange,
     )
   }
 
   /// A saved 2-of-2 testnet wallet, with cosigners A and B unless others are given.
   /// It is not the active wallet, so saving an edit does not reload the app's wallet.
   private func makeWallet(
-    in context: ModelContext, cosigners: [Edit] = [CosignerEditTests.cosignerA, CosignerEditTests.cosignerB]
+    in context: ModelContext, cosigners: [Edit] = [CosignerEditTests.cosignerA, CosignerEditTests.cosignerB],
   ) throws -> WalletProfile {
     let wallet = try WalletProfile(
       name: "Edit Test",
@@ -71,14 +71,14 @@ struct CosignerEditTests {
       totalCosigners: 2,
       externalDescriptor: Self.descriptor(cosigners, isChange: false),
       internalDescriptor: Self.descriptor(cosigners, isChange: true),
-      network: .testnet4
+      network: .testnet4,
     )
     context.insert(wallet)
 
     for (i, entry) in cosigners.enumerated() {
       let cosigner = CosignerInfo(
         label: entry.label, xpub: entry.xpub, fingerprint: entry.fingerprint,
-        derivationPath: entry.derivationPath, orderIndex: i
+        derivationPath: entry.derivationPath, orderIndex: i,
       )
       cosigner.wallet = wallet
       context.insert(cosigner)
@@ -97,7 +97,7 @@ struct CosignerEditTests {
 
   // MARK: - Valid edits
 
-  @Test func validEditRebuildsDescriptorsAndRecords() throws {
+  @Test func `valid edit rebuilds descriptors and records`() throws {
     let container = try createTestContainer()
     let context = ModelContext(container)
     let wallet = try makeWallet(in: context)
@@ -121,7 +121,7 @@ struct CosignerEditTests {
     #expect(saved.map(\.fingerprint) == ["73c5da0a", "effda333"])
   }
 
-  @Test func editKeepsEnteredFormatWithoutSurroundingWhitespace() throws {
+  @Test func `edit keeps entered format without surrounding whitespace`() throws {
     let container = try createTestContainer()
     let context = ModelContext(container)
     let wallet = try makeWallet(in: context)
@@ -140,7 +140,7 @@ struct CosignerEditTests {
 
   // MARK: - Rejected edits
 
-  @Test func rejectedEditLeavesWalletUntouched() throws {
+  @Test func `rejected edit leaves wallet untouched`() throws {
     func second(_ change: (inout Edit) -> Void) -> [Edit] {
       var edit = Self.cosignerB
       change(&edit)
@@ -173,14 +173,14 @@ struct CosignerEditTests {
       #expect(!walletManager.updateCosigners(of: wallet, to: edit, modelContext: context), "\(name) should be rejected")
       #expect(
         walletManager.errorMessage?.contains(message) == true,
-        "\(name): unexpected message '\(walletManager.errorMessage ?? "nil")'"
+        "\(name): unexpected message '\(walletManager.errorMessage ?? "nil")'",
       )
       #expect(state(of: wallet) == before, "\(name) changed the wallet")
     }
   }
 
   /// The same key entered once as a tpub and once as a Vpub is still one key.
-  @Test func rejectDuplicateAcrossFormats() throws {
+  @Test func `reject duplicate across formats`() throws {
     let container = try createTestContainer()
     let context = ModelContext(container)
     let wallet = try makeWallet(in: context)
@@ -202,7 +202,7 @@ struct CosignerEditTests {
   /// Wallets saved before keys had to sit at the BIP48 path are not re-checked:
   /// a key already in the wallet does not block other edits. Bringing in another
   /// key that is off the path is still refused.
-  @Test func keyAlreadyInWalletIsNotRecheckedForPlacement() throws {
+  @Test func `key already in wallet is not rechecked for placement`() throws {
     var legacy = Self.cosignerC
     legacy.xpub = Self.keyCWithDepth0
 
@@ -237,7 +237,7 @@ struct CosignerEditTests {
 
   /// New descriptors need a fresh BDK database; a rejected edit must keep the
   /// one that matches the descriptors still in place.
-  @Test func onlySavedEditClearsWalletDatabase() throws {
+  @Test func `only saved edit clears wallet database`() throws {
     let container = try createTestContainer()
     let context = ModelContext(container)
     let wallet = try makeWallet(in: context)

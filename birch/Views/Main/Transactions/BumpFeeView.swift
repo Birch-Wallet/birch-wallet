@@ -35,7 +35,7 @@ struct BumpFeeView: View {
           if !$0 {
             viewModel.errorMessage = nil
           }
-        }
+        },
       )) {
         Button("OK") { viewModel.errorMessage = nil }
       } message: {
@@ -227,8 +227,8 @@ private struct BumpFeeRateCard: View {
             .strokeBorder(
               viewModel.selectedFeePreset == .custom && !viewModel.isValidFeeRate && !viewModel.newFeeRate.isEmpty
                 ? Color.hbError.opacity(0.8) : .clear,
-              lineWidth: 1.5
-            )
+              lineWidth: 1.5,
+            ),
         )
         .onChange(of: viewModel.newFeeRate) { oldValue, newValue in
           // Reject a keystroke that isn't a number, adds a third decimal or
@@ -236,7 +236,7 @@ private struct BumpFeeRateCard: View {
           let filtered = InputLimits.sanitizeDecimal(
             newValue, old: oldValue,
             max: Decimal(InputLimits.maxFeeRate),
-            fractionDigits: InputLimits.feeRateFractionDigits
+            fractionDigits: InputLimits.feeRateFractionDigits,
           )
           if filtered != newValue {
             viewModel.newFeeRate = filtered
@@ -314,7 +314,7 @@ private struct BumpFeePSBTDisplayView: View {
         SignatureProgressView(
           collected: viewModel.signaturesCollected,
           required: viewModel.requiredSignatures,
-          signerStatus: viewModel.signerStatus
+          signerStatus: viewModel.signerStatus,
         )
         .onGeometryChange(for: CGFloat.self, of: \.size.height) { progressHeight = $0 }
 
@@ -330,7 +330,7 @@ private struct BumpFeePSBTDisplayView: View {
                   data: bytes,
                   urType: "crypto-psbt",
                   framesPerSecond: framesPerSecond,
-                  maxFragmentLen: effectiveDensity.urFragmentLen
+                  maxFragmentLen: effectiveDensity.urFragmentLen,
                 )
                 .id("\(effectiveDensity.urFragmentLen)-\(compactPSBT)")
               } else {
@@ -338,7 +338,7 @@ private struct BumpFeePSBTDisplayView: View {
                   data: bytes,
                   fileType: .psbt,
                   framesPerSecond: framesPerSecond,
-                  maxVersion: effectiveDensity.bbqrMaxVersion
+                  maxVersion: effectiveDensity.bbqrMaxVersion,
                 )
                 .id("\(effectiveDensity.rawValue)-bbqr-\(compactPSBT)")
               }
@@ -400,7 +400,7 @@ private struct BumpFeePSBTDisplayView: View {
               Spacer()
               Picker("", selection: Binding(
                 get: { effectiveDensity.rawValue },
-                set: { qrDensityRaw = $0 }
+                set: { qrDensityRaw = $0 },
               )) {
                 ForEach(QRDensity.available(forHeight: qrDisplayHeight), id: \.self) { density in
                   Text(density.rawValue).tag(density.rawValue)
@@ -539,7 +539,7 @@ private struct BumpFeePSBTDisplayView: View {
       isPresented: $showExportFile,
       document: PSBTFileDocument(data: viewModel.psbtBytes),
       contentType: .data,
-      defaultFilename: "transaction.psbt"
+      defaultFilename: "transaction.psbt",
     ) { _ in }
   }
 }
@@ -561,7 +561,7 @@ private struct BumpFeePSBTScanView: View {
 
       SignatureProgressView(
         collected: viewModel.signaturesCollected,
-        required: viewModel.requiredSignatures
+        required: viewModel.requiredSignatures,
       )
 
       URScannerSheet(preferMacroCamera: true, expectedTypes: [.psbt]) { result in
@@ -609,7 +609,7 @@ private struct BumpFeePSBTScanView: View {
     .fileImporter(
       isPresented: $showImportFile,
       allowedContentTypes: [.data, .plainText],
-      allowsMultipleSelection: false
+      allowsMultipleSelection: false,
     ) { result in
       if case let .success(urls) = result, let url = urls.first {
         guard url.startAccessingSecurityScopedResource() else { return }

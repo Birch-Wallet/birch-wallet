@@ -244,11 +244,9 @@ struct CosignerImportView: View {
     switch result {
     case .hdKey(var xpub, let fingerprint, let derivationPath):
       // Validate derivation path network before accepting the scan
-      if !derivationPath.isEmpty {
-        if let error = viewModel.validateDerivationPath(derivationPath) {
-          viewModel.cosignerErrors[idx, default: [:]][.xpub] = error
-          return
-        }
+      if !derivationPath.isEmpty, let error = viewModel.validateDerivationPath(derivationPath) {
+        viewModel.cosignerErrors[idx, default: [:]][.xpub] = error
+        return
       }
 
       // Auto-convert any xpub/tpub/Zpub/Vpub to the standard format for the network
@@ -311,9 +309,9 @@ private struct CosignerTabs: View {
             number: index + 1,
             isOpen: isOpen,
             isComplete: viewModel.isCosignerComplete(index),
-            action: { viewModel.openCosigner(index) }
+            action: { viewModel.openCosigner(index) },
           ),
-          fixedWidth: fixedWidth
+          fixedWidth: fixedWidth,
         )
         .zIndex(isOpen ? 1 : 0)
         .id(index)
@@ -391,8 +389,8 @@ private struct CosignerTab: View {
           LinearGradient(
             stops: [.init(color: sheen, location: 0), .init(color: Color.hbSurface, location: 0.8)],
             startPoint: .top,
-            endPoint: .bottom
-          )
+            endPoint: .bottom,
+          ),
         )
       }
     } else {
@@ -410,7 +408,7 @@ private struct CosignerTab: View {
               .init(color: shadeColor.opacity(shade * 0.5), location: 1),
             ],
             startPoint: .top,
-            endPoint: .bottom
+            endPoint: .bottom,
           )
           .frame(height: 9)
         }

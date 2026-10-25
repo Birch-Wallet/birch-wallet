@@ -90,7 +90,7 @@ struct UTXOFilterSheet: View {
       logger.info(
         "UTXO filter: spendable=\(filter.showSpendable) frozen=\(filter.showFrozen) "
           + "spent=\(filter.showSpent) change=\(filter.showChange) "
-          + "sort=\(filter.sort.rawValue) ascending=\(filter.ascending)"
+          + "sort=\(filter.sort.rawValue) ascending=\(filter.ascending)",
       )
     }
   }

@@ -57,7 +57,7 @@ struct UTXOFilter: Equatable {
     to items: [UTXOItem],
     isFrozen: (UTXOItem) -> Bool,
     label: (UTXOItem) -> String?,
-    date: (UTXOItem) -> Date?
+    date: (UTXOItem) -> Date?,
   ) -> [UTXOItem] {
     let visible = items.filter { item in
       if !showChange, item.keychain == .internal {
@@ -89,7 +89,7 @@ struct UTXOFilter: Equatable {
     case .label:
       let labels = Dictionary(
         visible.map { ($0.id, label($0)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") },
-        uniquingKeysWith: { first, _ in first }
+        uniquingKeysWith: { first, _ in first },
       )
       return visible.sorted { a, b in
         let la = labels[a.id]!, lb = labels[b.id]!

@@ -344,14 +344,13 @@ struct ConnectionStatusView: View {
       do {
         let height = try await service.testElectrumConnection(config: config)
         let network = wallet.bitcoinNetwork
-        if network != .signet {
-          if let detected = try? await service.detectElectrumNetwork(config: config),
-             detected != network
-          {
-            testResult = "Warning: Server is \(detected.displayName), expected \(network.displayName)"
-            isTesting = false
-            return
-          }
+        if network != .signet,
+           let detected = try? await service.detectElectrumNetwork(config: config),
+           detected != network
+        {
+          testResult = "Warning: Server is \(detected.displayName), expected \(network.displayName)"
+          isTesting = false
+          return
         }
         testResult = "Success — \(network.displayName) Chain Tip Height \(height)"
       } catch {

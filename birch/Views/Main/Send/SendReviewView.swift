@@ -217,7 +217,7 @@ struct SendReviewView: View {
       PSBTInspectorView.forCurrentWallet(
         psbtBytes: viewModel.psbtBytes,
         compactEnabled: compactPSBT,
-        requiredSignatures: viewModel.requiredSignatures
+        requiredSignatures: viewModel.requiredSignatures,
       )
       .birchSheet()
     }
@@ -302,7 +302,7 @@ struct TransactionFlowDiagram: View {
             path.addCurve(
               to: CGPoint(x: centerX, y: mergeY),
               control1: CGPoint(x: centerX * 0.75, y: y),
-              control2: CGPoint(x: centerX * 0.85, y: mergeY)
+              control2: CGPoint(x: centerX * 0.85, y: mergeY),
             )
             context.stroke(path, with: .color(Color.hbBitcoinOrange.opacity(0.35)), lineWidth: 1.5)
           }
@@ -315,7 +315,7 @@ struct TransactionFlowDiagram: View {
             path.addCurve(
               to: CGPoint(x: w - centerX * 0.45, y: y),
               control1: CGPoint(x: centerX * 1.15, y: mergeY),
-              control2: CGPoint(x: centerX * 1.25, y: y)
+              control2: CGPoint(x: centerX * 1.25, y: y),
             )
             context.stroke(path, with: .color(color.opacity(0.35)), lineWidth: 1.5)
           }

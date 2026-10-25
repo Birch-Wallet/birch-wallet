@@ -131,7 +131,7 @@ struct DescriptorImportView: View {
         fontSize: 11,
         placeholder: "wsh(sortedmulti(M,[fp/path]xpub/0/*,...))",
         minHeight: 120,
-        fillsHeight: fillsHeight
+        fillsHeight: fillsHeight,
       )
       .padding(12)
       .birchCard(.nested)

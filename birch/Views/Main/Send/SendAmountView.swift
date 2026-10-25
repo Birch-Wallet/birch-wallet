@@ -70,12 +70,12 @@ struct SendRecipientsView: View {
     }
     .animation(.easeInOut(duration: 0.15), value: keyboardVisible)
     .onReceive(NotificationCenter.default.publisher(
-      for: UIResponder.keyboardWillShowNotification
+      for: UIResponder.keyboardWillShowNotification,
     )) { _ in
       keyboardVisible = true
     }
     .onReceive(NotificationCenter.default.publisher(
-      for: UIResponder.keyboardWillHideNotification
+      for: UIResponder.keyboardWillHideNotification,
     )) { _ in
       keyboardVisible = false
     }
@@ -123,7 +123,7 @@ struct SendRecipientsView: View {
 
 private func dismissKeyboard() {
   UIApplication.shared.sendAction(
-    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil,
   )
 }
 
@@ -143,7 +143,7 @@ private struct KeyboardDismissButton: View {
         .background(
           Circle()
             .fill(Color.hbSurface)
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+            .shadow(color: .black.opacity(0.15), radius: 6, y: 2),
         )
         .contentShape(Circle())
     }
@@ -445,7 +445,7 @@ private struct AmountHeroCard: View {
               if !isMaxActive {
                 viewModel.recalculateMaxIfNeeded()
               }
-            }
+            },
           )
         } else {
           TextField("0", text: $viewModel.recipients[index].amountSats)
@@ -486,7 +486,7 @@ private struct AmountHeroCard: View {
         viewModel.fiatDisplayAmount[id] = newValue
         viewModel.updateSatsFromFiat(for: index)
         viewModel.recalculateMaxIfNeeded()
-      }
+      },
     )
   }
 }
@@ -872,7 +872,7 @@ private struct RecipientCard: View {
                   if index < viewModel.recipients.count, !viewModel.recipients[index].isSendMax {
                     viewModel.recalculateMaxIfNeeded()
                   }
-                }
+                },
               )
             } else {
               TextField("0", text: $viewModel.recipients[index].amountSats)
@@ -941,7 +941,7 @@ private struct RecipientCard: View {
         viewModel.fiatDisplayAmount[viewModel.recipients[index].id] = newValue
         viewModel.updateSatsFromFiat(for: index)
         viewModel.recalculateMaxIfNeeded()
-      }
+      },
     )
   }
 }
@@ -975,7 +975,7 @@ private struct DecisionStack: View {
         subtitle: feeSubtitle,
         subtitleColor: viewModel.feeRateValue > 0 ? Color.hbTextSecondary : Color.hbBitcoinOrange,
         badge: viewModel.selectedFeePreset == .custom ? nil : viewModel.selectedFeePreset.displayName,
-        action: { viewModel.showFeeSheet = true }
+        action: { viewModel.showFeeSheet = true },
       )
 
       HBDivider()
@@ -985,7 +985,7 @@ private struct DecisionStack: View {
         subtitle: coinsSubtitle,
         subtitleColor: viewModel.manualUTXOSelection ? Color.hbBitcoinOrange : Color.hbTextSecondary,
         badge: nil,
-        action: { viewModel.showUTXOPicker = true }
+        action: { viewModel.showUTXOPicker = true },
       )
 
       if viewModel.showValidationErrors, !viewModel.isValidFeeRate {
@@ -1005,7 +1005,7 @@ private struct DecisionStack: View {
     subtitle: String,
     subtitleColor: Color,
     badge: String?,
-    action: @escaping () -> Void
+    action: @escaping () -> Void,
   ) -> some View {
     Button(action: action) {
       HStack(spacing: 12) {
@@ -1136,7 +1136,7 @@ struct UTXOPickerSheet: View {
                 utxo: utxo,
                 isSelected: viewModel.selectedUTXOIds.contains(utxo.id),
                 label: utxoLabel(for: utxo),
-                onToggle: { viewModel.toggleUTXOSelection(utxo.id) }
+                onToggle: { viewModel.toggleUTXOSelection(utxo.id) },
               )
             }
 

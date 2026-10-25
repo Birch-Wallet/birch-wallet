@@ -77,7 +77,7 @@ extension PSBTFlowManaging {
       let previousBytes = psbtBytes
       let (updatedBase64, updatedBytes) = try await psbtBitcoinService.combinePSBTs(
         original: psbtBytes,
-        signed: signedBytes
+        signed: signedBytes,
       )
 
       // combine() pins the unsigned transaction, but it still adopts the other PSBT's

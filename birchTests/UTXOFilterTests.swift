@@ -11,11 +11,11 @@ struct UTXOFilterTests {
     vout: UInt32 = 0,
     amount: UInt64 = 1000,
     keychain: UTXOItem.KeychainKind = .external,
-    isSpent: Bool = false
+    isSpent: Bool = false,
   ) -> UTXOItem {
     UTXOItem(
       txid: txid, vout: vout, amount: amount, isConfirmed: true,
-      keychain: keychain, derivationIndex: 0, isSpent: isSpent
+      keychain: keychain, derivationIndex: 0, isSpent: isSpent,
     )
   }
 
@@ -24,19 +24,19 @@ struct UTXOFilterTests {
     to items: [UTXOItem],
     frozen: Set<String> = [],
     labels: [String: String] = [:],
-    dates: [String: Date] = [:]
+    dates: [String: Date] = [:],
   ) -> [String] {
     filter.apply(
       to: items,
       isFrozen: { frozen.contains($0.id) },
       label: { labels[$0.id] },
-      date: { dates[$0.id] }
+      date: { dates[$0.id] },
     ).map(\.txid)
   }
 
   // MARK: - Persistence
 
-  @Test func rawValueRoundTrip() {
+  @Test func `raw value round trip`() {
     var filter = UTXOFilter()
     filter.showSpent = true
     filter.showChange = false
@@ -45,7 +45,7 @@ struct UTXOFilterTests {
     #expect(UTXOFilter(rawValue: filter.rawValue) == filter)
   }
 
-  @Test func missingKeysFallBackToDefaults() {
+  @Test func `missing keys fall back to defaults`() {
     // A value saved before a field existed keeps what it had and defaults the rest
     let filter = UTXOFilter(rawValue: #"{"showSpent":true}"#)
     var expected = UTXOFilter()
@@ -53,12 +53,12 @@ struct UTXOFilterTests {
     #expect(filter == expected)
   }
 
-  @Test func unreadableValueFallsBackToDefaults() {
+  @Test func `unreadable value falls back to defaults`() {
     #expect(UTXOFilter(rawValue: "not json") == UTXOFilter())
     #expect(UTXOFilter(rawValue: #"{"sort":"someFutureKey"}"#) == UTXOFilter())
   }
 
-  @Test func defaultsShowTodaysList() {
+  @Test func `defaults show todays list`() {
     let filter = UTXOFilter()
     #expect(filter.showSpendable && filter.showFrozen && filter.showChange)
     #expect(!filter.showSpent)
@@ -66,7 +66,7 @@ struct UTXOFilterTests {
     #expect(!filter.isFiltering)
   }
 
-  @Test func isFilteringIgnoresSort() {
+  @Test func `is filtering ignores sort`() {
     var filter = UTXOFilter()
     filter.sort = .label
     filter.ascending = true
@@ -84,19 +84,19 @@ struct UTXOFilterTests {
     makeUTXO("change", keychain: .internal),
   ]
 
-  @Test func defaultHidesOnlySpent() {
+  @Test func `default hides only spent`() {
     let result = Self.apply(UTXOFilter(), to: Self.mixed, frozen: ["frozen:0"])
     #expect(Set(result) == ["spendable", "frozen", "change"])
   }
 
-  @Test func showSpentIncludesSpent() {
+  @Test func `show spent includes spent`() {
     var filter = UTXOFilter()
     filter.showSpent = true
     let result = Self.apply(filter, to: Self.mixed, frozen: ["frozen:0"])
     #expect(Set(result) == ["spendable", "frozen", "spent", "change"])
   }
 
-  @Test func hideFrozenAndSpendable() {
+  @Test func `hide frozen and spendable`() {
     var filter = UTXOFilter()
     filter.showFrozen = false
     #expect(Set(Self.apply(filter, to: Self.mixed, frozen: ["frozen:0"])) == ["spendable", "change"])
@@ -106,7 +106,7 @@ struct UTXOFilterTests {
     #expect(Set(Self.apply(filter, to: Self.mixed, frozen: ["frozen:0"])) == ["frozen"])
   }
 
-  @Test func spentIgnoresFrozenToggles() {
+  @Test func `spent ignores frozen toggles`() {
     // A leftover freeze record on a spent output must not hide it
     var filter = UTXOFilter()
     filter.showSpent = true
@@ -115,7 +115,7 @@ struct UTXOFilterTests {
     #expect(Self.apply(filter, to: Self.mixed, frozen: ["spent:0"]) == ["spent"])
   }
 
-  @Test func hideChange() {
+  @Test func `hide change`() {
     var filter = UTXOFilter()
     filter.showChange = false
     filter.showSpent = true
@@ -124,7 +124,7 @@ struct UTXOFilterTests {
 
   // MARK: - Sorting
 
-  @Test func ageSortTreatsUndatedAsNewest() {
+  @Test func `age sort treats undated as newest`() {
     let items = [Self.makeUTXO("old"), Self.makeUTXO("pending"), Self.makeUTXO("new")]
     let dates = ["old:0": Date(timeIntervalSince1970: 1000), "new:0": Date(timeIntervalSince1970: 2000)]
     var filter = UTXOFilter()
@@ -133,7 +133,7 @@ struct UTXOFilterTests {
     #expect(Self.apply(filter, to: items, dates: dates) == ["old", "new", "pending"])
   }
 
-  @Test func spentSortsInlineByAge() {
+  @Test func `spent sorts inline by age`() {
     let items = [Self.makeUTXO("a"), Self.makeUTXO("b", isSpent: true), Self.makeUTXO("c")]
     let dates = [
       "a:0": Date(timeIntervalSince1970: 3000),
@@ -145,7 +145,7 @@ struct UTXOFilterTests {
     #expect(Self.apply(filter, to: items, dates: dates) == ["a", "b", "c"])
   }
 
-  @Test func amountSort() {
+  @Test func `amount sort`() {
     let items = [Self.makeUTXO("mid", amount: 500), Self.makeUTXO("big", amount: 900), Self.makeUTXO("small", amount: 100)]
     var filter = UTXOFilter()
     filter.sort = .amount
@@ -155,7 +155,7 @@ struct UTXOFilterTests {
     #expect(Self.apply(filter, to: items) == ["small", "mid", "big"])
   }
 
-  @Test func labelSortKeepsUnlabeledLast() {
+  @Test func `label sort keeps unlabeled last`() {
     let items = [Self.makeUTXO("none"), Self.makeUTXO("b"), Self.makeUTXO("a"), Self.makeUTXO("blank")]
     let labels = ["a:0": "apple", "b:0": "Banana", "blank:0": "  "]
     var filter = UTXOFilter()
@@ -167,7 +167,7 @@ struct UTXOFilterTests {
     #expect(Set(Self.apply(filter, to: items, labels: labels).suffix(2)) == ["none", "blank"])
   }
 
-  @Test func sortKeyDefaultDirections() {
+  @Test func `sort key default directions`() {
     #expect(!UTXOFilter.SortKey.age.defaultAscending)
     #expect(!UTXOFilter.SortKey.amount.defaultAscending)
     #expect(UTXOFilter.SortKey.label.defaultAscending)
@@ -175,7 +175,7 @@ struct UTXOFilterTests {
 
   // MARK: - Spending transaction lookup
 
-  @Test func spendingTxidsMapsOutpointsToSpender() {
+  @Test func `spending txids maps outpoints to spender`() {
     let spender = TransactionItem(
       id: "spender", amount: -1000, fee: 200, confirmations: 3,
       timestamp: nil, isIncoming: false,
@@ -183,7 +183,7 @@ struct UTXOFilterTests {
         TransactionItem.TxIO(address: "tb1qa", amount: 600, prevTxid: "fund", prevVout: 1, isMine: true),
         TransactionItem.TxIO(address: "tb1qb", amount: 600, prevTxid: "fund", prevVout: 0, isMine: true),
       ],
-      outputs: []
+      outputs: [],
     )
     let map = UTXOListViewModel.spendingTxids(in: [spender])
     #expect(map == ["fund:1": "spender", "fund:0": "spender"])
@@ -191,7 +191,7 @@ struct UTXOFilterTests {
 
   // MARK: - Label propagation reaches spent outputs
 
-  @Test func addressLabelPropagatesToSpentOutput() throws {
+  @Test func `address label propagates to spent output`() throws {
     let schema = Schema([WalletLabel.self])
     let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
     let context = ModelContext(container)
@@ -203,7 +203,7 @@ struct UTXOFilterTests {
       id: "fund", amount: 5000, fee: nil, confirmations: 10,
       timestamp: nil, isIncoming: true,
       inputs: [],
-      outputs: [TransactionItem.TxIO(address: "tb1qpaid", amount: 5000, prevTxid: nil, prevVout: nil, isMine: true)]
+      outputs: [TransactionItem.TxIO(address: "tb1qpaid", amount: 5000, prevTxid: nil, prevVout: nil, isMine: true)],
     )
     let spent = Self.makeUTXO("fund", amount: 5000, isSpent: true)
     try LabelService.propagateAddressLabels(transactions: [tx], utxos: [spent], context: context, walletID: walletID)

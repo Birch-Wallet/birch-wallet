@@ -20,7 +20,7 @@ struct ReceiveAddressTests {
       descriptor: Descriptor(descriptor: "wpkh(\(tpub)/0/*)", networkKind: kind),
       changeDescriptor: Descriptor(descriptor: "wpkh(\(tpub)/1/*)", networkKind: kind),
       network: BitcoinService.shared.bdkNetwork(from: .testnet4),
-      persister: Persister.newInMemory()
+      persister: Persister.newInMemory(),
     )
     _ = wallet.revealNextAddress(keychain: .external)
     return wallet
@@ -32,7 +32,7 @@ struct ReceiveAddressTests {
 
   // MARK: - Viewing does not move the index
 
-  @Test func repeatedLookupsDoNotAdvanceRevealedIndex() throws {
+  @Test func `repeated lookups do not advance revealed index`() throws {
     let wallet = try Self.makeWallet()
     for _ in 0 ..< 10 {
       let (info, didReveal) = BitcoinService.availableReceiveAddress(in: wallet, from: 0, taken: [])
@@ -42,7 +42,7 @@ struct ReceiveAddressTests {
     #expect(wallet.derivationIndex(keychain: .external) == 0)
   }
 
-  @Test func skipsTakenAddressesAndRevealsOnce() throws {
+  @Test func `skips taken addresses and reveals once`() throws {
     let wallet = try Self.makeWallet()
     let taken: Set<String> = [Self.address(wallet, 0), Self.address(wallet, 1)]
 
@@ -59,7 +59,7 @@ struct ReceiveAddressTests {
 
   // MARK: - Next Address steps by one
 
-  @Test func nextAddressStepsFromTheOneShown() throws {
+  @Test func `next address steps from the one shown`() throws {
     let wallet = try Self.makeWallet()
     // A reveal counter inflated by the old behaviour must not make the step jump
     _ = wallet.revealAddressesTo(keychain: .external, index: 12)
@@ -70,7 +70,7 @@ struct ReceiveAddressTests {
     #expect(wallet.derivationIndex(keychain: .external) == 12)
   }
 
-  @Test func nextAddressSkipsTaken() throws {
+  @Test func `next address skips taken`() throws {
     let wallet = try Self.makeWallet()
     let taken: Set<String> = [Self.address(wallet, 1), Self.address(wallet, 2)]
     let next = BitcoinService.availableReceiveAddress(in: wallet, from: 1, taken: taken)
@@ -80,7 +80,7 @@ struct ReceiveAddressTests {
 
   // MARK: - Labeled addresses count as taken
 
-  @Test func labeledAddressesAreOnlyThisWalletsNonEmptyAddressLabels() throws {
+  @Test func `labeled addresses are only this wallets non empty address labels`() throws {
     let schema = Schema([WalletLabel.self])
     let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
     let context = ModelContext(container)
@@ -94,7 +94,7 @@ struct ReceiveAddressTests {
     #expect(LabelService.labeledAddresses(walletID: walletID, context: context) == ["tb1qlabeled"])
   }
 
-  @Test func labeledUnusedAddressIsSkipped() throws {
+  @Test func `labeled unused address is skipped`() throws {
     let wallet = try Self.makeWallet()
     // Address #0 has no transactions but was labeled, i.e. given to a payer
     let labeled: Set<String> = [Self.address(wallet, 0)]

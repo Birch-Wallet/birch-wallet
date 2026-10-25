@@ -125,7 +125,7 @@ struct PSBTDisplayView: View {
         SignatureProgressView(
           collected: viewModel.signaturesCollected,
           required: viewModel.requiredSignatures,
-          signerStatus: viewModel.signerStatus
+          signerStatus: viewModel.signerStatus,
         )
         .onGeometryChange(for: CGFloat.self, of: \.size.height) { progressHeight = $0 }
 
@@ -144,7 +144,7 @@ struct PSBTDisplayView: View {
                   data: bytes,
                   urType: "crypto-psbt",
                   framesPerSecond: framesPerSecond,
-                  maxFragmentLen: effectiveDensity.urFragmentLen
+                  maxFragmentLen: effectiveDensity.urFragmentLen,
                 )
                 .id("\(effectiveDensity.urFragmentLen)-\(compactPSBT)")
               } else {
@@ -152,7 +152,7 @@ struct PSBTDisplayView: View {
                   data: bytes,
                   fileType: .psbt,
                   framesPerSecond: framesPerSecond,
-                  maxVersion: effectiveDensity.bbqrMaxVersion
+                  maxVersion: effectiveDensity.bbqrMaxVersion,
                 )
                 .id("\(effectiveDensity.rawValue)-bbqr-\(compactPSBT)")
               }
@@ -221,7 +221,7 @@ struct PSBTDisplayView: View {
               Spacer()
               Picker("", selection: Binding(
                 get: { effectiveDensity.rawValue },
-                set: { qrDensityRaw = $0 }
+                set: { qrDensityRaw = $0 },
               )) {
                 ForEach(QRDensity.available(forHeight: qrDisplayHeight), id: \.self) { density in
                   Text(density.rawValue).tag(density.rawValue)
@@ -347,7 +347,7 @@ struct PSBTDisplayView: View {
       PSBTInspectorView.forCurrentWallet(
         psbtBytes: viewModel.psbtBytes,
         compactEnabled: compactPSBT,
-        requiredSignatures: viewModel.requiredSignatures
+        requiredSignatures: viewModel.requiredSignatures,
       )
       .birchSheet()
     }
@@ -420,7 +420,7 @@ struct PSBTDisplayView: View {
       isPresented: $showExportFile,
       document: PSBTFileDocument(data: viewModel.psbtBytes),
       contentType: .data,
-      defaultFilename: "transaction.psbt"
+      defaultFilename: "transaction.psbt",
     ) { _ in }
   }
 }
@@ -591,8 +591,8 @@ struct SignatureProgressView: View {
               RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .strokeBorder(
                   isSigned ? Color.hbBitcoinOrange : Color.hbBorder,
-                  lineWidth: isSigned ? 2 : 1
-                )
+                  lineWidth: isSigned ? 2 : 1,
+                ),
             )
             .overlay {
               if isSigned {
@@ -617,7 +617,7 @@ struct SignatureProgressView: View {
                 if !$0 {
                   tappedIndex = nil
                 }
-              }
+              },
             )) {
               if let signer {
                 VStack(alignment: .leading, spacing: 4) {

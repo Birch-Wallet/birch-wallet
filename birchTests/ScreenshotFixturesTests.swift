@@ -22,26 +22,26 @@ import Testing
         .map { "\($0.txid):\($0.vout)" }
     }
 
-    @Test func oneCoinWhenTheLargestCovers() {
+    @Test func `one coin when the largest covers`() {
       // 50,000 covers 45,000 and the 296 sat estimate for one input
       #expect(Self.picked(45000) == ["bb:0"])
     }
 
-    @Test func largestFirstUntilCovered() {
+    @Test func `largest first until covered`() {
       // 50,000 falls short of 60,296; adding 30,000 covers 60,496
       #expect(Self.picked(60000) == ["bb:0", "dd:0"])
     }
 
-    @Test func equalCoinsInOutpointOrder() {
+    @Test func `equal coins in outpoint order`() {
       let utxos = [Self.coin("bb", 0, 10000), Self.coin("aa", 1, 10000), Self.coin("aa", 0, 10000)]
       #expect(Self.picked(15000, from: utxos) == ["aa:0", "aa:1"])
     }
 
-    @Test func everyCoinWhenTheyFallShort() {
+    @Test func `every coin when they fall short`() {
       #expect(Self.picked(200_000) == ["bb:0", "dd:0", "cc:1", "aa:0"])
     }
 
-    @Test func walletIDFollowsTheDescriptor() {
+    @Test func `wallet ID follows the descriptor`() {
       let a = ScreenshotFixtures.walletID(for: "wsh(sortedmulti(1,a))")
       #expect(a == ScreenshotFixtures.walletID(for: "wsh(sortedmulti(1,a))"))
       #expect(a != ScreenshotFixtures.walletID(for: "wsh(sortedmulti(1,b))"))

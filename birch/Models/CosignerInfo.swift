@@ -17,7 +17,7 @@ final class CosignerInfo {
     xpub: String,
     fingerprint: String,
     derivationPath: String,
-    orderIndex: Int
+    orderIndex: Int,
   ) {
     self.id = id
     self.label = label

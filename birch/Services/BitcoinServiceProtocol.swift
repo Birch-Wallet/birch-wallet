@@ -14,7 +14,7 @@ protocol BitcoinServiceProtocol {
     recipients: [(address: String, amount: UInt64, isSendMax: Bool)],
     feeRate: Double,
     utxos: [(txid: String, vout: UInt32)]?,
-    unspendable: Set<String>
+    unspendable: Set<String>,
   ) async throws -> BitcoinService.PSBTResult
 
   func createBumpFeePSBT(txid: String, feeRate: Double) async throws -> BitcoinService.PSBTResult

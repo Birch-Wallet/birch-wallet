@@ -22,50 +22,50 @@ struct ResumePSBTPromptTests {
       inputCount: 1,
       manualUTXOSelection: false,
       selectedUTXOIds: "",
-      inputOutpoints: ""
+      inputOutpoints: "",
     )
     saved.updatedAt = now.addingTimeInterval(-savedAgo)
     return saved
   }
 
-  @Test func recentPSBTIsOffered() {
+  @Test func `recent PSBT is offered`() {
     let saved = Self.makePSBT(savedAgo: 60 * 60)
     #expect(SavedPSBT.resumeCandidate(in: [saved], walletID: Self.walletID, now: Self.now) === saved)
   }
 
-  @Test func psbtJustInsideWindowIsOffered() {
+  @Test func `psbt just inside window is offered`() {
     let saved = Self.makePSBT(savedAgo: SavedPSBT.resumePromptWindow - 60)
     #expect(SavedPSBT.resumeCandidate(in: [saved], walletID: Self.walletID, now: Self.now) === saved)
   }
 
-  @Test func psbtAtOrPastWindowIsNotOffered() {
+  @Test func `psbt at or past window is not offered`() {
     let atWindow = Self.makePSBT(savedAgo: SavedPSBT.resumePromptWindow)
     let past = Self.makePSBT(savedAgo: SavedPSBT.resumePromptWindow + 60)
     #expect(SavedPSBT.resumeCandidate(in: [atWindow], walletID: Self.walletID, now: Self.now) == nil)
     #expect(SavedPSBT.resumeCandidate(in: [past], walletID: Self.walletID, now: Self.now) == nil)
   }
 
-  @Test func newestIsChosenRegardlessOfOrder() {
+  @Test func `newest is chosen regardless of order`() {
     let older = Self.makePSBT(savedAgo: 5 * 60 * 60)
     let newer = Self.makePSBT(savedAgo: 60)
     #expect(SavedPSBT.resumeCandidate(in: [older, newer], walletID: Self.walletID, now: Self.now) === newer)
   }
 
   /// Only the most recent PSBT is ever offered — an older one is never promoted.
-  @Test func staleNewestDoesNotFallBackToOlder() {
+  @Test func `stale newest does not fall back to older`() {
     let stale = Self.makePSBT(savedAgo: 3 * 24 * 60 * 60)
     let older = Self.makePSBT(savedAgo: 4 * 24 * 60 * 60)
     #expect(SavedPSBT.resumeCandidate(in: [stale, older], walletID: Self.walletID, now: Self.now) == nil)
   }
 
-  @Test func otherWalletsPSBTsAreIgnored() {
+  @Test func `other wallets PSB ts are ignored`() {
     let otherWallet = Self.makePSBT(walletID: UUID(), savedAgo: 60)
     let ours = Self.makePSBT(savedAgo: 2 * 60 * 60)
     #expect(SavedPSBT.resumeCandidate(in: [otherWallet], walletID: Self.walletID, now: Self.now) == nil)
     #expect(SavedPSBT.resumeCandidate(in: [otherWallet, ours], walletID: Self.walletID, now: Self.now) === ours)
   }
 
-  @Test func emptyListOffersNothing() {
+  @Test func `empty list offers nothing`() {
     #expect(SavedPSBT.resumeCandidate(in: [], walletID: Self.walletID, now: Self.now) == nil)
   }
 }
