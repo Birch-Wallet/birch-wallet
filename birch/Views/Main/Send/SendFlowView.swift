@@ -72,6 +72,16 @@ struct SendFlowView: View {
           }
         }
       }
+      .overlayPreferenceValue(FiatHintAnchorKey.self) { anchor in
+        GeometryReader { proxy in
+          if viewModel.showFiatHint, let anchor {
+            FiatHintOverlay(pillFrame: proxy[anchor], containerWidth: proxy.size.width) {
+              withAnimation(.spring(duration: 0.25, bounce: 0.15)) { viewModel.showFiatHint = false }
+            }
+          }
+        }
+        .allowsHitTesting(viewModel.showFiatHint)
+      }
       .navigationTitle("")
       .alert("Error", isPresented: .init(
         get: { viewModel.errorMessage != nil },
@@ -90,6 +100,13 @@ struct SendFlowView: View {
       loadFrozenOutpoints()
       viewModel.loadBalance()
       checkForResumablePSBT()
+    }
+    .onChange(of: selectedTab) {
+      // The tab bar stays live above the callout, so a tap on Settings
+      // switches tabs and clears it in one go
+      if selectedTab != 1 {
+        viewModel.showFiatHint = false
+      }
     }
     .onChange(of: frozenUTXOs.count) {
       loadFrozenOutpoints()
@@ -173,6 +190,111 @@ struct SendFlowView: View {
     } else {
       viewModel.loadSavedPSBT(saved)
     }
+  }
+}
+
+// MARK: - Fiat Hint
+
+/// The unit pill on the recipients step reports its bounds here, so the
+/// callout can hang beneath whichever pill is showing: the amount card's with
+/// one recipient, the Spendable header's with several.
+struct FiatHintAnchorKey: PreferenceKey {
+  static var defaultValue: Anchor<CGRect>? {
+    nil
+  }
+
+  static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+    value = value ?? nextValue()
+  }
+}
+
+/// Dims the Send tab and points at the unit pill to say fiat entry is off.
+/// A tap anywhere but the callout dismisses it.
+private struct FiatHintOverlay: View {
+  let pillFrame: CGRect
+  let containerWidth: CGFloat
+  let onDismiss: () -> Void
+
+  private let gutter: CGFloat = 16
+  private let arrowSize = CGSize(width: 16, height: 8)
+
+  private var cardWidth: CGFloat {
+    min(260, containerWidth - gutter * 2)
+  }
+
+  /// Trailing edge lines up with the pill, kept inside the side gutters
+  private var cardX: CGFloat {
+    min(max(pillFrame.maxX - cardWidth, gutter), containerWidth - gutter - cardWidth)
+  }
+
+  /// The arrow's leading edge, relative to the card
+  private var arrowX: CGFloat {
+    min(max(pillFrame.midX - cardX - arrowSize.width / 2, 12), cardWidth - 12 - arrowSize.width)
+  }
+
+  var body: some View {
+    ZStack(alignment: .topLeading) {
+      Color.black.opacity(0.35)
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onDismiss)
+        .accessibilityLabel("Dismiss")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default, onDismiss)
+        .transition(.opacity)
+
+      callout
+        .offset(x: cardX, y: pillFrame.maxY + 4)
+        .transition(.scale(
+          scale: 0.9,
+          anchor: UnitPoint(x: (arrowX + arrowSize.width / 2) / cardWidth, y: 0),
+        ).combined(with: .opacity))
+    }
+  }
+
+  private var callout: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      CalloutArrow()
+        .fill(Color.hbFloating)
+        .frame(width: arrowSize.width, height: arrowSize.height)
+        .offset(x: arrowX)
+
+      HStack(alignment: .top, spacing: 10) {
+        Image(systemName: "info.circle.fill")
+          .font(.system(size: 17))
+          .foregroundStyle(Color.hbSteelBlue)
+
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Fiat is off")
+            .font(.hbBody(15).weight(.semibold))
+            .foregroundStyle(Color.hbTextPrimary)
+          Text("Turn on Show Fiat Price in Settings to enter amounts in your local currency.")
+            .font(.hbBody(13))
+            .foregroundStyle(Color.hbTextSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+      .padding(14)
+      .frame(width: cardWidth, alignment: .leading)
+      .background(Color.hbFloating, in: .rect(cornerRadius: 12, style: .continuous))
+    }
+    .compositingGroup()
+    .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .combine)
+    .accessibilityAction(.escape, onDismiss)
+  }
+}
+
+/// An upward-pointing triangle that joins the callout to the pill above it
+private struct CalloutArrow: Shape {
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+    path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.closeSubpath()
+    return path
   }
 }
 

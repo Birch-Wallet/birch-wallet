@@ -17,9 +17,6 @@ struct SendRecipientsView: View {
   var body: some View {
     ScrollView {
       VStack(spacing: 14) {
-        SendStepIndicator(currentStep: viewModel.currentStep)
-          .padding(.bottom, 4)
-
         if isMultiRecipient {
           spendableHeader
         }
@@ -155,7 +152,8 @@ private struct KeyboardDismissButton: View {
 // MARK: - Currency Toggle Pill
 
 /// Switches the amount between the Bitcoin unit and fiat. Falls back to a
-/// static unit pill when fiat is off or no rate has loaded.
+/// static unit pill when fiat is off or no rate has loaded; with fiat off, a
+/// tap brings up the callout pointing to Settings (`FiatHintOverlay`).
 private struct CurrencyTogglePill: View {
   @Bindable var viewModel: SendViewModel
   @AppStorage(Constants.fiatEnabledKey) private var fiatEnabled = false
@@ -165,6 +163,12 @@ private struct CurrencyTogglePill: View {
   }
 
   var body: some View {
+    pill
+      .anchorPreference(key: FiatHintAnchorKey.self, value: .bounds) { $0 }
+  }
+
+  @ViewBuilder
+  private var pill: some View {
     if fiatEnabled, viewModel.canToggleFiat {
       Button(action: { viewModel.toggleAmountCurrency() }) {
         HStack(spacing: 4) {
@@ -180,15 +184,29 @@ private struct CurrencyTogglePill: View {
         .clipShape(Capsule())
       }
       .buttonStyle(.plain)
+    } else if !fiatEnabled {
+      Button(action: {
+        dismissKeyboard()
+        withAnimation(.spring(duration: 0.25, bounce: 0.15)) { viewModel.showFiatHint = true }
+      }) {
+        staticPill
+      }
+      .buttonStyle(.plain)
+      .accessibilityHint("Fiat is off. Shows how to turn it on")
     } else {
-      Text(unitLabel)
-        .font(.hbBody(12).weight(.semibold))
-        .foregroundStyle(Color.hbTextSecondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.hbSurfaceElevated)
-        .clipShape(Capsule())
+      // Fiat is on but no rate has loaded yet
+      staticPill
     }
+  }
+
+  private var staticPill: some View {
+    Text(unitLabel)
+      .font(.hbBody(12).weight(.semibold))
+      .foregroundStyle(Color.hbTextSecondary)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(Color.hbSurfaceElevated)
+      .clipShape(Capsule())
   }
 }
 
@@ -1425,39 +1443,6 @@ class QRScannerUIView: UIView, AVCaptureMetadataOutputObjectsDelegate {
     sessionQueue.async {
       if session.isRunning {
         session.stopRunning()
-      }
-    }
-  }
-}
-
-// MARK: - Step Indicator
-
-struct SendStepIndicator: View {
-  let currentStep: SendViewModel.Step
-
-  private let steps: [(SendViewModel.Step, String)] = [
-    (.recipients, "Recipients"),
-    (.review, "Review"),
-    (.psbtDisplay, "Sign"),
-    (.broadcast, "Broadcast"),
-  ]
-
-  var body: some View {
-    HStack(spacing: 4) {
-      ForEach(steps, id: \.0) { step, label in
-        VStack(spacing: 4) {
-          RoundedRectangle(cornerRadius: 2, style: .continuous)
-            .fill(step.rawValue <= currentStep.rawValue
-              ? Color.hbBitcoinOrange
-              : Color.hbBorder)
-            .frame(height: 3)
-
-          Text(label)
-            .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(step.rawValue <= currentStep.rawValue
-              ? Color.hbBitcoinOrange
-              : Color.hbTextSecondary)
-        }
       }
     }
   }

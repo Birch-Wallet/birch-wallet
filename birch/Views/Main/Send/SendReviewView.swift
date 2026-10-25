@@ -14,9 +14,6 @@ struct SendReviewView: View {
   var body: some View {
     ScrollView {
       VStack(spacing: 24) {
-        SendStepIndicator(currentStep: .review)
-          .padding(.horizontal, 24)
-
         Text("Review Transaction")
           .font(.hbDisplay(22))
           .foregroundStyle(Color.hbTextPrimary)

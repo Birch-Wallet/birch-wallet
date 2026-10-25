@@ -10,9 +10,6 @@ struct PSBTScanView: View {
 
   var body: some View {
     VStack(spacing: 24) {
-      SendStepIndicator(currentStep: .psbtScan)
-        .padding(.horizontal, 24)
-
       Text("Scan Signed PSBT")
         .font(.hbDisplay(22))
         .foregroundStyle(Color.hbTextPrimary)
