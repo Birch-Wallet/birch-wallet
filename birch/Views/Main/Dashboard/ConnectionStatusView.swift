@@ -116,7 +116,7 @@ struct ConnectionStatusView: View {
 
   private var syncStatusSection: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Refresh Status")
+      Text("Sync Status")
         .font(.hbHeadline)
         .foregroundStyle(Color.hbTextPrimary)
 
@@ -133,11 +133,26 @@ struct ConnectionStatusView: View {
         }
       }
 
-      if let lastSync = service.lastSyncDate {
-        InfoRow(label: "Last refresh", value: lastSync.relativeString)
+      // What the sync is doing this moment, in full, and for how long
+      if service.syncState.isSyncing, let action = service.syncAction {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Action")
+            .font(.hbLabel())
+            .foregroundStyle(Color.hbTextSecondary)
+          TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Text("\(action.description) · \(action.elapsedSeconds(now: ProcessInfo.processInfo.systemUptime)) s")
+              .font(.hbBody(14))
+              .foregroundStyle(Color.hbTextPrimary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
       }
 
-      InfoRow(label: "Last refresh type", value: syncTypeLabel)
+      if let lastSync = service.lastSyncDate {
+        InfoRow(label: "Last sync", value: lastSync.relativeString)
+      }
 
       if let error = service.syncState.errorMessage {
         VStack(alignment: .leading, spacing: 4) {
@@ -162,14 +177,16 @@ struct ConnectionStatusView: View {
         .foregroundStyle(Color.hbTextPrimary)
         .frame(maxWidth: .infinity, alignment: .leading)
 
+      // A sync started anywhere (pull to refresh, the timer) counts, not just this button's
+      let syncing = isSyncing || service.syncState.isSyncing
       Button(action: syncNow) {
         HStack(spacing: 8) {
-          if isSyncing {
+          if syncing {
             ProgressView().tint(Color.hbProgress)
           } else {
             Image(systemName: "arrow.triangle.2.circlepath")
           }
-          Text(isSyncing ? "Refreshing..." : "Refresh Now")
+          Text(syncing ? "Syncing…" : "Sync Now")
             .font(.hbBody(15))
         }
         .foregroundStyle(Color.hbBrandInk)
@@ -178,21 +195,7 @@ struct ConnectionStatusView: View {
         .background(Color.hbBrandInk.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
-      .disabled(isSyncing)
-
-      Button(action: fullResync) {
-        HStack(spacing: 8) {
-          Image(systemName: "arrow.clockwise")
-          Text("Full Refresh")
-            .font(.hbBody(15))
-        }
-        .foregroundStyle(Color.hbError)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .background(Color.hbError.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-      }
-      .disabled(isSyncing)
+      .disabled(syncing)
 
       Button(action: testConnection) {
         HStack(spacing: 8) {
@@ -234,17 +237,9 @@ struct ConnectionStatusView: View {
   private var syncStateLabel: String {
     switch service.syncState {
     case .notStarted: "Not Started"
-    case let .syncing(msg): msg.replacingOccurrences(of: "Syncing", with: "Refreshing")
+    case let .syncing(phase): phase.statusText(progress: service.syncProgress)
     case .synced: "Synced"
     case .error: "Error"
-    }
-  }
-
-  private var syncTypeLabel: String {
-    switch service.lastSyncType {
-    case .none: "None"
-    case .fullScan: "Full Scan"
-    case .incremental: "Incremental"
     }
   }
 
@@ -252,14 +247,6 @@ struct ConnectionStatusView: View {
     isSyncing = true
     Task {
       try? await service.sync()
-      isSyncing = false
-    }
-  }
-
-  private func fullResync() {
-    isSyncing = true
-    Task {
-      try? await service.fullResync()
       isSyncing = false
     }
   }
@@ -299,7 +286,9 @@ struct ConnectionStatusView: View {
     lines.append("electrumURL: \(service.electrumURL ?? "nil")")
     lines.append("chainTipHeight: \(service.chainTipHeight)")
     lines.append("syncState: \(syncStateLabel)")
-    lines.append("lastSyncType: \(syncTypeLabel)")
+    if let action = service.syncAction {
+      lines.append("syncAction: \(action.description). \(action.calls)")
+    }
     if let date = service.lastSyncDate {
       lines.append("lastSyncDate: \(ISO8601DateFormatter().string(from: date))")
     } else {

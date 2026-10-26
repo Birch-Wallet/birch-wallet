@@ -2,7 +2,7 @@ import Foundation
 
 enum WalletSyncState: Equatable {
   case notStarted
-  case syncing(String = "Refreshing…")
+  case syncing(SyncPhase = .connecting)
   case synced(Date)
   case error(String)
 
@@ -13,9 +13,9 @@ enum WalletSyncState: Equatable {
     return false
   }
 
-  var syncMessage: String? {
-    if case let .syncing(msg) = self {
-      return msg
+  var syncPhase: SyncPhase? {
+    if case let .syncing(phase) = self {
+      return phase
     }
     return nil
   }
@@ -32,19 +32,5 @@ enum WalletSyncState: Equatable {
       return msg
     }
     return nil
-  }
-}
-
-enum SyncType: CustomStringConvertible {
-  case none
-  case fullScan
-  case incremental
-
-  var description: String {
-    switch self {
-    case .none: "none"
-    case .fullScan: "full scan"
-    case .incremental: "incremental"
-    }
   }
 }

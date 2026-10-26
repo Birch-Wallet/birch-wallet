@@ -28,7 +28,7 @@ final class WalletManagerViewModel {
       Task {
         do {
           try await BitcoinService.shared.loadWallet(profile: wallet)
-          let syncTask = Task { try await BitcoinService.shared.sync() }
+          let syncTask = Task { try await BitcoinService.shared.syncOnOpen() }
           BitcoinService.shared.syncTask = syncTask
           try await syncTask.value
         } catch {
@@ -207,7 +207,7 @@ final class WalletManagerViewModel {
     if wallet.isActive {
       Task {
         try? await BitcoinService.shared.loadWallet(profile: wallet)
-        try? await BitcoinService.shared.fullResync()
+        try? await BitcoinService.shared.sync()
       }
     }
 

@@ -40,7 +40,7 @@ struct PSBTVerificationBadge: View {
     case let .verified(inputs):
       "\(inputs) input\(inputs == 1 ? "" : "s") match the amounts this wallet has recorded."
     case let .partiallyVerified(verified, unverified):
-      "\(verified) verified, \(unverified) could not be checked. Refresh the wallet, then review the fee before signing."
+      "\(verified) verified, \(unverified) could not be checked. Sync the wallet, then review the fee before signing."
     case let .failed(message):
       message
     }

@@ -15,8 +15,8 @@ import Foundation
     /// status bar shows the same moment (run_device_passes in fastlane/Fastfile).
     static let now = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 16, hour: 9, minute: 41))!
 
-    /// When the last sync finished, as "Last refreshed" shows it: 2s ago.
-    static var lastRefreshed: Date {
+    /// When the last sync finished, as the header's "Synced" shows it: 2s ago.
+    static var lastSynced: Date {
       now.addingTimeInterval(-2)
     }
 

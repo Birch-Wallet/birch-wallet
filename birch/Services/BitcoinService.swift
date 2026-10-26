@@ -46,14 +46,30 @@ final class BitcoinService {
   private(set) var requiredSignatures: Int = 2
   private(set) var totalCosigners: Int = 1
   private(set) var chainTipHeight: UInt32 = 0
-  private var needsFullScan: Bool = true
   var syncTask: Task<Void, Error>?
 
   // Sync state — single source of truth
   private(set) var syncState: WalletSyncState = .notStarted
   private(set) var lastSyncDate: Date?
-  private(set) var lastSyncType: SyncType = .none
   private(set) var syncLog: [String] = []
+
+  /// How far the running sync has got, for the hairline under the balance: nil while
+  /// there is no total to measure it against (a wallet's first sync, so the bar
+  /// sweeps), and 1 once it finished
+  private(set) var syncProgress: Double?
+  @ObservationIgnored private var progressTracker: SyncProgressTracker?
+  @ObservationIgnored private var progressTicker: Task<Void, Never>?
+  /// The connection that last finished a sync. BDK's cache in it holds the wallet's
+  /// transactions, so the next sync over it fetches few of them.
+  @ObservationIgnored private weak var syncedClient: ElectrumClient?
+  /// What the running sync is doing now, for the connection sheet's Action row; nil
+  /// when no sync is running
+  private(set) var syncAction: SyncAction?
+  @ObservationIgnored private var syncStartUptime: TimeInterval = 0
+  /// The batches the saved wallet predicted when the sync started, nil on a first sync
+  @ObservationIgnored private var plannedBatchCounts: SyncWorkPlan.BatchCounts?
+  /// How many batches the running scan has started
+  @ObservationIgnored private var scanBatchNumber = 0
 
   /// Incremented whenever the wallet instance is replaced (load, reload, or unload).
   /// Comparing generations lets an in-flight sync detect that its wallet was swapped
@@ -92,7 +108,7 @@ final class BitcoinService {
 
   func startAutoSync() {
     guard autoSyncCancellable == nil else { return }
-    autoSyncCancellable = Timer.publish(every: 1800, on: .main, in: .common)
+    autoSyncCancellable = Timer.publish(every: Constants.autoSyncInterval, on: .main, in: .common)
       .autoconnect()
       .sink { [weak self] _ in
         guard let self, !self.syncState.isSyncing, wallet != nil else { return }
@@ -115,7 +131,7 @@ final class BitcoinService {
   /// Check if enough time has passed since last sync and sync if needed
   func autoSyncIfNeeded() {
     guard !syncState.isSyncing, wallet != nil else { return }
-    if timeSinceLastSync >= 1800 {
+    if timeSinceLastSync >= Constants.autoSyncInterval {
       syncTask = Task {
         try? await self.sync()
       }
@@ -189,8 +205,17 @@ final class BitcoinService {
     utxos = []
     outputs = []
     syncState = .notStarted
+    resetSyncProgress()
     lastSyncDate = nil
     syncLog = []
+  }
+
+  private func resetSyncProgress() {
+    progressTicker?.cancel()
+    progressTicker = nil
+    progressTracker = nil
+    syncProgress = nil
+    syncAction = nil
   }
 
   func loadWallet(profile: WalletProfile) async throws {
@@ -267,23 +292,27 @@ final class BitcoinService {
         network: network,
         persister: persister,
       )
-      // Reveal address #0 for both keychains so incremental syncs always cover it.
-      // Without this, startSyncWithRevealedSpks() has nothing to sync against on a
-      // brand-new wallet, and any funds sent to the first receive address are missed.
+      // Reveal address #0 on both keychains, so a new wallet starts with its first
+      // receive and change addresses on record.
       _ = w.revealNextAddress(keychain: .external)
       _ = w.revealNextAddress(keychain: .internal)
       _ = try w.persist(persister: persister)
       addToLog("Revealed address #0 for external and internal keychains")
     }
 
-    // Full scan only if last full scan was over 1 hour ago (or never)
-    let fullScanKey = "lastFullScanDate_\(profile.id.uuidString)"
-    let lastFullScan = UserDefaults.standard.object(forKey: fullScanKey) as? Date
-    let hoursSinceFullScan = lastFullScan.map { Date().timeIntervalSince($0) / 3600 }
-    needsFullScan = (hoursSinceFullScan ?? .infinity) >= 1.0
-    addToLog("Full scan needed: \(needsFullScan) (last: \(lastFullScan?.description ?? "never"))")
     syncState = .notStarted
-    lastSyncType = .none
+    resetSyncProgress()
+    // The last sync outlives a relaunch or a switch to another wallet, so the header
+    // can say when it was and opening the wallet can skip a sync it doesn't need. A
+    // database that has never synced (new, or rebuilt) has no last sync to go by.
+    let lastSyncKey = Self.lastSyncKey(profile.id)
+    if w.latestCheckpoint().height > 0, let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
+      lastSyncDate = lastSync
+      syncState = .synced(lastSync)
+    } else {
+      lastSyncDate = nil
+      UserDefaults.standard.removeObject(forKey: lastSyncKey)
+    }
 
     walletGeneration += 1
     wallet = w
@@ -334,9 +363,30 @@ final class BitcoinService {
     let syncGeneration = walletGeneration
     let syncProfileId = currentProfile?.id // for per-profile UserDefaults keys only
     let syncPersister = persister
+    let gapLimit = currentProfile?.scanGapLimit ?? Constants.defaultAddressGap
 
-    setSyncState(.syncing("Connecting…"), generation: syncGeneration)
-    addToLog("Starting sync (needsFullScan: \(needsFullScan))")
+    // The work this sync should take, from what the saved wallet holds. A wallet
+    // that has never synced has nothing to go on, so its bar sweeps instead.
+    let clientWarm = electrumClient != nil && electrumClient === syncedClient
+    let plan = wallet.latestCheckpoint().height == 0 ? nil : syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm)
+    let learnedSecondsPerUnit = syncProfileId.map { UserDefaults.standard.double(forKey: Self.syncPaceKey($0)) } ?? 0
+    startProgress(plan: plan, secondsPerUnit: learnedSecondsPerUnit, generation: syncGeneration)
+    syncStartUptime = Self.uptime
+    plannedBatchCounts = plan?.batchCounts
+    scanBatchNumber = 0
+    syncAction = nil
+    defer {
+      if walletGeneration == syncGeneration {
+        progressTicker?.cancel()
+      }
+    }
+
+    setSyncState(.syncing(.connecting), generation: syncGeneration)
+    addToLog(
+      "Starting sync (gap \(gapLimit), "
+        + (plan.map { "expecting \(Int($0.totalUnits)) round trips in \($0.batches.count) batches" } ?? "first sync, no estimate")
+        + (clientWarm ? ", client cache warm)" : ")"),
+    )
 
     // Capture pre-sync state so completion can log deltas.
     let syncStartTime = Date()
@@ -348,7 +398,11 @@ final class BitcoinService {
       // Try to reconnect if client is nil (e.g. app started offline)
       if electrumClient == nil, let profile = currentProfile {
         let config = connectionConfig(for: profile)
-        addToLog("Re-initializing Electrum client: \(config.url)")
+        beginSyncAction(
+          "Connecting to \(config.host):\(config.port) (\(config.useSSL ? "TCP and TLS handshake" : "TCP, no TLS"))",
+          calls: "ElectrumClient(url: \(config.url), validateDomain: \(!config.allowInsecureSSL))",
+          generation: syncGeneration,
+        )
         let reconnectURL = config.url
         let validateDomain = !config.allowInsecureSSL
         electrumClient = try await Task.detached { try ElectrumClient(url: reconnectURL, validateDomain: validateDomain) }.value
@@ -360,111 +414,70 @@ final class BitcoinService {
         throw AppError.electrumConnectionFailed("No internet connection")
       }
 
-      // Verify server is reachable before starting scan — prevents showing
-      // misleading "Scanning addresses" progress when offline / server is down.
-      setSyncState(.syncing("Checking server…"), generation: syncGeneration)
+      // Verify the server is reachable before the scan starts, so the bar doesn't
+      // show progress while offline or while the server is down.
+      beginSyncAction("Checking that the server answers", calls: "server.ping", generation: syncGeneration)
+      let pingStart = Self.uptime
       try await Task.detached { try client.ping() }.value
-      addToLog("Server ping OK")
+      let pingSeconds = Self.uptime - pingStart
+      addToLog("Server ping OK (\(Self.milliseconds(pingSeconds)))")
 
       // Fetch chain tip early to confirm server returns real data
-      if let header = await Task.detached(operation: { [client] in try? client.blockHeadersSubscribe() }).value {
-        guard walletGeneration == syncGeneration else {
-          addToLog("Sync cancelled: wallet replaced during chain tip fetch")
-          return
-        }
-        chainTipHeight = UInt32(header.height)
-        #if DEBUG
-          // The screenshot tour's confirmation counts and locktime stay the same every run.
-          if ScreenshotFixtures.isActive {
-            chainTipHeight = ScreenshotFixtures.chainTipHeight
-          }
-        #endif
-        if let profileId = syncProfileId {
-          UserDefaults.standard.set(Int(chainTipHeight), forKey: "chainTipHeight_\(profileId.uuidString)")
-        }
-        electrumVerified = true
-        electrumConnectionError = nil
-        addToLog("Chain tip height: \(chainTipHeight)")
-      } else {
-        addToLog("Chain tip fetch returned nothing; keeping tip \(chainTipHeight)")
+      beginSyncAction("Fetching the server's chain tip", calls: "blockchain.headers.subscribe", generation: syncGeneration)
+      guard await updateChainTip(from: client, generation: syncGeneration, profileId: syncProfileId) else {
+        addToLog("Sync cancelled: wallet replaced during chain tip fetch")
+        return
       }
 
-      if needsFullScan {
-        let gapLimit = currentProfile?.scanGapLimit ?? Constants.maxAddressGap
-        addToLog("Starting full scan (gapLimit: \(gapLimit))")
-
-        let inspector = FullScanProgressInspector { [weak self] keychain, index in
-          let path = keychain == .external ? "0" : "1"
-          Task { @MainActor [weak self] in
-            self?.setSyncState(.syncing("Scanning …/\(path)/\(index)"), generation: syncGeneration)
-          }
-        }
-        let fullScanRequest = try wallet.startFullScan()
-          .inspectSpksForAllKeychains(inspector: inspector)
-          .build()
-
-        addToLog("Full scan request built")
-        setSyncState(.syncing("Scanning addresses…"), generation: syncGeneration)
-        let update = try await Task.detached { [client] in
-          try client.fullScan(
-            request: fullScanRequest,
-            stopGap: UInt64(gapLimit),
-            batchSize: 50,
-            fetchPrevTxouts: true,
-          )
-        }.value
-
-        // Bail out if the wallet was switched or reloaded during the network scan
-        guard walletGeneration == syncGeneration else {
-          addToLog("Sync cancelled: wallet replaced during full scan")
-          return
-        }
-        try Task.checkCancellation()
-
-        addToLog("Full scan update received from server")
-        setSyncState(.syncing("Applying update…"), generation: syncGeneration)
-        try wallet.applyUpdate(update: update)
-        addToLog("Full scan update applied to wallet")
-        needsFullScan = false
-        lastSyncType = .fullScan
-        if let profileId = syncProfileId {
-          UserDefaults.standard.set(Date(), forKey: "lastFullScanDate_\(profileId.uuidString)")
-        }
-      } else {
-        addToLog("Starting incremental sync")
-
-        let inspector = SyncProgressInspector { [weak self] _, total in
-          Task { @MainActor [weak self] in
-            self?.setSyncState(.syncing("Checking \(total) scripts…"), generation: syncGeneration)
-          }
-        }
-        let syncRequest = try wallet.startSyncWithRevealedSpks()
-          .inspectSpks(inspector: inspector)
-          .build()
-
-        addToLog("Sync request built")
-        setSyncState(.syncing("Refreshing transactions…"), generation: syncGeneration)
-        let update = try await Task.detached { [client] in
-          try client.sync(
-            request: syncRequest,
-            batchSize: 50,
-            fetchPrevTxouts: true,
-          )
-        }.value
-
-        // Bail out if the wallet was switched or reloaded during the network sync
-        guard walletGeneration == syncGeneration else {
-          addToLog("Sync cancelled: wallet replaced during incremental sync")
-          return
-        }
-        try Task.checkCancellation()
-
-        addToLog("Sync update received from server")
-        setSyncState(.syncing("Applying update…"), generation: syncGeneration)
-        try wallet.applyUpdate(update: update)
-        addToLog("Sync update applied to wallet")
-        lastSyncType = .incremental
+      // Without a measured pace yet, a round trip is about one ping
+      if learnedSecondsPerUnit <= 0 {
+        progressTracker?.secondsPerUnit = Self.clampedSecondsPerUnit(pingSeconds)
       }
+      progressTracker?.serverReady(now: Self.uptime)
+      publishProgress()
+      setSyncState(.syncing(.fetching), generation: syncGeneration)
+
+      // Every sync is a full scan: it walks both keychains until `gapLimit` unused
+      // addresses in a row, so it finds funds on any address, revealed or not.
+      let inspector = FullScanProgressInspector(batchSize: Constants.syncBatchSize) { [weak self] keychain, index, time in
+        MainActor.assumeIsolated {
+          self?.syncBatchStarted(keychain: keychain, index: index, at: time, generation: syncGeneration)
+        }
+      }
+      let fullScanRequest = try wallet.startFullScan()
+        .inspectSpksForAllKeychains(inspector: inspector)
+        .build()
+
+      beginSyncAction(
+        "Starting the full scan: fetching the server's latest blocks",
+        calls: "BDK full_scan (gap \(gapLimit), batch \(Constants.syncBatchSize), fetchPrevTxouts): "
+          + "blockchain.headers.subscribe, then blockchain.block.header for the latest blocks (batched)",
+        generation: syncGeneration,
+      )
+      let scanStart = Self.uptime
+      let update = try await Task.detached { [client] in
+        try client.fullScan(
+          request: fullScanRequest,
+          stopGap: UInt64(gapLimit),
+          batchSize: UInt64(Constants.syncBatchSize),
+          fetchPrevTxouts: true,
+        )
+      }.value
+      let scanSeconds = Self.uptime - scanStart
+
+      // Bail out if the wallet was switched or reloaded during the network scan
+      guard walletGeneration == syncGeneration else {
+        addToLog("Sync cancelled: wallet replaced during full scan")
+        return
+      }
+      try Task.checkCancellation()
+
+      progressTracker?.scanFinished(now: Self.uptime)
+      publishProgress()
+      addToLog("Full scan returned in \(String(format: "%.1f", scanSeconds))s, bar at \(Self.percent(progressTracker?.fraction))")
+      setSyncState(.syncing(.saving), generation: syncGeneration)
+      beginSyncAction("Applying the scan's update to the wallet", calls: "BDK Wallet.applyUpdate", generation: syncGeneration)
+      try wallet.applyUpdate(update: update)
 
       // Final identity check before persisting
       guard walletGeneration == syncGeneration else {
@@ -472,9 +485,8 @@ final class BitcoinService {
         return
       }
 
-      setSyncState(.syncing("Saving…"), generation: syncGeneration)
       if let syncPersister {
-        addToLog("Persisting wallet state")
+        beginSyncAction("Saving to the wallet database", calls: "BDK Wallet.persist (SQLite)", generation: syncGeneration)
         _ = try wallet.persist(persister: syncPersister)
       }
 
@@ -484,14 +496,31 @@ final class BitcoinService {
         return
       }
 
+      beginSyncAction(
+        "Rebuilding the transaction, address and UTXO lists",
+        calls: "Wallet.transactions, Wallet.listOutput, Wallet.listUnspent",
+        generation: syncGeneration,
+      )
       updateCachedData()
       pruneStaleeSavedPSBTs()
+      endSyncAction("Finished", generation: syncGeneration)
+
+      if electrumClient === client {
+        syncedClient = client
+      }
+      learnSyncPace(scanSeconds: scanSeconds, wallet: wallet, gap: gapLimit, clientWarm: clientWarm, profileId: syncProfileId)
+      addToLog("Bar at \(Self.percent(progressTracker?.fraction)) before finishing")
+      progressTracker?.finish()
+      publishProgress()
 
       let now = Date()
       lastSyncDate = now
+      if let profileId = syncProfileId {
+        UserDefaults.standard.set(now, forKey: Self.lastSyncKey(profileId))
+      }
       #if DEBUG
-        // The screenshot tour's "Last refreshed" reads the same every run.
-        let shownSyncDate = ScreenshotFixtures.isActive ? ScreenshotFixtures.lastRefreshed : now
+        // The screenshot tour's "Synced" age reads the same every run.
+        let shownSyncDate = ScreenshotFixtures.isActive ? ScreenshotFixtures.lastSynced : now
       #else
         let shownSyncDate = now
       #endif
@@ -501,7 +530,7 @@ final class BitcoinService {
       let balanceDelta = Int64(balance) - Int64(balanceBefore)
       let balanceDeltaStr = balanceDelta >= 0 ? "+\(balanceDelta)" : "\(balanceDelta)"
       addToLog(
-        "Sync completed successfully in \(duration)s (\(lastSyncType.description)): "
+        "Sync completed successfully in \(duration)s: "
           + "balance \(balanceBefore) -> \(balance) sats (\(balanceDeltaStr)), "
           + "txs \(txCountBefore) -> \(transactions.count), "
           + "utxos \(utxoCountBefore) -> \(utxos.count), tip \(chainTipHeight)",
@@ -515,6 +544,7 @@ final class BitcoinService {
         throw error
       }
       let errorMsg = "\(error)"
+      endSyncAction("Failed: \(errorMsg)", generation: syncGeneration)
       addToLog("Sync failed with error: \(errorMsg)")
       let friendly = Self.friendlyElectrumError(error)
       electrumVerified = false
@@ -524,9 +554,237 @@ final class BitcoinService {
     }
   }
 
-  func fullResync() async throws {
-    needsFullScan = true
-    try await sync()
+  /// Syncs a wallet that was just opened (a cold start, or a switch to it) unless it
+  /// synced within `Constants.autoSyncInterval`. Pull to refresh, Sync Now and the
+  /// auto-sync timer always sync.
+  func syncOnOpen() async throws {
+    guard let wallet else {
+      addToLog("Sync failed: Wallet not loaded")
+      throw AppError.walletNotLoaded
+    }
+    guard Self.syncedRecently(lastSync: lastSyncDate, now: Date(), hasSynced: wallet.latestCheckpoint().height > 0) else {
+      try await sync()
+      return
+    }
+    addToLog("Skipping sync on open: synced \(Int(timeSinceLastSync))s ago")
+    await checkConnection()
+  }
+
+  /// Whether a wallet synced recently enough for opening it to skip a sync. One whose
+  /// database has never synced always syncs, whatever the stored date says.
+  nonisolated static func syncedRecently(lastSync: Date?, now: Date, hasSynced: Bool) -> Bool {
+    guard hasSynced, let lastSync else { return false }
+    let age = now.timeIntervalSince(lastSync)
+    return age >= 0 && age < Constants.autoSyncInterval
+  }
+
+  private static func lastSyncKey(_ profileId: UUID) -> String {
+    "lastSyncDate_\(profileId.uuidString)"
+  }
+
+  /// Pings the server and fetches its chain tip without a sync, for a wallet opened
+  /// soon after its last one: the connection status and the confirmation counts stay
+  /// current, and nothing on screen says it's syncing.
+  private func checkConnection() async {
+    guard let client = electrumClient else { return }
+    let generation = walletGeneration
+    let tipBefore = chainTipHeight
+    do {
+      try await Task.detached { try client.ping() }.value
+      guard await updateChainTip(from: client, generation: generation, profileId: currentProfile?.id) else { return }
+      if chainTipHeight != tipBefore {
+        updateCachedData()
+      }
+    } catch {
+      guard walletGeneration == generation else { return }
+      electrumVerified = false
+      electrumConnectionError = Self.friendlyElectrumError(error)
+      addToLog("Connection check failed: \(error)")
+    }
+  }
+
+  /// Fetches the server's chain tip and records it, and that the server answered.
+  /// False when the wallet was replaced while it waited.
+  private func updateChainTip(from client: ElectrumClient, generation: UInt64, profileId: UUID?) async -> Bool {
+    guard let header = await Task.detached(operation: { [client] in try? client.blockHeadersSubscribe() }).value else {
+      addToLog("Chain tip fetch returned nothing; keeping tip \(chainTipHeight)")
+      return walletGeneration == generation
+    }
+    guard walletGeneration == generation else { return false }
+    chainTipHeight = UInt32(header.height)
+    #if DEBUG
+      // The screenshot tour's confirmation counts and locktime stay the same every run.
+      if ScreenshotFixtures.isActive {
+        chainTipHeight = ScreenshotFixtures.chainTipHeight
+      }
+    #endif
+    if let profileId {
+      UserDefaults.standard.set(Int(chainTipHeight), forKey: "chainTipHeight_\(profileId.uuidString)")
+    }
+    electrumVerified = true
+    electrumConnectionError = nil
+    addToLog("Chain tip height: \(chainTipHeight)")
+    return true
+  }
+
+  // MARK: - Sync Progress
+
+  private static var uptime: TimeInterval {
+    ProcessInfo.processInfo.systemUptime
+  }
+
+  private static func syncPaceKey(_ profileId: UUID) -> String {
+    "syncSecondsPerUnit_\(profileId.uuidString)"
+  }
+
+  private static func clampedSecondsPerUnit(_ seconds: Double) -> Double {
+    min(max(seconds, 0.01), 2)
+  }
+
+  private static func seconds(_ seconds: Double) -> String {
+    String(format: "%.1fs", max(0, seconds))
+  }
+
+  private static func milliseconds(_ seconds: Double) -> String {
+    "\(Int((seconds * 1000).rounded())) ms"
+  }
+
+  private static func percent(_ fraction: Double?) -> String {
+    fraction.map { "\(Int($0 * 100))%" } ?? "sweeping (no estimate)"
+  }
+
+  /// Starts the bar for a new sync, and the ticker that moves it on between BDK's events
+  private func startProgress(plan: SyncWorkPlan?, secondsPerUnit: Double, generation: UInt64) {
+    progressTracker = SyncProgressTracker(
+      plan: plan,
+      secondsPerUnit: secondsPerUnit > 0 ? secondsPerUnit : SyncProgressTracker.defaultSecondsPerUnit,
+      now: Self.uptime,
+    )
+    syncProgress = progressTracker?.fraction
+    progressTicker?.cancel()
+    progressTicker = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(100))
+        guard let self, walletGeneration == generation, syncState.isSyncing else { return }
+        progressTracker?.tick(now: Self.uptime)
+        publishProgress()
+      }
+    }
+  }
+
+  /// Publishes the tracker's fill when it has moved enough to redraw
+  private func publishProgress() {
+    let fraction = progressTracker?.fraction
+    switch (fraction, syncProgress) {
+    case let (new?, old?) where abs(new - old) < 0.001:
+      return
+    case (nil, nil):
+      return
+    default:
+      syncProgress = fraction
+    }
+  }
+
+  private func syncBatchStarted(keychain: KeychainKind, index: UInt32, at time: TimeInterval, generation: UInt64) {
+    guard walletGeneration == generation, progressTracker != nil else { return }
+    let keychain: UTXOItem.KeychainKind = keychain == .external ? .external : .internal
+    progressTracker?.batchStarted(keychain: keychain, index: index, now: time)
+    publishProgress()
+    scanBatchNumber += 1
+    let action = if let plan = progressTracker?.plan, let planned = plannedBatchCounts {
+      plan.batchAction(keychain: keychain, index: index, scanBatch: scanBatchNumber, planned: planned)
+    } else {
+      SyncWorkPlan.unplannedBatchAction(keychain: keychain, index: index, batchSize: Constants.syncBatchSize, scanBatch: scanBatchNumber)
+    }
+    beginSyncAction(action.description, calls: action.calls, at: time, generation: generation)
+  }
+
+  /// Records what the sync is doing now. The connection sheet's Action row shows it,
+  /// and the debug log gets it with the calls behind it, the time since the sync
+  /// started, how long the step before it took, and the bar.
+  private func beginSyncAction(_ description: String, calls: String, at time: TimeInterval? = nil, generation: UInt64) {
+    guard walletGeneration == generation else { return }
+    let now = time ?? Self.uptime
+    let previous = syncAction.map { "; previous step \(Self.seconds(now - $0.startedAt))" } ?? ""
+    syncAction = SyncAction(description: description, calls: calls, startedAt: now)
+    addToLog("Sync +\(Self.seconds(now - syncStartUptime)): \(description). \(calls)\(previous); bar \(Self.percent(progressTracker?.fraction))")
+  }
+
+  /// Logs how the sync ended and clears the Action row
+  private func endSyncAction(_ outcome: String, generation: UInt64) {
+    guard walletGeneration == generation else { return }
+    let now = Self.uptime
+    let step = syncAction.map { " during \"\($0.description)\" after \(Self.seconds(now - $0.startedAt))" } ?? ""
+    addToLog("Sync +\(Self.seconds(now - syncStartUptime)): \(outcome)\(outcome.hasPrefix("Failed") ? step : "")")
+    syncAction = nil
+  }
+
+  /// What the saved wallet says a full scan will do (see `SyncWorkPlan`): how far
+  /// each keychain has been used, where each transaction first appears in scan
+  /// order, and how many of their parents aren't the wallet's own.
+  private func syncWorkPlan(for wallet: Wallet, gap: Int, clientWarm: Bool) -> SyncWorkPlan {
+    let txs = wallet.transactions().map(\.transaction)
+    let lookup = Dictionary(
+      txs.map { ($0.computeTxid().description, $0) },
+      uniquingKeysWith: { first, _ in first },
+    )
+    func keychainIndex(_ script: Script) -> (keychain: UTXOItem.KeychainKind, index: UInt32)? {
+      wallet.derivationOfSpk(spk: script).map { ($0.keychain == .external ? .external : .internal, $0.index) }
+    }
+
+    var lastUsed: [UTXOItem.KeychainKind: UInt32] = [:]
+    var firstSeen: [(keychain: UTXOItem.KeychainKind, index: UInt32)] = []
+    var externalParents = Set<String>()
+    for tx in txs {
+      var touched = tx.output().compactMap { keychainIndex($0.scriptPubkey) }
+      if !tx.isCoinbase() {
+        for input in tx.input() {
+          let parentTxid = input.previousOutput.txid.description
+          guard let parent = lookup[parentTxid] else {
+            externalParents.insert(parentTxid)
+            continue
+          }
+          let parentOutputs = parent.output()
+          let vout = Int(input.previousOutput.vout)
+          if vout < parentOutputs.count, let spent = keychainIndex(parentOutputs[vout].scriptPubkey) {
+            touched.append(spent)
+          }
+        }
+      }
+      for address in touched {
+        lastUsed[address.keychain] = max(lastUsed[address.keychain] ?? 0, address.index)
+      }
+      if let first = touched.min(by: { ($0.keychain == .external ? 0 : 1, $0.index) < ($1.keychain == .external ? 0 : 1, $1.index) }) {
+        firstSeen.append(first)
+      }
+    }
+    return SyncWorkPlan.make(
+      lastUsed: lastUsed,
+      gap: gap,
+      batchSize: Constants.syncBatchSize,
+      firstSeen: firstSeen,
+      externalParents: externalParents.count,
+      clientWarm: clientWarm,
+    )
+  }
+
+  /// Folds this sync's pace into the wallet's average, for the next sync's bar. Only
+  /// a sync that fetched its transactions counts: over a warm connection they came
+  /// from the cache, so its pace says nothing about the round trips.
+  private func learnSyncPace(scanSeconds: Double, wallet: Wallet, gap: Int, clientWarm: Bool, profileId: UUID?) {
+    let units = syncWorkPlan(for: wallet, gap: gap, clientWarm: clientWarm).scanUnits
+    guard let profileId, units > 0, scanSeconds > 0 else { return }
+    let measured = scanSeconds / units
+    guard !clientWarm else {
+      addToLog("Sync pace over a warm connection: \(Self.milliseconds(measured)) per estimated round trip (\(Int(units)) estimated)")
+      return
+    }
+    let key = Self.syncPaceKey(profileId)
+    let previous = UserDefaults.standard.double(forKey: key)
+    let clamped = Self.clampedSecondsPerUnit(measured)
+    let learned = previous > 0 ? previous + (clamped - previous) * 0.3 : clamped
+    UserDefaults.standard.set(learned, forKey: key)
+    addToLog("Sync pace: \(Self.milliseconds(measured)) per round trip over \(Int(units)); average now \(Self.milliseconds(learned))")
   }
 
   /// Tests connectivity by fetching the chain tip from the server.
@@ -878,10 +1136,9 @@ final class BitcoinService {
   }
 
   /// The first receive address at or after `start` that isn't in `taken`.
-  /// It is revealed if it wasn't already, so incremental syncs
-  /// (startSyncWithRevealedSpks) watch it for incoming funds. Revealing up to
-  /// an index is a no-op once that index is revealed, so looking at an
-  /// address never moves the wallet's derivation index.
+  /// It is revealed if it wasn't already, so BDK's derivation index records it
+  /// as handed out. Revealing up to an index is a no-op once that index is
+  /// revealed, so looking at an address never moves the wallet's derivation index.
   static func availableReceiveAddress(
     in wallet: Wallet,
     from start: UInt32,
@@ -899,7 +1156,7 @@ final class BitcoinService {
     guard let wallet else { return [] }
     let bdkKeychain: KeychainKind = keychain == .external ? .external : .internal
     let usedAddresses = buildUsedAddressSet()
-    let gapLimit = currentProfile?.scanGapLimit ?? Constants.maxAddressGap
+    let gapLimit = currentProfile?.scanGapLimit ?? Constants.defaultAddressGap
 
     // Scan addresses, always ensuring gapLimit unused addresses after the last used one.
     // We extend the scan window each time we find a used address.
@@ -1841,34 +2098,27 @@ final class BitcoinService {
   }
 }
 
-// MARK: - Sync Progress Inspectors
+// MARK: - Sync Progress Inspector
 
-/// Reports per-script progress during full scan (keychain + derivation index)
+/// Reports each batch of addresses the full scan starts. BDK calls the inspector
+/// once per address as it takes it into a batch request, so the first address of a
+/// batch (an index that's a multiple of the batch size) marks the start of that
+/// batch and the end of the one before. The time is read here, on BDK's thread,
+/// so a busy main thread doesn't delay it.
 final class FullScanProgressInspector: FullScanScriptInspector, @unchecked Sendable {
-  private let onProgress: (KeychainKind, UInt32) -> Void
+  private let batchSize: UInt32
+  private let onBatchStart: (KeychainKind, UInt32, TimeInterval) -> Void
 
-  init(onProgress: @escaping (KeychainKind, UInt32) -> Void) {
-    self.onProgress = onProgress
+  init(batchSize: UInt32, onBatchStart: @escaping (KeychainKind, UInt32, TimeInterval) -> Void) {
+    self.batchSize = max(batchSize, 1)
+    self.onBatchStart = onBatchStart
   }
 
   func inspect(keychain: KeychainKind, index: UInt32, script _: Script) {
-    DispatchQueue.main.async { [onProgress] in
-      onProgress(keychain, index)
-    }
-  }
-}
-
-/// Reports per-script progress during incremental sync (script + total count)
-final class SyncProgressInspector: SyncScriptInspector, @unchecked Sendable {
-  private let onProgress: (Script, UInt64) -> Void
-
-  init(onProgress: @escaping (Script, UInt64) -> Void) {
-    self.onProgress = onProgress
-  }
-
-  func inspect(script: Script, total: UInt64) {
-    DispatchQueue.main.async { [onProgress] in
-      onProgress(script, total)
+    guard index % batchSize == 0 else { return }
+    let time = ProcessInfo.processInfo.systemUptime
+    DispatchQueue.main.async { [onBatchStart] in
+      onBatchStart(keychain, index, time)
     }
   }
 }

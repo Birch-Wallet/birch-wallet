@@ -621,7 +621,7 @@ enum PSBTValidator {
     guard output.isMine else {
       return .warning(
         Code.outputBeyondGapLimit,
-        "\(label) is your \(keychain == .internal ? "change" : "receive") address at index \(index), beyond the addresses this wallet has revealed. The funds are recoverable from your descriptor, but refresh the wallet so it tracks them.",
+        "\(label) is your \(keychain == .internal ? "change" : "receive") address at index \(index), beyond the addresses this wallet has revealed. The funds are recoverable from your descriptor, but sync the wallet so it tracks them.",
       )
     }
 
@@ -696,7 +696,7 @@ enum PSBTValidator {
       return .warning(
         Code.inputAmountUnverifiable,
         outpoint: outpoint,
-        "Input \(outpoint) declares \(declared.formattedSats), which this wallet cannot confirm — the output is not in its history. Refresh the wallet, or treat the fee shown as unverified.",
+        "Input \(outpoint) declares \(declared.formattedSats), which this wallet cannot confirm — the output is not in its history. Sync the wallet, or treat the fee shown as unverified.",
       )
     }
 

@@ -54,7 +54,14 @@ enum Constants {
 
   static let maxCosigners = 10
   static let minCosigners = 1
-  static let maxAddressGap = 20
+  /// The gap limit a new wallet starts with: how many unused addresses in a row end a scan
+  static let defaultAddressGap = 50
+  /// How many addresses each Electrum history request asks about. 25 and 100
+  /// measured the same as 50, and 10 was 6–13% slower.
+  static let syncBatchSize: UInt32 = 50
+  /// How often the open wallet syncs on its own, and how recent a sync has to be for
+  /// opening a wallet (a cold start, a switch to it, a return to the app) to skip one
+  static let autoSyncInterval: TimeInterval = 30 * 60
 
   static func derivationPath(for network: BitcoinNetwork) -> String {
     "m/48'/\(network.coinType)'/0'/2'"

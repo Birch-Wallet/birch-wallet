@@ -20,6 +20,10 @@ final class TransactionListViewModel {
     bitcoinService.syncState
   }
 
+  var syncProgress: Double? {
+    bitcoinService.syncProgress
+  }
+
   func clearState() {
     transactions = []
     balance = 0
@@ -43,7 +47,7 @@ final class TransactionListViewModel {
         do {
           try await bitcoinService.loadWallet(profile: active)
           updateFromService()
-          try await bitcoinService.sync()
+          try await bitcoinService.syncOnOpen()
           updateFromService()
         } catch {
           // syncState is managed by BitcoinService
@@ -59,14 +63,18 @@ final class TransactionListViewModel {
     transactions = bitcoinService.transactions
   }
 
-  func refresh() async {
+  /// Starts a sync without waiting for it, so pull-to-refresh lets go at once and
+  /// the header's progress bar takes over
+  func startSync() {
     isLoading = true
-    do {
-      try await bitcoinService.sync()
-      updateFromService()
-    } catch {
-      // syncState is managed by BitcoinService
+    Task {
+      do {
+        try await bitcoinService.sync()
+        updateFromService()
+      } catch {
+        // syncState is managed by BitcoinService
+      }
+      isLoading = false
     }
-    isLoading = false
   }
 }

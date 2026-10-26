@@ -51,7 +51,7 @@ struct UTXOListView: View {
         ContentUnavailableView(
           "No UTXOs",
           systemImage: "bitcoinsign.circle",
-          description: Text("UTXOs will appear after refreshing your wallet"),
+          description: Text("UTXOs will appear after your wallet syncs"),
         )
       } else if visible.isEmpty {
         ContentUnavailableView {

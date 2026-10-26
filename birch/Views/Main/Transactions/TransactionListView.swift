@@ -134,23 +134,16 @@ struct TransactionListView: View {
 
             Spacer()
 
-            if let syncMsg = viewModel.syncState.syncMessage {
-              Text(syncMsg)
-                .font(.hbLabel(11))
-                .foregroundStyle(Color.hbTextSecondary)
-                .contentTransition(.numericText())
-            } else if let lastSynced = viewModel.syncState.lastSynced {
-              TimelineView(.periodic(from: .now, by: 1)) { _ in
-                Text("Last refreshed \(lastSynced.relativeString)")
-                  .font(.hbLabel(11))
-                  .foregroundStyle(Color.hbTextSecondary)
-                  .accessibilityIdentifier("lastRefreshed")
-              }
-            }
+            syncStatus
           }
         }
         .padding(16)
         .background(Color.hbHeroBackground)
+        // The sync's progress runs along the header's bottom edge, like Safari's
+        // loading bar under the address field
+        .overlay(alignment: .bottom) {
+          SyncProgressBar(state: viewModel.syncState, progress: viewModel.syncProgress)
+        }
 
         // Transactions section header
         HStack {
@@ -183,7 +176,8 @@ struct TransactionListView: View {
         showWalletPicker = false
       }
       .refreshable {
-        await viewModel.refresh()
+        // The spinner lets go as soon as the sync starts; the header's bar shows the rest
+        viewModel.startSync()
       }
       .overlay { walletPickerOverlay }
       .sheet(isPresented: $showConnectionStatus) {
@@ -433,6 +427,36 @@ struct TransactionListView: View {
         insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
         removal: .scale(scale: 0.95, anchor: .top).combined(with: .opacity),
       ))
+    }
+  }
+
+  /// The info row's right side: what the sync is doing, when it last finished, or
+  /// that it failed. The failure opens the connection details.
+  @ViewBuilder
+  private var syncStatus: some View {
+    switch viewModel.syncState {
+    case let .syncing(phase):
+      Text(phase.statusText(progress: viewModel.syncProgress))
+        .font(.hbLabel(11))
+        .foregroundStyle(Color.hbTextSecondary)
+        .contentTransition(.numericText())
+    case let .synced(date):
+      TimelineView(.periodic(from: .now, by: 1)) { _ in
+        Text("Synced \(date.relativeString)")
+          .font(.hbLabel(11))
+          .foregroundStyle(Color.hbTextSecondary)
+          .accessibilityIdentifier("lastSynced")
+      }
+    case .error:
+      Button(action: { showConnectionStatus = true }) {
+        Text("Couldn't sync")
+          .font(.hbLabel(11))
+          .foregroundStyle(Color.hbError)
+      }
+      .accessibilityHint("Shows the connection details")
+      .accessibilityIdentifier("syncFailed")
+    case .notStarted:
+      EmptyView()
     }
   }
 

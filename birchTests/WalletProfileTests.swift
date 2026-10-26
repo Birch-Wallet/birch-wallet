@@ -137,6 +137,18 @@ struct WalletProfileTests {
     #expect(profile(electrumPort: 0).electrumConfig.port == BitcoinNetwork.testnet4.defaultElectrumPort)
   }
 
+  /// New wallets scan 50 unused addresses past the last used one. A gap of 50 costs
+  /// at most one more batch per keychain than 20 did.
+  @Test func `new profile starts with a gap of 50`() {
+    let wallet = WalletProfile(
+      name: "Test", requiredSignatures: 2, totalCosigners: 3,
+      externalDescriptor: "", internalDescriptor: "",
+      network: .testnet4,
+    )
+    #expect(wallet.addressGapLimit == 50)
+    #expect(wallet.scanGapLimit == 50)
+  }
+
   /// The gap limit is converted to an unsigned count for every full scan and
   /// bounds the address list, so a stored value out of range must be held in.
   @Test func `scan gap limit stays within range`() {
