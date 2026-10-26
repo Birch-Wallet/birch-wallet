@@ -1,5 +1,5 @@
 {
-  "originHash" : "561131c8e974cf1aaf4e7fb48eebaf74a94dabe0b90801de672b9398a0361a37",
+  "originHash" : "07797a22618254d36477eacf164f41aa97d931bc121608f7017c7a80ecb83e2d",
   "pins" : [
     {
       "identity" : "bbqr-swift",
@@ -40,10 +40,10 @@
     {
       "identity" : "bdk-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/bitcoindevkit/bdk-swift",
+      "location" : "https://github.com/Birch-Wallet/bdk-swift",
       "state" : {
-        "revision" : "55284dc4e767c301c7926c412daad241c0667106",
-        "version" : "3.1.1"
+        "revision" : "328b09bc45ab1c98cb46757a8cff74e935029cb3",
+        "version" : "3.1.1-populate-cache"
       }
     },
     {
