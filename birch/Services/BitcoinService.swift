@@ -450,17 +450,20 @@ final class BitcoinService {
 
       beginSyncAction(
         "Starting the full scan: fetching the server's latest blocks",
-        calls: "BDK full_scan (gap \(gapLimit), batch \(Constants.syncBatchSize), fetchPrevTxouts): "
+        calls: "BDK full_scan (gap \(gapLimit), batch \(Constants.syncBatchSize), fetchPrevTxouts off): "
           + "blockchain.headers.subscribe, then blockchain.block.header for the latest blocks (batched)",
         generation: syncGeneration,
       )
       let scanStart = Self.uptime
+      // fetchPrevTxouts would download the parent of every received payment on every
+      // sync, though the wallet keeps the outputs it needs from them. The ones it's
+      // missing are downloaded after the scan instead (downloadMissingPrevouts).
       let update = try await Task.detached { [client] in
         try client.fullScan(
           request: fullScanRequest,
           stopGap: UInt64(gapLimit),
           batchSize: UInt64(Constants.syncBatchSize),
-          fetchPrevTxouts: true,
+          fetchPrevTxouts: false,
         )
       }.value
       let scanSeconds = Self.uptime - scanStart
@@ -472,18 +475,20 @@ final class BitcoinService {
       }
       try Task.checkCancellation()
 
-      progressTracker?.scanFinished(now: Self.uptime)
-      publishProgress()
       addToLog("Full scan returned in \(String(format: "%.1f", scanSeconds))s, bar at \(Self.percent(progressTracker?.fraction))")
-      setSyncState(.syncing(.saving), generation: syncGeneration)
       beginSyncAction("Applying the scan's update to the wallet", calls: "BDK Wallet.applyUpdate", generation: syncGeneration)
       try wallet.applyUpdate(update: update)
+      await downloadMissingPrevouts(client: client, wallet: wallet, generation: syncGeneration)
 
       // Final identity check before persisting
       guard walletGeneration == syncGeneration else {
         addToLog("Sync cancelled: wallet replaced before persist")
         return
       }
+
+      progressTracker?.scanFinished(now: Self.uptime)
+      publishProgress()
+      setSyncState(.syncing(.saving), generation: syncGeneration)
 
       if let syncPersister {
         beginSyncAction("Saving to the wallet database", calls: "BDK Wallet.persist (SQLite)", generation: syncGeneration)
@@ -734,16 +739,11 @@ final class BitcoinService {
 
     var lastUsed: [UTXOItem.KeychainKind: UInt32] = [:]
     var firstSeen: [(keychain: UTXOItem.KeychainKind, index: UInt32)] = []
-    var externalParents = Set<String>()
     for tx in txs {
       var touched = tx.output().compactMap { keychainIndex($0.scriptPubkey) }
       if !tx.isCoinbase() {
         for input in tx.input() {
-          let parentTxid = input.previousOutput.txid.description
-          guard let parent = lookup[parentTxid] else {
-            externalParents.insert(parentTxid)
-            continue
-          }
+          guard let parent = lookup[input.previousOutput.txid.description] else { continue }
           let parentOutputs = parent.output()
           let vout = Int(input.previousOutput.vout)
           if vout < parentOutputs.count, let spent = keychainIndex(parentOutputs[vout].scriptPubkey) {
@@ -763,8 +763,77 @@ final class BitcoinService {
       gap: gap,
       batchSize: Constants.syncBatchSize,
       firstSeen: firstSeen,
-      externalParents: externalParents.count,
       clientWarm: clientWarm,
+    )
+  }
+
+  /// How many missing parents to download at once. Each download is a blocking call
+  /// on a cooperative thread, so this stays well under the device's core count.
+  private static let parentDownloadConcurrency = 4
+
+  /// Downloads the outputs the wallet's transactions spend but it doesn't have: the
+  /// inputs of payments received from outside, which their fees need. The scan runs
+  /// with fetchPrevTxouts off, so it doesn't download every received payment's
+  /// parent on every sync; this downloads each missing one once, and the wallet saves
+  /// its outputs with the rest of its data. A parent that fails to download is tried
+  /// again on the next sync, without failing this one.
+  private func downloadMissingPrevouts(client: ElectrumClient, wallet: Wallet, generation: UInt64) async {
+    var missing: [Txid: [OutPoint]] = [:]
+    for canonical in wallet.transactions() where !canonical.transaction.isCoinbase() {
+      do {
+        _ = try wallet.calculateFee(tx: canonical.transaction)
+      } catch let CalculateFeeError.MissingTxOut(outPoints) {
+        for outpoint in outPoints {
+          missing[outpoint.txid, default: []].append(outpoint)
+        }
+      } catch {
+        continue
+      }
+    }
+    guard !missing.isEmpty else {
+      addToLog("No parent transactions to download: the wallet has every output its transactions spend")
+      return
+    }
+
+    let outputCount = missing.values.reduce(0) { $0 + $1.count }
+    beginSyncAction(
+      "Downloading \(missing.count) parent \(missing.count == 1 ? "transaction" : "transactions") for the fees of received payments",
+      calls: "\(missing.count) × blockchain.transaction.get for \(outputCount) \(outputCount == 1 ? "output" : "outputs") the wallet doesn't have, "
+        + "\(Self.parentDownloadConcurrency) at a time",
+      generation: generation,
+    )
+    var parents: [Txid: Transaction] = [:]
+    var failed = 0
+    await withTaskGroup(of: (Txid, Transaction?).self) { group in
+      var pending = Array(missing.keys)
+      for _ in 0 ..< min(Self.parentDownloadConcurrency, pending.count) {
+        let txid = pending.removeLast()
+        group.addTask { (txid, try? client.fetchTx(txid: txid)) }
+      }
+      for await (txid, parent) in group {
+        // The server answers with the transaction it has under that txid; take it only
+        // if it hashes to the txid asked for
+        if let parent, parent.computeTxid() == txid {
+          parents[txid] = parent
+        } else {
+          failed += 1
+        }
+        if let next = pending.popLast() {
+          group.addTask { (next, try? client.fetchTx(txid: next)) }
+        }
+      }
+    }
+    guard walletGeneration == generation else { return }
+
+    for (txid, outpoints) in missing {
+      guard let outputs = parents[txid]?.output() else { continue }
+      for outpoint in outpoints where Int(outpoint.vout) < outputs.count {
+        wallet.insertTxout(outpoint: outpoint, txout: outputs[Int(outpoint.vout)])
+      }
+    }
+    addToLog(
+      "Downloaded \(parents.count) of \(missing.count) parent transactions"
+        + (failed > 0 ? "; \(failed) failed and will be tried again on the next sync" : ""),
     )
   }
 
