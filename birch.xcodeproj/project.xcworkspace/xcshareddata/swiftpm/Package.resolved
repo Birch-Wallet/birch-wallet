@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Birch-Wallet/bdk-swift",
       "state" : {
-        "revision" : "328b09bc45ab1c98cb46757a8cff74e935029cb3",
-        "version" : "3.1.1-populate-cache"
+        "revision" : "9f33fd892e18e55f8b5d6fff353ce8a400fe7e03",
+        "version" : "3.1.1-populate-tx-cache"
       }
     },
     {

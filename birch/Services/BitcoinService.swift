@@ -350,9 +350,8 @@ final class BitcoinService {
   }
 
   /// Full Resync: syncs over a new connection without filling its cache from the saved
-  /// wallet, so every transaction and proof comes from the server again, as if
-  /// populateCache didn't exist. The saved wallet stays, and the scan merges into it
-  /// as any sync does.
+  /// wallet, so every transaction comes from the server again, as if populateTxCache
+  /// didn't exist. The saved wallet stays, and the scan merges into it as any sync does.
   func fullResync() async throws {
     try await sync(fullResync: true)
   }
@@ -380,8 +379,9 @@ final class BitcoinService {
     // The work this sync should take, from what the saved wallet holds. A wallet
     // that has never synced has nothing to go on, so its bar sweeps instead. One that
     // has fills a new connection's cache from its saved transactions before the scan
-    // (populateCache), so the connection is as warm as one that already synced it.
-    // Full Resync doesn't, so it downloads everything.
+    // (populateTxCache), so the connection is about as warm as one that already synced
+    // it: only the merkle proofs, fetched in batches, come again. Full Resync doesn't,
+    // so it downloads everything.
     let walletHasSynced = wallet.latestCheckpoint().height != 0
     let clientWarm = walletHasSynced && !fullResync
     let plan = walletHasSynced ? syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm) : nil
@@ -432,17 +432,17 @@ final class BitcoinService {
       }
 
       // A new connection's cache is empty, so the scan would download every saved
-      // transaction and its proof again. Filling it from the saved wallet costs no
-      // round trips; the client still checks each saved proof against the server's
-      // header at its height before reusing it.
+      // transaction again, one round trip each. Filling it from the saved wallet costs
+      // no round trips. The merkle proofs still come from the server, in batches, and
+      // are checked against its headers.
       if walletHasSynced, !fullResync, client !== syncedClient {
         beginSyncAction(
           "Filling the connection's cache with the saved transactions",
-          calls: "ElectrumClient.populateCache (no network)",
+          calls: "ElectrumClient.populateTxCache (no network)",
           generation: syncGeneration,
         )
         let populateStart = Self.uptime
-        client.populateCache(wallet: wallet)
+        client.populateTxCache(txs: wallet.transactions().map(\.transaction))
         addToLog("Cache filled from the saved wallet in \(Self.milliseconds(Self.uptime - populateStart))")
       }
 
