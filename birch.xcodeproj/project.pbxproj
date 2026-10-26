@@ -486,7 +486,7 @@
 			repositoryURL = "https://github.com/Birch-Wallet/bdk-swift";
 			requirement = {
 				kind = exactVersion;
-				version = "3.1.1-populate-cache";
+				version = "3.1.1-populate-tx-cache";
 			};
 		};
 		AA00000400000000000000D0 /* XCRemoteSwiftPackageReference "URKit" */ = {
