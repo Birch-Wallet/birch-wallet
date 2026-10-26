@@ -242,10 +242,16 @@ final class LogFileStore: @unchecked Sendable {
       queue.async { [weak self] in
         guard let self else { continuation.resume(returning: []); return }
         var result: [LogEntry] = []
+        // Compare time intervals rather than `entry.t >= since`: the iOS 27.2 SDK
+        // weak-links Foundation's `Date.>=`, which some iOS 27.2 betas lack, so the
+        // call jumped to a null address and crashed the Debug Logs viewer.
+        let cutoff = since.timeIntervalSinceReferenceDate
         for url in [archiveURL, fileURL] {
           guard let data = try? Data(contentsOf: url) else { continue }
           for lineSlice in data.split(separator: 0x0A) {
-            if let entry = try? decoder.decode(LogEntry.self, from: Data(lineSlice)), entry.t >= since {
+            if let entry = try? decoder.decode(LogEntry.self, from: Data(lineSlice)),
+               entry.t.timeIntervalSinceReferenceDate >= cutoff
+            {
               result.append(entry)
             }
           }
