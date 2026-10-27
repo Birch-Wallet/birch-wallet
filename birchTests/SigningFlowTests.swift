@@ -219,6 +219,9 @@ struct SigningFlowTests {
 
     #expect(vm.broadcastTxid == "")
     #expect(vm.errorMessage != nil)
+    // Nothing was sent, so nothing to confirm
+    #expect(vm.postBroadcastSync == nil)
+    #expect(mock.syncCallCount == 0)
   }
 
   @Test func `broadcast sets txid on success`() async {
@@ -230,9 +233,9 @@ struct SigningFlowTests {
     await vm.broadcast()
 
     #expect(vm.broadcastTxid == "txid_abc")
-    // Sync is now triggered by the View layer (BroadcastResultView) on navigation,
-    // not by the ViewModel after broadcast
-    #expect(mock.syncCallCount == 0)
+    // The broadcast starts a sync itself, however the success screen is left
+    await vm.postBroadcastSync?.value
+    #expect(mock.syncCallCount == 1)
   }
 
   // MARK: - SendViewModel + Mock: createPSBT

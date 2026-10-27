@@ -72,7 +72,7 @@ final class BitcoinService {
   /// Comparing generations lets an in-flight sync detect that its wallet was swapped
   /// out even when the profile id is unchanged — e.g. a descriptor edit reloads the
   /// same profile with a fresh Wallet and persister.
-  private var walletGeneration: UInt64 = 0
+  private(set) var walletGeneration: UInt64 = 0
 
   /// Updates syncState only if the wallet the sync started against is still loaded.
   /// Prevents a long-running sync from overwriting UI state after a wallet switch
@@ -2037,6 +2037,9 @@ final class BitcoinService {
 
     let (_, tx) = try finalizePSBT(psbtData)
     let config = connectionConfig(for: profile)
+    // The wallet the transaction was finalized against, so a wallet loaded while it
+    // was being sent never has it recorded
+    let generation = walletGeneration
     logger.info("Broadcasting finalized tx (\(psbtData.count) byte PSBT) via \(config.url)")
 
     // A new connection, as a sync opens, so one left idle since the last sync can't
@@ -2056,6 +2059,7 @@ final class BitcoinService {
         try client.transactionBroadcast(tx: tx).description
       }.value
       logger.info("Broadcast succeeded: tx \(result)")
+      recordBroadcast(tx, generation: generation)
       return result
     } catch {
       logger.error("Broadcast failed: \(error)")
@@ -2066,6 +2070,32 @@ final class BitcoinService {
       }
       throw error
     }
+  }
+
+  /// Adds a transaction the server just accepted to the wallet as unconfirmed, so the
+  /// coins it spends stop counting as spendable and it shows as pending before the next
+  /// sync finds it. A fee bump's replacement is newer than the transaction it
+  /// replaces, so the wallet shows the replacement. Skipped when another wallet, or a
+  /// reload of this one, was loaded while it was sent: that wallet's next sync finds
+  /// it. Never throws, because the broadcast itself has already succeeded.
+  func recordBroadcast(_ tx: Transaction, generation: UInt64) {
+    let txid = tx.computeTxid().description
+    guard walletGeneration == generation, let wallet else {
+      addToLog("Broadcast tx \(txid) not recorded: the wallet was replaced while it was sent; the next sync finds it")
+      return
+    }
+    let lastSeen = UInt64(Date().timeIntervalSince1970)
+    wallet.applyUnconfirmedTxs(unconfirmedTxs: [UnconfirmedTx(tx: tx, lastSeen: lastSeen)])
+    if let persister {
+      do {
+        _ = try wallet.persist(persister: persister)
+      } catch {
+        addToLog("Broadcast tx \(txid) recorded but not saved: \(error); the next sync saves it")
+      }
+    }
+    let balanceBefore = balance
+    updateCachedData()
+    addToLog("Recorded broadcast tx \(txid) as unconfirmed: balance \(balanceBefore) -> \(balance) sats, \(utxos.count) UTXOs")
   }
 
   // MARK: - PSBT Import Validation
