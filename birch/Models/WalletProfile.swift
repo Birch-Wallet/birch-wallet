@@ -32,7 +32,7 @@ final class WalletProfile {
     internalDescriptor: String,
     network: BitcoinNetwork = .testnet4,
     isActive: Bool = false,
-    addressGapLimit: Int = 20,
+    addressGapLimit: Int = Constants.defaultAddressGap,
     electrumHost: String = "",
     electrumPort: Int = 0,
     electrumSSL: Int = 0,

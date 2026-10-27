@@ -10,9 +10,9 @@ struct WalletInfoView: View {
   @Environment(\.dismiss) private var dismiss
   @Bindable var wallet: WalletProfile
   @State private var gapLimitText: String = ""
-  @State private var isResyncing = false
-  @State private var resyncError: String?
-  @State private var resyncSuccess = false
+  @State private var isSyncing = false
+  @State private var syncError: String?
+  @State private var syncSucceeded = false
   @State private var showEditCosigners = false
   @State private var isEditingName = false
   @State private var editedName: String = ""
@@ -334,9 +334,9 @@ struct WalletInfoView: View {
         }
         .hbCard()
 
-        // Gap Limit & Resync
+        // Gap limit and sync
         VStack(spacing: 16) {
-          Text("Refresh Settings")
+          Text("Sync Settings")
             .font(.hbHeadline)
             .foregroundStyle(Color.hbTextPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -380,15 +380,15 @@ struct WalletInfoView: View {
           HBDivider()
 
           VStack(spacing: 12) {
-            Button(action: forceResync) {
+            Button(action: syncWallet) {
               HStack(spacing: 8) {
-                if isResyncing {
+                if isSyncing {
                   ProgressView()
                     .tint(Color.hbProgress)
                 } else {
                   Image(systemName: "arrow.clockwise")
                 }
-                Text(isResyncing ? "Refreshing..." : "Force Full Refresh")
+                Text(isSyncing ? "Syncing…" : "Sync")
                   .font(.hbBody(15))
               }
               .foregroundStyle(Color.hbBrandInk)
@@ -397,19 +397,19 @@ struct WalletInfoView: View {
               .background(Color.hbBrandInk.opacity(0.12))
               .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .disabled(isResyncing)
+            .disabled(isSyncing)
 
-            Text("Refreshes all addresses from scratch using the gap limit above. This may take a while.")
+            Text("Checks every address up to the gap limit above. A large wallet can take a minute.")
               .font(.hbBody(12))
               .foregroundStyle(Color.hbTextSecondary)
 
-            if resyncSuccess {
-              Label("Refresh complete", systemImage: "checkmark.circle.fill")
+            if syncSucceeded {
+              Label("Sync complete", systemImage: "checkmark.circle.fill")
                 .font(.hbBody(14))
                 .foregroundStyle(Color.hbSuccess)
             }
 
-            if let error = resyncError {
+            if let error = syncError {
               Text(error)
                 .font(.hbBody(13))
                 .foregroundStyle(Color.hbError)
@@ -562,22 +562,22 @@ struct WalletInfoView: View {
     isEditingName = false
   }
 
-  private func forceResync() {
-    logger.info("Force full resync initiated")
-    isResyncing = true
-    resyncError = nil
-    resyncSuccess = false
+  private func syncWallet() {
+    logger.info("Sync started from Wallet Settings")
+    isSyncing = true
+    syncError = nil
+    syncSucceeded = false
 
     Task {
       do {
-        try await BitcoinService.shared.fullResync()
-        logger.info("Force resync completed")
-        resyncSuccess = true
+        try await BitcoinService.shared.sync()
+        logger.info("Sync from Wallet Settings completed")
+        syncSucceeded = true
       } catch {
-        logger.error("Force resync failed: \(error)")
-        resyncError = error.localizedDescription
+        logger.error("Sync from Wallet Settings failed: \(error)")
+        syncError = error.localizedDescription
       }
-      isResyncing = false
+      isSyncing = false
     }
   }
 
@@ -898,7 +898,7 @@ private struct EditCosignersView: View {
       Button("Change Keys", role: .destructive) { commit() }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("This rebuilds the wallet from the new cosigner details. Birch clears its downloaded transactions and UTXOs and refreshes from scratch. A changed key gives the wallet different addresses, so labels and frozen coins on the current transactions, addresses and UTXOs won't match anything, and saved PSBTs can't be signed. Export your labels and output descriptor first if you might need them.")
+      Text("This rebuilds the wallet from the new cosigner details. Birch clears its downloaded transactions and UTXOs and syncs from scratch. A changed key gives the wallet different addresses, so labels and frozen coins on the current transactions, addresses and UTXOs won't match anything, and saved PSBTs can't be signed. Export your labels and output descriptor first if you might need them.")
     }
   }
 

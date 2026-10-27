@@ -32,7 +32,7 @@ enum AppError: LocalizedError {
     case let .electrumConnectionFailed(detail):
       "Electrum connection failed: \(detail)"
     case let .syncFailed(detail):
-      "Refresh failed: \(detail)"
+      "Sync failed: \(detail)"
     case let .psbtCreationFailed(detail):
       "PSBT creation failed: \(detail)"
     case let .psbtCombineFailed(detail):

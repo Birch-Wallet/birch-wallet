@@ -98,7 +98,7 @@ final class SetupWizardViewModel {
 
   // Advanced settings
   var blockExplorerHost: String = ""
-  var addressGapLimit: String = "20"
+  var addressGapLimit: String = "\(Constants.defaultAddressGap)"
 
   // State
   var errorMessage: String?
@@ -921,7 +921,7 @@ final class SetupWizardViewModel {
       internalDescriptor: internalDescriptor,
       network: network,
       isActive: true,
-      addressGapLimit: Int(addressGapLimit) ?? 50,
+      addressGapLimit: Int(addressGapLimit) ?? Constants.defaultAddressGap,
       electrumHost: electrumHost.trimmingCharacters(in: .whitespaces),
       electrumPort: Int(electrumPort) ?? 0,
       electrumSSL: electrumSSL,

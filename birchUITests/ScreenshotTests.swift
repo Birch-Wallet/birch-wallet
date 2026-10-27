@@ -212,12 +212,12 @@ final class ScreenshotTests: XCTestCase {
 
     // Wait for the main Transactions tab, then for the Electrum sync to land
     // (the first transaction row), the fiat rates (the balance's fiat line) and
-    // the sync to finish (the sync message gives way to "Last refreshed").
+    // the sync to finish (the sync status gives way to "Synced").
     let balanceExists = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'sats'")).firstMatch
     XCTAssertTrue(balanceExists.waitForExistence(timeout: 40), "Main screen should appear after wallet creation")
     XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 45), "Transactions should appear once the wallet syncs")
     XCTAssertTrue(app.staticTexts["balanceFiat"].waitForExistence(timeout: 20), "Balance should show its fiat value")
-    XCTAssertTrue(app.staticTexts["lastRefreshed"].waitForExistence(timeout: 20), "Sync status should read Last refreshed")
+    XCTAssertTrue(app.staticTexts["lastSynced"].waitForExistence(timeout: 20), "Sync status should read Synced")
     settle()
 
     // MARK: 04 - Transactions (balance hero + tx list)
