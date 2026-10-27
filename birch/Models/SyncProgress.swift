@@ -30,10 +30,10 @@ enum SyncPhase: Equatable {
 /// BDK's full scan asks for the addresses' histories in batches, one round trip a
 /// batch, and fetches each transaction it hasn't seen on its own, one round trip
 /// each, before it starts the next batch. After the last batch it fetches the
-/// parents of received transactions (fetchPrevTxouts) one at a time, then the
 /// confirmations' proofs and headers in two batched calls. The client keeps every
 /// transaction it fetched, so another sync on the same connection costs little
-/// more than its batches.
+/// more than its batches. Birch scans with fetchPrevTxouts off and downloads the
+/// few parents the wallet is missing afterwards, so they aren't part of the plan.
 struct SyncWorkPlan: Equatable {
   typealias Keychain = UTXOItem.KeychainKind
 
@@ -59,8 +59,6 @@ struct SyncWorkPlan: Equatable {
   let tailUnits: Double
   /// The connection already synced this wallet, so its cache holds the transactions
   let clientWarm: Bool
-  /// Parents of saved transactions that aren't the wallet's own
-  let externalParents: Int
 
   var scanUnits: Double {
     batches.reduce(0) { $0 + $1.units } + tailUnits
@@ -76,16 +74,13 @@ struct SyncWorkPlan: Equatable {
   ///   - firstSeen: for each saved transaction, the first of the wallet's addresses
   ///     it touches in scan order (receive before change, then by index). That is the
   ///     batch whose histories bring it in; later batches find it in the cache.
-  ///   - externalParents: the distinct parents of saved transactions that aren't the
-  ///     wallet's own, which fetchPrevTxouts fetches after the last batch.
   ///   - clientWarm: the connection already synced this wallet, so its cache holds
-  ///     the saved transactions and their parents.
+  ///     the saved transactions.
   static func make(
     lastUsed: [Keychain: UInt32],
     gap: Int,
     batchSize: UInt32,
     firstSeen: [(keychain: Keychain, index: UInt32)],
-    externalParents: Int,
     clientWarm: Bool,
   ) -> SyncWorkPlan {
     let size = Int(max(batchSize, 1))
@@ -110,14 +105,7 @@ struct SyncWorkPlan: Equatable {
       batches[position].units += transactionUnits
       batches[position].transactions += 1
     }
-    let parentUnits = clientWarm ? 0 : Double(externalParents)
-    return SyncWorkPlan(
-      batchSize: UInt32(size),
-      batches: batches,
-      tailUnits: tailBaseUnits + parentUnits,
-      clientWarm: clientWarm,
-      externalParents: externalParents,
-    )
+    return SyncWorkPlan(batchSize: UInt32(size), batches: batches, tailUnits: tailBaseUnits, clientWarm: clientWarm)
   }
 
   /// The position of the batch that starts at `index`, adding one when the scan
@@ -367,16 +355,10 @@ extension SyncWorkPlan {
       }
     }
     if position == batches.count - 1 {
-      // After the last batch BDK fetches the parents and the proofs, unannounced
+      // After the last batch BDK fetches the proofs, unannounced
       if clientWarm {
         downloads.append("the latest block headers")
         nextCalls.append("blockchain.block.header for new blocks (batched)")
-      } else if externalParents > 0 {
-        downloads.append("about \(externalParents) parent \(externalParents == 1 ? "transaction" : "transactions") and the confirmation proofs")
-        nextCalls.append(
-          "~\(externalParents) × blockchain.transaction.get for parents (fetchPrevTxouts, expected), "
-            + "then blockchain.transaction.get_merkle and blockchain.block.header (batched)",
-        )
       } else {
         downloads.append("the confirmation proofs")
         nextCalls.append("blockchain.transaction.get_merkle and blockchain.block.header (batched)")
