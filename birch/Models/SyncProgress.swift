@@ -131,6 +131,8 @@ struct SyncWorkPlan: Equatable {
 /// How far a sync has got, for the hairline under the balance. It moves the way
 /// Safari's loading bar does:
 /// - It jumps to 10% when the sync starts, so the tap visibly registered.
+/// - It stays under 20% until the server answers the ping and sends its chain tip,
+///   so a server it can't reach doesn't look like progress.
 /// - Each batch BDK starts closes half the distance to the point the work before it
 ///   ends at.
 /// - Between batches it eases toward where the batch in flight should end, at the
@@ -145,6 +147,8 @@ struct SyncWorkPlan: Equatable {
 /// reports no fraction and the bar sweeps instead.
 struct SyncProgressTracker {
   static let start = 0.10
+  /// The bar's cap until the server answers
+  static let connectingCap = 0.20
   static let scanEnd = 0.85
   static let cap = 0.95
   /// The share of the remaining distance to a checkpoint that reaching it closes at once
@@ -242,9 +246,9 @@ struct SyncProgressTracker {
     let ceiling: Double
     switch stage {
     case .head:
-      goal = target(SyncWorkPlan.headUnits, of: plan)
+      goal = min(target(SyncWorkPlan.headUnits, of: plan), Self.connectingCap)
       expectedSeconds = SyncWorkPlan.headUnits * secondsPerUnit
-      ceiling = Self.scanEnd
+      ceiling = Self.connectingCap
     case let .batch(position):
       var inFlight = position < plan.batches.count ? plan.batches[position].units : 0
       if position >= plan.batches.count - 1 {

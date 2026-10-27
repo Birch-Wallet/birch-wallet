@@ -990,9 +990,14 @@ struct WalletIdenticon: View {
 
 struct SyncStatusDot: View {
   let state: WalletSyncState
+  /// The phone has no network: the dot is secondary unless a sync is still running
+  var offline = false
 
   var color: Color {
-    switch state {
+    if offline, !state.isSyncing {
+      return .hbTextSecondary
+    }
+    return switch state {
     case .notStarted: .hbTextSecondary
     case .syncing: .hbProgress
     case .synced: .hbSuccess

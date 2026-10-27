@@ -127,7 +127,7 @@ struct ConnectionStatusView: View {
           .foregroundStyle(Color.hbTextSecondary)
         Spacer()
         HStack(spacing: 6) {
-          SyncStatusDot(state: service.syncState)
+          SyncStatusDot(state: service.syncState, offline: NetworkMonitor.shared.state.isOffline)
           Text(syncStateLabel)
             .font(.hbBody(15))
             .foregroundStyle(Color.hbTextPrimary)
@@ -311,6 +311,7 @@ struct ConnectionStatusView: View {
     lines.append("currentProfile set: \(service.currentProfile != nil)")
     lines.append("currentProfile ID: \(service.currentProfile?.id.uuidString ?? "nil")")
     lines.append("wallet loaded: \(service.wallet != nil)")
+    lines.append("network: \(NetworkMonitor.shared.state.logDescription)")
     lines.append("electrumConnected: \(service.isElectrumConnected)")
     lines.append("electrumURL: \(service.electrumURL ?? "nil")")
     lines.append("chainTipHeight: \(service.chainTipHeight)")

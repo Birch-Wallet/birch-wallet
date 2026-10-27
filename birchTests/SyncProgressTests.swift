@@ -106,6 +106,29 @@ struct SyncProgressTests {
     #expect(tracker.fraction == 1)
   }
 
+  /// A server that never answers: the bar still moves, so the tap registered, but
+  /// five minutes of waiting don't take it past 20%
+  @Test(arguments: [true, false])
+  func `connecting never passes 20 percent`(large: Bool) throws {
+    var tracker = SyncProgressTracker(plan: large ? largeWalletPlan() : smallWalletPlan(), secondsPerUnit: 0.065, now: 0)
+    var fills: [Double] = []
+    for tenth in 1 ... 3000 {
+      tracker.tick(now: Double(tenth) / 10)
+      try fills.append(#require(tracker.fraction))
+    }
+    #expect(fills.allSatisfy { $0 <= SyncProgressTracker.connectingCap })
+    #expect(isNonDecreasing(fills))
+    #expect(try #require(fills.last) > SyncProgressTracker.start)
+  }
+
+  @Test func `the bar passes 20 percent once the server answers`() throws {
+    var tracker = SyncProgressTracker(plan: largeWalletPlan(), secondsPerUnit: 0.065, now: 0)
+    tracker.tick(now: 60)
+    tracker.serverReady(now: 60)
+    tracker.tick(now: 90)
+    #expect(try #require(tracker.fraction) > SyncProgressTracker.connectingCap)
+  }
+
   /// The large wallet's sync, paced as the benchmark measured it (about 65 ms a round
   /// trip). The bar should be most of the way, but not past 85%, when the scan returns.
   @Test func `large wallet lands between 70 and 85 percent before the scan returns`() {
