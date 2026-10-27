@@ -187,11 +187,8 @@ struct BroadcastResultView: View {
   private func navigateToTransactions() {
     countdownTimer?.invalidate()
     viewModel.reset()
+    // The broadcast already started a sync (SendViewModel.broadcast)
     selectedTab = 0
-    // Sync after navigation so the new transaction appears in the list
-    Task {
-      try? await BitcoinService.shared.sync()
-    }
   }
 
   private func saveRecipientLabels() {

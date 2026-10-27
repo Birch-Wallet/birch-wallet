@@ -604,6 +604,9 @@ final class SendViewModel: PSBTFlowManaging {
     }
   }
 
+  /// The sync started after a successful broadcast
+  @ObservationIgnored private(set) var postBroadcastSync: Task<Void, Never>?
+
   func broadcast() async {
     guard isPSBTForLoadedWallet else {
       errorMessage = otherWalletPSBTMessage
@@ -613,6 +616,11 @@ final class SendViewModel: PSBTFlowManaging {
     do {
       let txid = try await bitcoinService.broadcastPSBT(psbtBytes)
       broadcastTxid = txid
+      // Started here rather than on leaving the success screen, so it runs however
+      // the screen is left. The transaction is already in the wallet; the sync
+      // confirms it with the server.
+      let service = bitcoinService
+      postBroadcastSync = Task { try? await service.sync() }
     } catch {
       errorMessage = error.localizedDescription
     }
