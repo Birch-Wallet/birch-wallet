@@ -346,6 +346,17 @@ final class BitcoinService {
   // MARK: - Sync
 
   func sync() async throws {
+    try await sync(fullResync: false)
+  }
+
+  /// Full Resync: syncs over a new connection without filling its cache from the saved
+  /// wallet, so every transaction comes from the server again, as if populateTxCache
+  /// didn't exist. The saved wallet stays, and the scan merges into it as any sync does.
+  func fullResync() async throws {
+    try await sync(fullResync: true)
+  }
+
+  private func sync(fullResync: Bool) async throws {
     guard let wallet else {
       addToLog("Sync failed: Wallet not loaded")
       throw AppError.walletNotLoaded
@@ -366,9 +377,14 @@ final class BitcoinService {
     let gapLimit = currentProfile?.scanGapLimit ?? Constants.defaultAddressGap
 
     // The work this sync should take, from what the saved wallet holds. A wallet
-    // that has never synced has nothing to go on, so its bar sweeps instead.
-    let clientWarm = electrumClient != nil && electrumClient === syncedClient
-    let plan = wallet.latestCheckpoint().height == 0 ? nil : syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm)
+    // that has never synced has nothing to go on, so its bar sweeps instead. One that
+    // has fills a new connection's cache from its saved transactions before the scan
+    // (populateTxCache), so the connection is about as warm as one that already synced
+    // it: only the merkle proofs, fetched in batches, come again. Full Resync doesn't,
+    // so it downloads everything.
+    let walletHasSynced = wallet.latestCheckpoint().height != 0
+    let clientWarm = walletHasSynced && !fullResync
+    let plan = walletHasSynced ? syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm) : nil
     let learnedSecondsPerUnit = syncProfileId.map { UserDefaults.standard.double(forKey: Self.syncPaceKey($0)) } ?? 0
     startProgress(plan: plan, secondsPerUnit: learnedSecondsPerUnit, generation: syncGeneration)
     syncStartUptime = Self.uptime
@@ -383,7 +399,7 @@ final class BitcoinService {
 
     setSyncState(.syncing(.connecting), generation: syncGeneration)
     addToLog(
-      "Starting sync (gap \(gapLimit), "
+      (fullResync ? "Starting full resync (gap \(gapLimit), " : "Starting sync (gap \(gapLimit), ")
         + (plan.map { "expecting \(Int($0.totalUnits)) round trips in \($0.batches.count) batches" } ?? "first sync, no estimate")
         + (clientWarm ? ", client cache warm)" : ")"),
     )
@@ -395,8 +411,9 @@ final class BitcoinService {
     let utxoCountBefore = utxos.count
 
     do {
-      // Try to reconnect if client is nil (e.g. app started offline)
-      if electrumClient == nil, let profile = currentProfile {
+      // Try to reconnect if client is nil (e.g. app started offline). Full Resync
+      // always opens a new connection, so the old one's cache goes with it.
+      if fullResync || electrumClient == nil, let profile = currentProfile {
         let config = connectionConfig(for: profile)
         beginSyncAction(
           "Connecting to \(config.host):\(config.port) (\(config.useSSL ? "TCP and TLS handshake" : "TCP, no TLS"))",
@@ -412,6 +429,21 @@ final class BitcoinService {
       guard let client = electrumClient else {
         addToLog("Sync failed: No Electrum client")
         throw AppError.electrumConnectionFailed("No internet connection")
+      }
+
+      // A new connection's cache is empty, so the scan would download every saved
+      // transaction again, one round trip each. Filling it from the saved wallet costs
+      // no round trips. The merkle proofs still come from the server, in batches, and
+      // are checked against its headers.
+      if walletHasSynced, !fullResync, client !== syncedClient {
+        beginSyncAction(
+          "Filling the connection's cache with the saved transactions",
+          calls: "ElectrumClient.populateTxCache (no network)",
+          generation: syncGeneration,
+        )
+        let populateStart = Self.uptime
+        client.populateTxCache(txs: wallet.transactions().map(\.transaction))
+        addToLog("Cache filled from the saved wallet in \(Self.milliseconds(Self.uptime - populateStart))")
       }
 
       // Verify the server is reachable before the scan starts, so the bar doesn't
