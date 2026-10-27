@@ -87,9 +87,10 @@ struct WalletSetupFlowTests {
     #expect(profile.internalDescriptor == vm.internalDescriptor)
 
     // The Receive screen's address
-    let (address, index) = try service.getNextAddress()
-    #expect(index == 0)
-    #expect(address == core.receive[0])
+    let receive0 = try #require(try service.getNextAddress())
+    #expect(receive0.index == 0)
+    #expect(receive0.address == core.receive[0])
+    #expect(receive0.hasNext)
 
     // The address list: one gap-limit window on each chain, nothing used yet
     let receive = service.getAddresses(keychain: .external)

@@ -704,10 +704,12 @@ struct HBPrimaryButtonModifier: ViewModifier {
 /// Full-width secondary buttons sit on the ground, so they take the card fill
 /// (and its light-mode shadow) to stay visible in themes where nested == ground.
 struct HBSecondaryButtonModifier: ViewModifier {
+  var isEnabled: Bool = true
+
   func body(content: Content) -> some View {
     content
       .font(.hbHeadline)
-      .foregroundStyle(Color.hbBrandInk)
+      .foregroundStyle(isEnabled ? Color.hbBrandInk : Color.hbDisabledInk)
       .frame(maxWidth: .infinity)
       .padding(.vertical, 16)
       .birchCard()
@@ -868,8 +870,8 @@ extension View {
     modifier(HBPrimaryButtonModifier(isEnabled: isEnabled))
   }
 
-  func hbSecondaryButton() -> some View {
-    modifier(HBSecondaryButtonModifier())
+  func hbSecondaryButton(isEnabled: Bool = true) -> some View {
+    modifier(HBSecondaryButtonModifier(isEnabled: isEnabled))
   }
 
   /// Next or Import beside Back on a setup step's footer

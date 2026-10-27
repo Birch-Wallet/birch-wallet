@@ -104,6 +104,9 @@ struct ReceiveView: View {
             }
             .padding(.top, 4)
           }
+        } else if viewModel.isGapLimitReached {
+          // No address within the gap limit to show at all
+          gapLimitWarning
         } else {
           ProgressView()
             .tint(Color.hbProgress)
@@ -115,9 +118,16 @@ struct ReceiveView: View {
 
         Button(action: { viewModel.generateNewAddress() }) {
           Text("Next Address")
-            .hbSecondaryButton()
+            .hbSecondaryButton(isEnabled: !viewModel.isGapLimitReached)
         }
+        .disabled(viewModel.isGapLimitReached)
         .padding(.horizontal, 24)
+
+        // Under the button while an address is showing; in its place when none is
+        if viewModel.isGapLimitReached, !viewModel.currentAddress.isEmpty {
+          gapLimitWarning
+            .padding(.top, 8)
+        }
 
         gap
 
@@ -153,6 +163,23 @@ struct ReceiveView: View {
       isEditingLabel = false
       loadLabel()
     }
+    .onChange(of: BitcoinService.shared.syncState) { _, newState in
+      // A sync can find a newly paid address, which moves the gap limit on
+      if case .synced = newState {
+        viewModel.refreshGapLimit()
+      }
+    }
+  }
+
+  /// Why Next Address is off: every address a sync checks is used or labeled
+  private var gapLimitWarning: some View {
+    Text(viewModel.gapLimitMessage)
+      .font(.hbBody(12))
+      .foregroundStyle(Color.hbWarning)
+      .multilineTextAlignment(.center)
+      .fixedSize(horizontal: false, vertical: true)
+      .padding(.horizontal, 32)
+      .accessibilityIdentifier("gapLimitWarning")
   }
 
   private var gap: some View {

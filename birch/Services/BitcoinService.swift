@@ -1373,48 +1373,140 @@ final class BitcoinService {
 
   // MARK: - Addresses
 
+  /// A receive address to show, and whether Next Address has another after it
+  struct ReceiveAddress: Equatable {
+    let address: String
+    let index: UInt32
+    /// False when every later address a sync would check is used or labeled
+    let hasNext: Bool
+  }
+
+  /// The gap limit a sync scans the receive chain with
+  var receiveGapLimit: Int {
+    currentProfile?.scanGapLimit ?? Constants.defaultAddressGap
+  }
+
   /// The receive address to hand out: the lowest-index one that has no
-  /// transactions and no label.
-  func getNextAddress() throws -> (String, UInt32) {
+  /// transactions and no label. Nil when there is none within the gap limit.
+  func getNextAddress() throws -> ReceiveAddress? {
     try receiveAddress(from: 0)
   }
 
-  /// "Next Address": the first available receive address after `index`.
-  func getNextAddress(after index: UInt32) throws -> (String, UInt32) {
-    try receiveAddress(from: index + 1)
+  /// "Next Address": the first available receive address after `index`, or nil
+  /// when there is none within the gap limit.
+  func getNextAddress(after index: UInt32) throws -> ReceiveAddress? {
+    guard index < UInt32.max else { return nil }
+    return try receiveAddress(from: index + 1)
   }
 
-  private func receiveAddress(from start: UInt32) throws -> (String, UInt32) {
+  /// Whether Next Address has an address to give after `index`. Looks without
+  /// revealing anything.
+  func hasReceiveAddress(after index: UInt32) -> Bool {
+    guard let wallet, index < UInt32.max else { return false }
+    return Self.firstAvailableReceiveAddress(
+      in: wallet,
+      from: index + 1,
+      taken: takenReceiveAddresses(),
+      maxIndex: receiveIndexCap(),
+    ) != nil
+  }
+
+  private func receiveAddress(from start: UInt32) throws -> ReceiveAddress? {
     guard let wallet else { throw AppError.walletNotLoaded }
-    // A labeled address counts as handed out even before it is paid, so it
-    // isn't offered to someone else while that payment is still outstanding.
-    var taken = buildUsedAddressSet()
-    if let walletID = currentProfile?.id, let container = modelContainer {
-      taken.formUnion(LabelService.labeledAddresses(walletID: walletID, context: container.mainContext))
+    let taken = takenReceiveAddresses()
+    let cap = receiveIndexCap()
+    guard let available = Self.availableReceiveAddress(in: wallet, from: start, taken: taken, maxIndex: cap) else {
+      logger.info("No receive address left within the gap limit (\(receiveGapLimit)): every one up to #\(cap) is used or labeled")
+      return nil
     }
-    let (info, didReveal) = Self.availableReceiveAddress(in: wallet, from: start, taken: taken)
-    if didReveal {
+    let info = available.info
+    if available.didReveal {
       if let persister {
         _ = try wallet.persist(persister: persister)
       } else {
         logger.warning("Address revealed without persister — derivation state may be lost")
       }
     }
-    return (info.address.description, info.index)
+    let hasNext = info.index < UInt32.max
+      && Self.firstAvailableReceiveAddress(in: wallet, from: info.index + 1, taken: taken, maxIndex: cap) != nil
+    return ReceiveAddress(address: info.address.description, index: info.index, hasNext: hasNext)
   }
 
-  /// The first receive address at or after `start` that isn't in `taken`.
-  /// It is revealed if it wasn't already, so BDK's derivation index records it
-  /// as handed out. Revealing up to an index is a no-op once that index is
-  /// revealed, so looking at an address never moves the wallet's derivation index.
+  /// Receive addresses that count as handed out: every one with a transaction, and
+  /// every labeled one. A labeled address counts even before it is paid, so it isn't
+  /// offered to someone else while that payment is still outstanding.
+  private func takenReceiveAddresses() -> Set<String> {
+    var taken = buildUsedAddressSet()
+    if let walletID = currentProfile?.id, let container = modelContainer {
+      taken.formUnion(LabelService.labeledAddresses(walletID: walletID, context: container.mainContext))
+    }
+    return taken
+  }
+
+  /// The highest receive index a sync checks, so the highest Birch hands out
+  private func receiveIndexCap() -> UInt32 {
+    Self.receiveIndexCap(lastUsed: wallet.flatMap(Self.lastUsedReceiveIndex), gap: receiveGapLimit)
+  }
+
+  /// The highest receive index a sync checks. A full scan stops at the gap-th unused
+  /// address in a row, so it reaches `lastUsed + gap`, or `gap - 1` when no receive
+  /// address has a transaction yet. Funds sent to any later address would not be
+  /// found, by Birch or by a restore with the same gap limit.
+  nonisolated static func receiveIndexCap(lastUsed: UInt32?, gap: Int) -> UInt32 {
+    let gap = UInt32(clamping: max(gap, 1))
+    guard let lastUsed else { return gap - 1 }
+    let (cap, overflow) = lastUsed.addingReportingOverflow(gap)
+    return overflow ? .max : cap
+  }
+
+  /// The highest receive index with a transaction paying it, per the wallet's own
+  /// script index, or nil when no receive address has one
+  static func lastUsedReceiveIndex(in wallet: Wallet) -> UInt32? {
+    var lastUsed: UInt32?
+    for canonicalTx in wallet.transactions() {
+      for output in canonicalTx.transaction.output() {
+        guard let derivation = wallet.derivationOfSpk(spk: output.scriptPubkey),
+              derivation.keychain == .external else { continue }
+        lastUsed = max(lastUsed ?? 0, derivation.index)
+      }
+    }
+    return lastUsed
+  }
+
+  /// The first receive address from `start` through `maxIndex` that isn't in `taken`,
+  /// or nil when there is none. Only looks: nothing is revealed.
+  static func firstAvailableReceiveAddress(
+    in wallet: Wallet,
+    from start: UInt32,
+    taken: Set<String>,
+    maxIndex: UInt32,
+  ) -> AddressInfo? {
+    var index = start
+    while index <= maxIndex {
+      let info = wallet.peekAddress(keychain: .external, index: index)
+      if !taken.contains(info.address.description) {
+        return info
+      }
+      guard index < maxIndex else { break }
+      index += 1
+    }
+    return nil
+  }
+
+  /// The first receive address from `start` through `maxIndex` that isn't in
+  /// `taken`, or nil when there is none. The address returned is revealed if it
+  /// wasn't already, so BDK's derivation index records it as handed out. Revealing
+  /// up to an index is a no-op once that index is revealed, so looking at an address
+  /// never moves the wallet's derivation index, and nothing is revealed when there
+  /// is no address to return.
   static func availableReceiveAddress(
     in wallet: Wallet,
     from start: UInt32,
     taken: Set<String>,
-  ) -> (info: AddressInfo, didReveal: Bool) {
-    var info = wallet.peekAddress(keychain: .external, index: start)
-    while taken.contains(info.address.description) {
-      info = wallet.peekAddress(keychain: .external, index: info.index + 1)
+    maxIndex: UInt32,
+  ) -> (info: AddressInfo, didReveal: Bool)? {
+    guard let info = firstAvailableReceiveAddress(in: wallet, from: start, taken: taken, maxIndex: maxIndex) else {
+      return nil
     }
     let revealed = wallet.revealAddressesTo(keychain: .external, index: info.index)
     return (info, !revealed.isEmpty)
