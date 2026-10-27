@@ -16,7 +16,6 @@ struct SyncProgressTests {
       gap: 20,
       batchSize: UInt32(batchSize),
       firstSeen: [],
-      externalParents: 0,
       clientWarm: false,
     )
     #expect(plan.batches.count * batchSize == addresses)
@@ -28,7 +27,6 @@ struct SyncProgressTests {
       gap: 50,
       batchSize: 50,
       firstSeen: [],
-      externalParents: 0,
       clientWarm: false,
     )
     #expect(plan.batches.count(where: { $0.keychain == .external }) == 15)
@@ -39,7 +37,7 @@ struct SyncProgressTests {
   }
 
   @Test func `unused keychains get one batch each`() {
-    let plan = SyncWorkPlan.make(lastUsed: [:], gap: 50, batchSize: 50, firstSeen: [], externalParents: 0, clientWarm: false)
+    let plan = SyncWorkPlan.make(lastUsed: [:], gap: 50, batchSize: 50, firstSeen: [], clientWarm: false)
     #expect(plan.batches.map(\.keychain) == [.external, .internal])
     #expect(plan.totalUnits == SyncWorkPlan.headUnits + 2 + SyncWorkPlan.tailBaseUnits)
   }
@@ -51,19 +49,18 @@ struct SyncProgressTests {
       gap: 50,
       batchSize: 50,
       firstSeen: firstSeen,
-      externalParents: 3,
       clientWarm: false,
     )
     #expect(cold.batches.map(\.units) == [3, 2, 1, 2, 1])
-    #expect(cold.tailUnits == SyncWorkPlan.tailBaseUnits + 3)
+    // Parents aren't part of the scan: the app downloads the few missing ones after it
+    #expect(cold.tailUnits == SyncWorkPlan.tailBaseUnits)
 
-    // Over a connection that already synced, the transactions and parents are cached
+    // Over a connection that already synced, the transactions are cached
     let warm = SyncWorkPlan.make(
       lastUsed: [.external: 60, .internal: 0],
       gap: 50,
       batchSize: 50,
       firstSeen: firstSeen,
-      externalParents: 3,
       clientWarm: true,
     )
     #expect(warm.batches[0].units == 1 + 2 * SyncWorkPlan.cachedTransactionUnits)
@@ -71,7 +68,7 @@ struct SyncProgressTests {
   }
 
   @Test func `a batch past the saved wallet is added before change`() {
-    var plan = SyncWorkPlan.make(lastUsed: [.external: 10], gap: 50, batchSize: 50, firstSeen: [], externalParents: 0, clientWarm: false)
+    var plan = SyncWorkPlan.make(lastUsed: [.external: 10], gap: 50, batchSize: 50, firstSeen: [], clientWarm: false)
     #expect(plan.batches.count == 3)
     #expect(plan.position(keychain: .external, index: 50) == 1)
     #expect(plan.position(keychain: .external, index: 100) == 2)
@@ -109,6 +106,29 @@ struct SyncProgressTests {
     #expect(tracker.fraction == 1)
   }
 
+  /// A server that never answers: the bar still moves, so the tap registered, but
+  /// five minutes of waiting don't take it past 20%
+  @Test(arguments: [true, false])
+  func `connecting never passes 20 percent`(large: Bool) throws {
+    var tracker = SyncProgressTracker(plan: large ? largeWalletPlan() : smallWalletPlan(), secondsPerUnit: 0.065, now: 0)
+    var fills: [Double] = []
+    for tenth in 1 ... 3000 {
+      tracker.tick(now: Double(tenth) / 10)
+      try fills.append(#require(tracker.fraction))
+    }
+    #expect(fills.allSatisfy { $0 <= SyncProgressTracker.connectingCap })
+    #expect(isNonDecreasing(fills))
+    #expect(try #require(fills.last) > SyncProgressTracker.start)
+  }
+
+  @Test func `the bar passes 20 percent once the server answers`() throws {
+    var tracker = SyncProgressTracker(plan: largeWalletPlan(), secondsPerUnit: 0.065, now: 0)
+    tracker.tick(now: 60)
+    tracker.serverReady(now: 60)
+    tracker.tick(now: 90)
+    #expect(try #require(tracker.fraction) > SyncProgressTracker.connectingCap)
+  }
+
   /// The large wallet's sync, paced as the benchmark measured it (about 65 ms a round
   /// trip). The bar should be most of the way, but not past 85%, when the scan returns.
   @Test func `large wallet lands between 70 and 85 percent before the scan returns`() {
@@ -119,8 +139,7 @@ struct SyncProgressTests {
     #expect(result.fills.last == 1)
   }
 
-  /// The small wallet's time is mostly the parents fetched after the last batch, which
-  /// BDK doesn't announce, so the bar has to get there on its own
+  /// The small wallet has few batches, so most of its bar is the easing between them
   @Test func `small wallet lands between 70 and 85 percent before the scan returns`() {
     let result = replay(smallWalletPlan(), expectedSecondsPerUnit: 0.065, actualSecondsPerUnit: 0.065)
     #expect(result.beforeScanReturns >= 0.70)
@@ -138,7 +157,7 @@ struct SyncProgressTests {
   }
 
   @Test func `more used addresses grow the total without moving the bar back`() throws {
-    let plan = SyncWorkPlan.make(lastUsed: [.external: 100], gap: 50, batchSize: 50, firstSeen: [], externalParents: 0, clientWarm: false)
+    let plan = SyncWorkPlan.make(lastUsed: [.external: 100], gap: 50, batchSize: 50, firstSeen: [], clientWarm: false)
     var tracker = SyncProgressTracker(plan: plan, secondsPerUnit: 0.065, now: 0)
     var fills: [Double] = []
     var now = 0.0
@@ -176,7 +195,6 @@ struct SyncProgressTests {
       gap: 50,
       batchSize: 50,
       firstSeen: [(.external, 5), (.external, 49), (.external, 60), (.internal, 0)],
-      externalParents: 3,
       clientWarm: clientWarm,
     )
   }
@@ -200,17 +218,17 @@ struct SyncProgressTests {
     #expect(empty.calls == "blockchain.scripthash.get_history ×50")
   }
 
-  /// After the last batch BDK fetches the parents and the proofs without saying so, so
+  /// After the last batch BDK fetches the confirmations' proofs without saying so, so
   /// the last batch's action names them
-  @Test func `the last batch names the parents and proofs that follow it`() {
+  @Test func `the last batch names the proofs that follow it`() {
     let plan = actionPlan(clientWarm: false)
     let last = plan.batchAction(keychain: .internal, index: 50, scanBatch: 5, planned: plan.batchCounts)
-    #expect(last.description == "Fetching histories for change addresses 50–99 (change 2 of 2, batch 5 of 5), then downloading about 3 parent transactions and the confirmation proofs")
-    #expect(last.calls == "blockchain.scripthash.get_history ×50, then ~3 × blockchain.transaction.get for parents (fetchPrevTxouts, expected), then blockchain.transaction.get_merkle and blockchain.block.header (batched)")
+    #expect(last.description == "Fetching histories for change addresses 50–99 (change 2 of 2, batch 5 of 5), then downloading the confirmation proofs")
+    #expect(last.calls == "blockchain.scripthash.get_history ×50, then blockchain.transaction.get_merkle and blockchain.block.header (batched)")
   }
 
   @Test func `a scan past the saved wallet counts on with a plus`() {
-    var plan = SyncWorkPlan.make(lastUsed: [.external: 10], gap: 50, batchSize: 50, firstSeen: [], externalParents: 0, clientWarm: false)
+    var plan = SyncWorkPlan.make(lastUsed: [.external: 10], gap: 50, batchSize: 50, firstSeen: [], clientWarm: false)
     let planned = plan.batchCounts
     _ = plan.position(keychain: .external, index: 100)
 
@@ -274,12 +292,11 @@ struct SyncProgressTests {
       gap: 50,
       batchSize: 50,
       firstSeen: firstSeen,
-      externalParents: 20,
       clientWarm: false,
     )
   }
 
-  /// 10 transactions on receive #0–#2 and change #0–#8, most of them received, gap 50
+  /// 10 transactions on receive #0–#2 and change #0–#8, gap 50
   private func smallWalletPlan() -> SyncWorkPlan {
     let firstSeen: [(keychain: SyncWorkPlan.Keychain, index: UInt32)] = [
       (.external, 0), (.external, 1), (.external, 2), (.external, 2),
@@ -290,7 +307,6 @@ struct SyncProgressTests {
       gap: 50,
       batchSize: 50,
       firstSeen: firstSeen,
-      externalParents: 18,
       clientWarm: false,
     )
   }
@@ -303,7 +319,7 @@ struct SyncProgressTests {
   }
 
   /// Plays a sync through the tracker the way BDK paces one: each batch takes its
-  /// units' worth of round trips at `actualSecondsPerUnit`, the parents and proofs
+  /// units' worth of round trips at `actualSecondsPerUnit`, the proofs
   /// follow the last batch unannounced, and the bar is ticked every 0.1 s.
   private func replay(_ plan: SyncWorkPlan, expectedSecondsPerUnit: Double, actualSecondsPerUnit: Double) -> Replay {
     var tracker = SyncProgressTracker(plan: plan, secondsPerUnit: expectedSecondsPerUnit, now: 0)

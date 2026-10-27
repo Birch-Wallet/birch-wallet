@@ -35,6 +35,12 @@ struct birchApp: App {
       fatalError("Failed to create ModelContainer: \(error)")
     }
 
+    // A sync checks the network before it connects, and runs again when it's back
+    NetworkMonitor.shared.onChange = { old, new in
+      BitcoinService.shared.networkChanged(from: old, to: new)
+    }
+    NetworkMonitor.shared.start()
+
     LogFileStore.shared.performStartupMaintenance()
     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"

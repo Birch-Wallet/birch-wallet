@@ -59,9 +59,6 @@ final class BitcoinService {
   private(set) var syncProgress: Double?
   @ObservationIgnored private var progressTracker: SyncProgressTracker?
   @ObservationIgnored private var progressTicker: Task<Void, Never>?
-  /// The connection that last finished a sync. BDK's cache in it holds the wallet's
-  /// transactions, so the next sync over it fetches few of them.
-  @ObservationIgnored private weak var syncedClient: ElectrumClient?
   /// What the running sync is doing now, for the connection sheet's Action row; nil
   /// when no sync is running
   private(set) var syncAction: SyncAction?
@@ -113,7 +110,7 @@ final class BitcoinService {
       .sink { [weak self] _ in
         guard let self, !self.syncState.isSyncing, wallet != nil else { return }
         syncTask = Task {
-          try? await self.sync()
+          try? await self.sync(fullResync: false, trigger: .automatic)
         }
       }
   }
@@ -133,7 +130,52 @@ final class BitcoinService {
     guard !syncState.isSyncing, wallet != nil else { return }
     if timeSinceLastSync >= Constants.autoSyncInterval {
       syncTask = Task {
-        try? await self.sync()
+        try? await self.sync(fullResync: false, trigger: .automatic)
+      }
+    }
+  }
+
+  // MARK: - Network
+
+  /// NetworkMonitor's changes. Only going offline and coming back act: a change
+  /// between Wi-Fi and cellular, Wi-Fi Assist or a VPN leaves the connection and any
+  /// sync alone. A sync that loses the network ends at its timeouts.
+  func networkChanged(from old: NetworkState, to new: NetworkState) {
+    addToLog("Network: \(new.logDescription)")
+    if new.isOffline, !old.isOffline {
+      electrumVerified = false
+      electrumConnectionError = new.message
+    }
+    guard NetworkState.cameBackOnline(from: old, to: new) else { return }
+    Task {
+      try? await Task.sleep(for: .seconds(Constants.backOnlineSettleSeconds))
+      resumeAfterOffline()
+    }
+  }
+
+  /// Back online: syncs if a sync was missed while offline, the last one failed or one
+  /// is due, and otherwise checks the connection so its status is current again
+  private func resumeAfterOffline() {
+    guard !NetworkMonitor.shared.state.isOffline, wallet != nil, !syncState.isSyncing else { return }
+    let reason: String? = if syncPendingOnline {
+      "a sync was missed while offline"
+    } else if syncState.errorMessage != nil {
+      "the last sync failed"
+    } else if timeSinceLastSync >= Constants.autoSyncInterval {
+      "a sync is due"
+    } else {
+      nil
+    }
+    syncPendingOnline = false
+    if let reason {
+      addToLog("Back online: syncing, because \(reason)")
+      syncTask = Task {
+        try? await self.sync(fullResync: false, trigger: .automatic)
+      }
+    } else if !isElectrumConnected {
+      addToLog("Back online: checking the connection")
+      Task {
+        await checkConnection()
       }
     }
   }
@@ -147,6 +189,9 @@ final class BitcoinService {
 
   /// Stores the last Electrum connection error for display in the UI.
   private(set) var electrumConnectionError: String?
+
+  /// A sync didn't start because the phone was offline, so one runs when it's back
+  @ObservationIgnored private var syncPendingOnline = false
 
   var electrumURL: String? {
     guard let profile = currentProfile else { return nil }
@@ -170,6 +215,10 @@ final class BitcoinService {
   /// Returns a user-friendly description for Electrum connection errors,
   /// detecting self-signed certificate issues that BDK cannot handle.
   static func friendlyElectrumError(_ error: Error) -> String {
+    // Birch's own connection errors already say what happened
+    if case let AppError.electrumConnectionFailed(detail) = error {
+      return detail
+    }
     let msg = "\(error)"
     if msg.contains("InvalidCertificate") || msg.contains("CertificateRequired")
       || msg.contains("BadCertificate") || msg.contains("UnknownIssuer")
@@ -180,6 +229,52 @@ final class BitcoinService {
       return "Could not connect to Electrum server — check your network connection and server settings."
     }
     return msg
+  }
+
+  /// A new connection to an Electrum server. The TCP connect and every read and write
+  /// give up after `Constants.electrumTimeoutSeconds`, and a failed call reconnects and
+  /// tries once more.
+  nonisolated static func makeElectrumClient(url: String, validateDomain: Bool) throws -> ElectrumClient {
+    try ElectrumClient(
+      url: url,
+      timeout: Constants.electrumTimeoutSeconds,
+      retry: Constants.electrumRetries,
+      validateDomain: validateDomain,
+    )
+  }
+
+  /// The arguments `makeElectrumClient` passes, for the Action row and the log
+  private static func clientCall(_ config: ElectrumConfig) -> String {
+    "ElectrumClient(url: \(config.url), timeout: \(Constants.electrumTimeoutSeconds), "
+      + "retry: \(Constants.electrumRetries), validateDomain: \(!config.allowInsecureSSL))"
+  }
+
+  /// Runs a blocking Electrum call while connecting to `config`'s server, which has
+  /// until `deadline` (system uptime). Past it, it throws the error the UI shows.
+  private nonisolated static func connecting<T>(
+    to config: ElectrumConfig,
+    until deadline: TimeInterval,
+    _ work: @escaping @Sendable () throws -> T,
+  ) async throws -> T {
+    do {
+      return try await BlockingCall.run(until: deadline, work)
+    } catch is BlockingCall.DeadlineExceeded {
+      throw connectTimedOut(host: config.host, port: config.port)
+    }
+  }
+
+  /// What a sync, check, test or fee estimate says when connecting runs out of time
+  private nonisolated static func connectTimedOut(host: String, port: UInt16) -> AppError {
+    .electrumConnectionFailed("Couldn't reach \(host):\(port) within \(Int(Constants.electrumConnectSeconds)) seconds")
+  }
+
+  /// Opens a new connection to `config`'s server, giving up at `deadline`
+  private nonisolated static func openConnection(to config: ElectrumConfig, until deadline: TimeInterval) async throws -> ElectrumClient {
+    let url = config.url
+    let validateDomain = !config.allowInsecureSSL
+    return try await connecting(to: config, until: deadline) {
+      try makeElectrumClient(url: url, validateDomain: validateDomain)
+    }
   }
 
   /// Not private, so a test can load a wallet into a service of its own instead
@@ -327,25 +422,35 @@ final class BitcoinService {
     // Load cached data from persisted wallet first (works offline)
     updateCachedData()
 
-    // Connect to Electrum — may fail offline, but wallet data is still available
-    let config = connectionConfig(for: profile)
-    addToLog("Connecting to Electrum: \(config.url)")
-    do {
-      let url = config.url
-      let validateDomain = !config.allowInsecureSSL
-      electrumClient = try await Task.detached { try ElectrumClient(url: url, validateDomain: validateDomain) }.value
-      electrumConnectionError = nil
-      addToLog("Electrum client initialized")
-    } catch {
-      electrumClient = nil
-      electrumConnectionError = Self.friendlyElectrumError(error)
-      addToLog("Electrum connection failed: \(error)")
-    }
+    // Loading doesn't connect, so the saved wallet shows at once even when the server
+    // can't be reached. The sync or check that opening the wallet starts connects,
+    // with the bar and the connect limit. A reload may have changed the server.
+    electrumClient = nil
+    electrumVerified = false
+    electrumConnectionError = nil
   }
 
   // MARK: - Sync
 
+  /// Who asked for a sync. While the phone is offline, one the user asked for throws,
+  /// so the screen that asked can say so; an automatic one returns quietly.
+  private enum SyncTrigger {
+    case user
+    case automatic
+  }
+
   func sync() async throws {
+    try await sync(fullResync: false, trigger: .user)
+  }
+
+  /// Full Resync: syncs over a new connection without filling its cache from the saved
+  /// wallet, so every transaction comes from the server again, as if populateTxCache
+  /// didn't exist. The saved wallet stays, and the scan merges into it as any sync does.
+  func fullResync() async throws {
+    try await sync(fullResync: true, trigger: .user)
+  }
+
+  private func sync(fullResync: Bool, trigger: SyncTrigger) async throws {
     guard let wallet else {
       addToLog("Sync failed: Wallet not loaded")
       throw AppError.walletNotLoaded
@@ -354,6 +459,18 @@ final class BitcoinService {
     guard !syncState.isSyncing else {
       addToLog("Sync skipped: already in progress")
       return
+    }
+
+    // Offline, nothing can connect, so the sync doesn't start and the bar doesn't
+    // move. It runs once the network is back.
+    let network = NetworkMonitor.shared.state
+    if network.isOffline {
+      syncPendingOnline = true
+      electrumVerified = false
+      electrumConnectionError = network.message
+      addToLog("Sync not started: \(network.logDescription)")
+      guard trigger == .user else { return }
+      throw AppError.electrumConnectionFailed(network.message)
     }
 
     // Capture wallet identity and persister at start — if the wallet is switched
@@ -366,9 +483,14 @@ final class BitcoinService {
     let gapLimit = currentProfile?.scanGapLimit ?? Constants.defaultAddressGap
 
     // The work this sync should take, from what the saved wallet holds. A wallet
-    // that has never synced has nothing to go on, so its bar sweeps instead.
-    let clientWarm = electrumClient != nil && electrumClient === syncedClient
-    let plan = wallet.latestCheckpoint().height == 0 ? nil : syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm)
+    // that has never synced has nothing to go on, so its bar sweeps instead. One that
+    // has fills a new connection's cache from its saved transactions before the scan
+    // (populateTxCache), so the connection is about as warm as one that already synced
+    // it: only the merkle proofs, fetched in batches, come again. Full Resync doesn't,
+    // so it downloads everything.
+    let walletHasSynced = wallet.latestCheckpoint().height != 0
+    let clientWarm = walletHasSynced && !fullResync
+    let plan = walletHasSynced ? syncWorkPlan(for: wallet, gap: gapLimit, clientWarm: clientWarm) : nil
     let learnedSecondsPerUnit = syncProfileId.map { UserDefaults.standard.double(forKey: Self.syncPaceKey($0)) } ?? 0
     startProgress(plan: plan, secondsPerUnit: learnedSecondsPerUnit, generation: syncGeneration)
     syncStartUptime = Self.uptime
@@ -383,7 +505,7 @@ final class BitcoinService {
 
     setSyncState(.syncing(.connecting), generation: syncGeneration)
     addToLog(
-      "Starting sync (gap \(gapLimit), "
+      (fullResync ? "Starting full resync (gap \(gapLimit), " : "Starting sync (gap \(gapLimit), ")
         + (plan.map { "expecting \(Int($0.totalUnits)) round trips in \($0.batches.count) batches" } ?? "first sync, no estimate")
         + (clientWarm ? ", client cache warm)" : ")"),
     )
@@ -395,36 +517,56 @@ final class BitcoinService {
     let utxoCountBefore = utxos.count
 
     do {
-      // Try to reconnect if client is nil (e.g. app started offline)
-      if electrumClient == nil, let profile = currentProfile {
-        let config = connectionConfig(for: profile)
+      guard let profile = currentProfile else { throw AppError.walletNotLoaded }
+
+      // Every sync opens a new connection. One left open since the last sync may have
+      // died while idle without either side hearing of it, as when a carrier drops an
+      // idle connection, and its first request would wait out the socket timeout.
+      // Connecting, the ping and the chain tip share one limit, so a server that can't
+      // be reached fails the sync instead of holding the bar under 20%.
+      let config = connectionConfig(for: profile)
+      let connectDeadline = Self.uptime + Constants.electrumConnectSeconds
+      beginSyncAction(
+        "Connecting to \(config.host):\(config.port) (\(config.useSSL ? "TCP and TLS handshake" : "TCP, no TLS"))",
+        calls: Self.clientCall(config),
+        generation: syncGeneration,
+      )
+      let client = try await Self.openConnection(to: config, until: connectDeadline)
+      guard walletGeneration == syncGeneration else {
+        addToLog("Sync cancelled: wallet replaced while connecting")
+        return
+      }
+      electrumClient = client
+      electrumConnectionError = nil
+
+      // A new connection's cache is empty, so the scan would download every saved
+      // transaction again, one round trip each. Filling it from the saved wallet costs
+      // no round trips. The merkle proofs still come from the server, in batches, and
+      // are checked against its headers. Full Resync leaves it empty.
+      if walletHasSynced, !fullResync {
         beginSyncAction(
-          "Connecting to \(config.host):\(config.port) (\(config.useSSL ? "TCP and TLS handshake" : "TCP, no TLS"))",
-          calls: "ElectrumClient(url: \(config.url), validateDomain: \(!config.allowInsecureSSL))",
+          "Filling the connection's cache with the saved transactions",
+          calls: "ElectrumClient.populateTxCache (no network)",
           generation: syncGeneration,
         )
-        let reconnectURL = config.url
-        let validateDomain = !config.allowInsecureSSL
-        electrumClient = try await Task.detached { try ElectrumClient(url: reconnectURL, validateDomain: validateDomain) }.value
-        electrumConnectionError = nil
-      }
-
-      guard let client = electrumClient else {
-        addToLog("Sync failed: No Electrum client")
-        throw AppError.electrumConnectionFailed("No internet connection")
+        let populateStart = Self.uptime
+        client.populateTxCache(txs: wallet.transactions().map(\.transaction))
+        addToLog("Cache filled from the saved wallet in \(Self.milliseconds(Self.uptime - populateStart))")
       }
 
       // Verify the server is reachable before the scan starts, so the bar doesn't
       // show progress while offline or while the server is down.
       beginSyncAction("Checking that the server answers", calls: "server.ping", generation: syncGeneration)
       let pingStart = Self.uptime
-      try await Task.detached { try client.ping() }.value
+      try await Self.connecting(to: config, until: connectDeadline) { try client.ping() }
       let pingSeconds = Self.uptime - pingStart
       addToLog("Server ping OK (\(Self.milliseconds(pingSeconds)))")
 
       // Fetch chain tip early to confirm server returns real data
       beginSyncAction("Fetching the server's chain tip", calls: "blockchain.headers.subscribe", generation: syncGeneration)
-      guard await updateChainTip(from: client, generation: syncGeneration, profileId: syncProfileId) else {
+      guard try await updateChainTip(
+        from: client, config: config, until: connectDeadline, generation: syncGeneration, profileId: syncProfileId,
+      ) else {
         addToLog("Sync cancelled: wallet replaced during chain tip fetch")
         return
       }
@@ -450,17 +592,20 @@ final class BitcoinService {
 
       beginSyncAction(
         "Starting the full scan: fetching the server's latest blocks",
-        calls: "BDK full_scan (gap \(gapLimit), batch \(Constants.syncBatchSize), fetchPrevTxouts): "
+        calls: "BDK full_scan (gap \(gapLimit), batch \(Constants.syncBatchSize), fetchPrevTxouts off): "
           + "blockchain.headers.subscribe, then blockchain.block.header for the latest blocks (batched)",
         generation: syncGeneration,
       )
       let scanStart = Self.uptime
+      // fetchPrevTxouts would download the parent of every received payment on every
+      // sync, though the wallet keeps the outputs it needs from them. The ones it's
+      // missing are downloaded after the scan instead (downloadMissingPrevouts).
       let update = try await Task.detached { [client] in
         try client.fullScan(
           request: fullScanRequest,
           stopGap: UInt64(gapLimit),
           batchSize: UInt64(Constants.syncBatchSize),
-          fetchPrevTxouts: true,
+          fetchPrevTxouts: false,
         )
       }.value
       let scanSeconds = Self.uptime - scanStart
@@ -472,18 +617,20 @@ final class BitcoinService {
       }
       try Task.checkCancellation()
 
-      progressTracker?.scanFinished(now: Self.uptime)
-      publishProgress()
       addToLog("Full scan returned in \(String(format: "%.1f", scanSeconds))s, bar at \(Self.percent(progressTracker?.fraction))")
-      setSyncState(.syncing(.saving), generation: syncGeneration)
       beginSyncAction("Applying the scan's update to the wallet", calls: "BDK Wallet.applyUpdate", generation: syncGeneration)
       try wallet.applyUpdate(update: update)
+      await downloadMissingPrevouts(client: client, wallet: wallet, generation: syncGeneration)
 
       // Final identity check before persisting
       guard walletGeneration == syncGeneration else {
         addToLog("Sync cancelled: wallet replaced before persist")
         return
       }
+
+      progressTracker?.scanFinished(now: Self.uptime)
+      publishProgress()
+      setSyncState(.syncing(.saving), generation: syncGeneration)
 
       if let syncPersister {
         beginSyncAction("Saving to the wallet database", calls: "BDK Wallet.persist (SQLite)", generation: syncGeneration)
@@ -505,9 +652,6 @@ final class BitcoinService {
       pruneStaleeSavedPSBTs()
       endSyncAction("Finished", generation: syncGeneration)
 
-      if electrumClient === client {
-        syncedClient = client
-      }
       learnSyncPace(scanSeconds: scanSeconds, wallet: wallet, gap: gapLimit, clientWarm: clientWarm, profileId: syncProfileId)
       addToLog("Bar at \(Self.percent(progressTracker?.fraction)) before finishing")
       progressTracker?.finish()
@@ -563,7 +707,7 @@ final class BitcoinService {
       throw AppError.walletNotLoaded
     }
     guard Self.syncedRecently(lastSync: lastSyncDate, now: Date(), hasSynced: wallet.latestCheckpoint().height > 0) else {
-      try await sync()
+      try await sync(fullResync: false, trigger: .automatic)
       return
     }
     addToLog("Skipping sync on open: synced \(Int(timeSinceLastSync))s ago")
@@ -584,14 +728,29 @@ final class BitcoinService {
 
   /// Pings the server and fetches its chain tip without a sync, for a wallet opened
   /// soon after its last one: the connection status and the confirmation counts stay
-  /// current, and nothing on screen says it's syncing.
+  /// current, and nothing on screen says it's syncing. It opens a new connection, as a
+  /// sync does, with the same limit.
   private func checkConnection() async {
-    guard let client = electrumClient else { return }
+    guard let profile = currentProfile else { return }
+    let network = NetworkMonitor.shared.state
+    guard !network.isOffline else {
+      electrumVerified = false
+      electrumConnectionError = network.message
+      addToLog("Connection check not started: \(network.logDescription)")
+      return
+    }
     let generation = walletGeneration
     let tipBefore = chainTipHeight
+    let config = connectionConfig(for: profile)
+    let deadline = Self.uptime + Constants.electrumConnectSeconds
     do {
-      try await Task.detached { try client.ping() }.value
-      guard await updateChainTip(from: client, generation: generation, profileId: currentProfile?.id) else { return }
+      let client = try await Self.openConnection(to: config, until: deadline)
+      guard walletGeneration == generation else { return }
+      electrumClient = client
+      try await Self.connecting(to: config, until: deadline) { try client.ping() }
+      guard try await updateChainTip(from: client, config: config, until: deadline, generation: generation, profileId: profile.id) else {
+        return
+      }
       if chainTipHeight != tipBefore {
         updateCachedData()
       }
@@ -604,9 +763,17 @@ final class BitcoinService {
   }
 
   /// Fetches the server's chain tip and records it, and that the server answered.
-  /// False when the wallet was replaced while it waited.
-  private func updateChainTip(from client: ElectrumClient, generation: UInt64, profileId: UUID?) async -> Bool {
-    guard let header = await Task.detached(operation: { [client] in try? client.blockHeadersSubscribe() }).value else {
+  /// False when the wallet was replaced while it waited. A server error keeps the
+  /// saved tip; only running out of time to connect (`deadline`) throws.
+  private func updateChainTip(
+    from client: ElectrumClient,
+    config: ElectrumConfig,
+    until deadline: TimeInterval,
+    generation: UInt64,
+    profileId: UUID?,
+  ) async throws -> Bool {
+    let header = try await Self.connecting(to: config, until: deadline) { try? client.blockHeadersSubscribe() }
+    guard let header else {
       addToLog("Chain tip fetch returned nothing; keeping tip \(chainTipHeight)")
       return walletGeneration == generation
     }
@@ -734,16 +901,11 @@ final class BitcoinService {
 
     var lastUsed: [UTXOItem.KeychainKind: UInt32] = [:]
     var firstSeen: [(keychain: UTXOItem.KeychainKind, index: UInt32)] = []
-    var externalParents = Set<String>()
     for tx in txs {
       var touched = tx.output().compactMap { keychainIndex($0.scriptPubkey) }
       if !tx.isCoinbase() {
         for input in tx.input() {
-          let parentTxid = input.previousOutput.txid.description
-          guard let parent = lookup[parentTxid] else {
-            externalParents.insert(parentTxid)
-            continue
-          }
+          guard let parent = lookup[input.previousOutput.txid.description] else { continue }
           let parentOutputs = parent.output()
           let vout = Int(input.previousOutput.vout)
           if vout < parentOutputs.count, let spent = keychainIndex(parentOutputs[vout].scriptPubkey) {
@@ -763,8 +925,77 @@ final class BitcoinService {
       gap: gap,
       batchSize: Constants.syncBatchSize,
       firstSeen: firstSeen,
-      externalParents: externalParents.count,
       clientWarm: clientWarm,
+    )
+  }
+
+  /// How many missing parents to download at once. Each download is a blocking call
+  /// on a cooperative thread, so this stays well under the device's core count.
+  private static let parentDownloadConcurrency = 4
+
+  /// Downloads the outputs the wallet's transactions spend but it doesn't have: the
+  /// inputs of payments received from outside, which their fees need. The scan runs
+  /// with fetchPrevTxouts off, so it doesn't download every received payment's
+  /// parent on every sync; this downloads each missing one once, and the wallet saves
+  /// its outputs with the rest of its data. A parent that fails to download is tried
+  /// again on the next sync, without failing this one.
+  private func downloadMissingPrevouts(client: ElectrumClient, wallet: Wallet, generation: UInt64) async {
+    var missing: [Txid: [OutPoint]] = [:]
+    for canonical in wallet.transactions() where !canonical.transaction.isCoinbase() {
+      do {
+        _ = try wallet.calculateFee(tx: canonical.transaction)
+      } catch let CalculateFeeError.MissingTxOut(outPoints) {
+        for outpoint in outPoints {
+          missing[outpoint.txid, default: []].append(outpoint)
+        }
+      } catch {
+        continue
+      }
+    }
+    guard !missing.isEmpty else {
+      addToLog("No parent transactions to download: the wallet has every output its transactions spend")
+      return
+    }
+
+    let outputCount = missing.values.reduce(0) { $0 + $1.count }
+    beginSyncAction(
+      "Downloading \(missing.count) parent \(missing.count == 1 ? "transaction" : "transactions") for the fees of received payments",
+      calls: "\(missing.count) × blockchain.transaction.get for \(outputCount) \(outputCount == 1 ? "output" : "outputs") the wallet doesn't have, "
+        + "\(Self.parentDownloadConcurrency) at a time",
+      generation: generation,
+    )
+    var parents: [Txid: Transaction] = [:]
+    var failed = 0
+    await withTaskGroup(of: (Txid, Transaction?).self) { group in
+      var pending = Array(missing.keys)
+      for _ in 0 ..< min(Self.parentDownloadConcurrency, pending.count) {
+        let txid = pending.removeLast()
+        group.addTask { (txid, try? client.fetchTx(txid: txid)) }
+      }
+      for await (txid, parent) in group {
+        // The server answers with the transaction it has under that txid; take it only
+        // if it hashes to the txid asked for
+        if let parent, parent.computeTxid() == txid {
+          parents[txid] = parent
+        } else {
+          failed += 1
+        }
+        if let next = pending.popLast() {
+          group.addTask { (next, try? client.fetchTx(txid: next)) }
+        }
+      }
+    }
+    guard walletGeneration == generation else { return }
+
+    for (txid, outpoints) in missing {
+      guard let outputs = parents[txid]?.output() else { continue }
+      for outpoint in outpoints where Int(outpoint.vout) < outputs.count {
+        wallet.insertTxout(outpoint: outpoint, txout: outputs[Int(outpoint.vout)])
+      }
+    }
+    addToLog(
+      "Downloaded \(parents.count) of \(missing.count) parent transactions"
+        + (failed > 0 ? "; \(failed) failed and will be tried again on the next sync" : ""),
     )
   }
 
@@ -793,18 +1024,30 @@ final class BitcoinService {
   /// Returns the block height on success.
   @discardableResult
   func testElectrumConnection(config: ElectrumConfig) async throws -> UInt32 {
+    try Self.requireNetwork()
+    // The certificate check and BDK's connection share one connect limit
+    let deadline = Self.uptime + Constants.electrumConnectSeconds
     // Pre-check SSL certificate before handing off to BDK
     if config.useSSL, !config.allowInsecureSSL {
-      try await Self.validateTLSCertificate(host: config.host, port: config.port)
+      try await Self.validateTLSCertificate(host: config.host, port: config.port, until: deadline)
     }
 
     let url = config.url
     let validateDomain = !config.allowInsecureSSL
-    let header = try await Task.detached {
-      let client = try ElectrumClient(url: url, validateDomain: validateDomain)
+    let header = try await Self.connecting(to: config, until: deadline) {
+      let client = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
       return try client.blockHeadersSubscribe()
-    }.value
+    }
     return UInt32(header.height)
+  }
+
+  /// Throws the offline message while the phone has no network, so a connection test
+  /// or a fee estimate doesn't try to connect
+  private static func requireNetwork() throws {
+    let network = NetworkMonitor.shared.state
+    if network.isOffline {
+      throw AppError.electrumConnectionFailed(network.message)
+    }
   }
 
   /// Known genesis block nonces for network verification.
@@ -817,16 +1060,19 @@ final class BitcoinService {
   /// Detects which network an Electrum server is on by checking its genesis block nonce.
   /// Returns nil for unknown networks (e.g. signet).
   func detectElectrumNetwork(config: ElectrumConfig) async throws -> BitcoinNetwork? {
+    try Self.requireNetwork()
+    // The certificate check and BDK's connection share one connect limit
+    let deadline = Self.uptime + Constants.electrumConnectSeconds
     if config.useSSL, !config.allowInsecureSSL {
-      try await Self.validateTLSCertificate(host: config.host, port: config.port)
+      try await Self.validateTLSCertificate(host: config.host, port: config.port, until: deadline)
     }
 
     let url = config.url
     let validateDomain = !config.allowInsecureSSL
-    let genesisHeader = try await Task.detached {
-      let client = try ElectrumClient(url: url, validateDomain: validateDomain)
+    let genesisHeader = try await Self.connecting(to: config, until: deadline) {
+      let client = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
       return try client.blockHeader(height: 0)
-    }.value
+    }
 
     for (network, nonce) in Self.genesisNonce where genesisHeader.nonce == nonce {
       return network
@@ -835,8 +1081,9 @@ final class BitcoinService {
   }
 
   /// Performs a native TLS handshake to validate the server's certificate.
-  /// Throws a clear error if the certificate is self-signed or untrusted.
-  private static func validateTLSCertificate(host: String, port: UInt16) async throws {
+  /// Throws a clear error if the certificate is self-signed or untrusted, or if the
+  /// server can't be reached by `deadline` (system uptime).
+  private static func validateTLSCertificate(host: String, port: UInt16, until deadline: TimeInterval) async throws {
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       let queue = DispatchQueue(label: "tls-check")
       let connection = NWConnection(
@@ -844,34 +1091,29 @@ final class BitcoinService {
         port: NWEndpoint.Port(rawValue: port)!,
         using: .tls,
       )
+      // The handshake and the deadline race, and whichever comes first ends the check
+      let once = ResumeOnce(continuation)
+      let finish: @Sendable (Result<Void, Error>) -> Void = { result in
+        connection.cancel()
+        once.resume(with: result)
+      }
 
       connection.stateUpdateHandler = { state in
         switch state {
         case .ready:
-          connection.cancel()
-          continuation.resume()
+          finish(.success(()))
         case let .waiting(error):
-          connection.cancel()
-          if case let .tls(osStatus) = error, osStatus == errSecCertificateExpired {
-            continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "SSL certificate expired on \(host):\(port).",
-            ))
-          } else {
-            continuation.resume(throwing: AppError.electrumConnectionFailed(
-              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
-            ))
-          }
+          finish(.failure(tlsCheckError(waiting: error, host: host, port: port)))
         case let .failed(error):
-          connection.cancel()
           let desc = error.localizedDescription
           if desc.contains("certificate") || desc.contains("SSL") || desc.contains("trust") {
-            continuation.resume(throwing: AppError.electrumConnectionFailed(
+            finish(.failure(AppError.electrumConnectionFailed(
               "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
-            ))
+            )))
           } else {
-            continuation.resume(throwing: AppError.electrumConnectionFailed(
+            finish(.failure(AppError.electrumConnectionFailed(
               "Connection to \(host):\(port) failed: \(desc)",
-            ))
+            )))
           }
         case .cancelled:
           break
@@ -880,7 +1122,33 @@ final class BitcoinService {
         }
       }
 
+      // Without it, a server that never answers holds the check in .preparing until
+      // the system's TCP connect timeout, about 75 s
+      queue.asyncAfter(deadline: .now() + max(deadline - uptime, 0)) {
+        finish(.failure(connectTimedOut(host: host, port: port)))
+      }
+
       connection.start(queue: queue)
+    }
+  }
+
+  /// What the TLS check says when its connection is left waiting. Only a TLS error is
+  /// about the certificate. A POSIX or DNS error, such as a refused or timed-out
+  /// connection, means the server couldn't be reached.
+  nonisolated static func tlsCheckError(waiting error: NWError, host: String, port: UInt16) -> AppError {
+    switch error {
+    case let .tls(status) where status == errSecCertificateExpired:
+      .electrumConnectionFailed("SSL certificate expired on \(host):\(port).")
+    case .tls:
+      .electrumConnectionFailed(
+        "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
+      )
+    case let .posix(code):
+      .electrumConnectionFailed("Couldn't reach \(host):\(port) (\(String(cString: strerror(code.rawValue))))")
+    case .dns:
+      .electrumConnectionFailed("Couldn't reach \(host):\(port) (DNS lookup failed)")
+    default:
+      .electrumConnectionFailed("Couldn't reach \(host):\(port) (\(error.localizedDescription))")
     }
   }
 
@@ -1252,8 +1520,11 @@ final class BitcoinService {
     case .signet: "https://mempool.space/signet"
     case nil: "https://mempool.space"
     }
+    guard !NetworkMonitor.shared.state.isOffline else { throw URLError(.notConnectedToInternet) }
     let url = URL(string: "\(base)/api/v1/fees/precise")!
-    let (data, _) = try await URLSession.shared.data(from: url)
+    // The Electrum socket timeout, instead of URLSession's 60 s
+    let request = URLRequest(url: url, timeoutInterval: TimeInterval(Constants.electrumTimeoutSeconds))
+    let (data, _) = try await URLSession.shared.data(for: request)
     let decoded = try JSONDecoder().decode(MempoolPreciseFees.self, from: data)
     // An absurd estimate is treated like a failed fetch, so callers use the fallback rates.
     let rates = [decoded.fastestFee, decoded.halfHourFee, decoded.economyFee]
@@ -1276,9 +1547,11 @@ final class BitcoinService {
   }
 
   private func fetchElectrumFees() async throws -> RecommendedFees {
-    guard let electrumClient else {
-      throw AppError.electrumConnectionFailed("Not connected to server")
-    }
+    guard let profile = currentProfile else { throw AppError.walletNotLoaded }
+    try Self.requireNetwork()
+    let config = connectionConfig(for: profile)
+    let url = config.url
+    let validateDomain = !config.allowInsecureSSL
 
     // Electrum returns BTC/kB. To convert to sats/vB:
     // BTC -> sats = * 100,000,000
@@ -1286,7 +1559,11 @@ final class BitcoinService {
     // So multiplier is 100,000
     let multiplier: Double = 100_000
 
-    return await Task.detached {
+    // A new connection, as a sync opens, so one left idle since the last sync can't
+    // hold the fee step up. Connecting and the three estimates share the connect limit;
+    // past it, Send and Bump Fee use the fallback rates.
+    return try await Self.connecting(to: config, until: Self.uptime + Constants.electrumConnectSeconds) {
+      let electrumClient = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
       let highRaw = try? electrumClient.estimateFee(number: 1)
       let medRaw = try? electrumClient.estimateFee(number: 6)
       let lowRaw = try? electrumClient.estimateFee(number: 144)
@@ -1324,7 +1601,7 @@ final class BitcoinService {
         medium: medium,
         slow: slow,
       )
-    }.value
+    }
   }
 
   // MARK: - PSBT
@@ -1751,13 +2028,29 @@ final class BitcoinService {
   }
 
   func broadcastPSBT(_ psbtData: Data) async throws -> String {
-    guard let client = electrumClient else {
-      logger.error("Broadcast failed: not connected to Electrum server")
-      throw AppError.electrumConnectionFailed("Not connected to server")
+    guard let profile = currentProfile else { throw AppError.walletNotLoaded }
+    let network = NetworkMonitor.shared.state
+    guard !network.isOffline else {
+      logger.error("Broadcast not sent: \(network.logDescription)")
+      throw AppError.electrumConnectionFailed("\(network.message). The transaction wasn't sent.")
     }
 
     let (_, tx) = try finalizePSBT(psbtData)
-    logger.info("Broadcasting finalized tx (\(psbtData.count) byte PSBT) via \(currentProfile?.electrumConfig.url ?? "unknown")")
+    let config = connectionConfig(for: profile)
+    logger.info("Broadcasting finalized tx (\(psbtData.count) byte PSBT) via \(config.url)")
+
+    // A new connection, as a sync opens, so one left idle since the last sync can't
+    // hold the broadcast up. Until it's open, nothing has been sent.
+    let client: ElectrumClient
+    do {
+      client = try await Self.openConnection(to: config, until: Self.uptime + Constants.electrumConnectSeconds)
+    } catch {
+      logger.error("Broadcast not sent, couldn't connect: \(error)")
+      throw AppError.electrumConnectionFailed("Couldn't reach \(config.host):\(config.port). The transaction wasn't sent.")
+    }
+
+    // The broadcast itself has only the socket timeout and its retry, so the server's
+    // answer is never cut off
     do {
       let result = try await Task.detached { [client] in
         try client.transactionBroadcast(tx: tx).description
@@ -1766,6 +2059,11 @@ final class BitcoinService {
       return result
     } catch {
       logger.error("Broadcast failed: \(error)")
+      if BroadcastOutcome.classify(error) == .unknown {
+        throw AppError.electrumConnectionFailed(
+          "The server didn't answer, so Birch can't tell whether it got the transaction. Broadcasting it again is safe.",
+        )
+      }
       throw error
     }
   }
@@ -2119,6 +2417,27 @@ final class FullScanProgressInspector: FullScanScriptInspector, @unchecked Senda
     let time = ProcessInfo.processInfo.systemUptime
     DispatchQueue.main.async { [onBatchStart] in
       onBatchStart(keychain, index, time)
+    }
+  }
+}
+
+// MARK: - Broadcast Outcome
+
+/// What a failed broadcast means for the transaction
+enum BroadcastOutcome: Equatable {
+  /// The server answered and refused it
+  case rejected
+  /// The connection failed after the transaction went out, so the server may have it
+  case unknown
+  /// Any other failure, shown as it is
+  case other
+
+  static func classify(_ error: Error) -> BroadcastOutcome {
+    guard let error = error as? ElectrumError else { return .other }
+    return switch error {
+    case .Protocol: .rejected
+    case .IoError, .SharedIoError, .AllAttemptsErrored, .CouldntLockReader, .Mpsc: .unknown
+    default: .other
     }
   }
 }

@@ -7,6 +7,7 @@ struct ConnectionStatusView: View {
   @State private var testResult: String?
   @State private var isTesting = false
   @State private var isSyncing = false
+  @State private var isResyncing = false
   @State private var copiedDebugInfo = false
 
   private var service: BitcoinService {
@@ -126,7 +127,7 @@ struct ConnectionStatusView: View {
           .foregroundStyle(Color.hbTextSecondary)
         Spacer()
         HStack(spacing: 6) {
-          SyncStatusDot(state: service.syncState)
+          SyncStatusDot(state: service.syncState, offline: NetworkMonitor.shared.state.isOffline)
           Text(syncStateLabel)
             .font(.hbBody(15))
             .foregroundStyle(Color.hbTextPrimary)
@@ -178,15 +179,35 @@ struct ConnectionStatusView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
 
       // A sync started anywhere (pull to refresh, the timer) counts, not just this button's
-      let syncing = isSyncing || service.syncState.isSyncing
+      let syncing = isSyncing || isResyncing || service.syncState.isSyncing
       Button(action: syncNow) {
         HStack(spacing: 8) {
-          if syncing {
+          if syncing, !isResyncing {
             ProgressView().tint(Color.hbProgress)
           } else {
             Image(systemName: "arrow.triangle.2.circlepath")
           }
-          Text(syncing ? "Syncing…" : "Sync Now")
+          Text(syncing && !isResyncing ? "Syncing…" : "Sync Now")
+            .font(.hbBody(15))
+        }
+        .foregroundStyle(Color.hbBrandInk)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color.hbBrandInk.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+      .disabled(syncing)
+
+      // Downloads every transaction again over a new connection, instead of reusing
+      // the ones saved on the device
+      Button(action: fullResync) {
+        HStack(spacing: 8) {
+          if isResyncing {
+            ProgressView().tint(Color.hbProgress)
+          } else {
+            Image(systemName: "arrow.clockwise")
+          }
+          Text(isResyncing ? "Resyncing…" : "Full Resync")
             .font(.hbBody(15))
         }
         .foregroundStyle(Color.hbBrandInk)
@@ -251,6 +272,14 @@ struct ConnectionStatusView: View {
     }
   }
 
+  private func fullResync() {
+    isResyncing = true
+    Task {
+      try? await service.fullResync()
+      isResyncing = false
+    }
+  }
+
   private func copyDebugInfo() {
     var lines = ["=== Birch Debug Info ==="]
     lines.append("Timestamp: \(ISO8601DateFormatter().string(from: Date()))")
@@ -282,6 +311,7 @@ struct ConnectionStatusView: View {
     lines.append("currentProfile set: \(service.currentProfile != nil)")
     lines.append("currentProfile ID: \(service.currentProfile?.id.uuidString ?? "nil")")
     lines.append("wallet loaded: \(service.wallet != nil)")
+    lines.append("network: \(NetworkMonitor.shared.state.logDescription)")
     lines.append("electrumConnected: \(service.isElectrumConnected)")
     lines.append("electrumURL: \(service.electrumURL ?? "nil")")
     lines.append("chainTipHeight: \(service.chainTipHeight)")
