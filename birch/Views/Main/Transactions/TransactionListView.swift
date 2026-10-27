@@ -31,6 +31,11 @@ struct TransactionListView: View {
     FiatPriceService.shared
   }
 
+  /// The phone has no network, so no sync can connect
+  private var isOffline: Bool {
+    NetworkMonitor.shared.state.isOffline
+  }
+
   private var activeWalletName: String {
     wallets.first(where: { $0.isActive })?.name ?? viewModel.walletName
   }
@@ -89,7 +94,7 @@ struct TransactionListView: View {
 
             // Connection status
             Button(action: { showConnectionStatus = true }) {
-              SyncStatusDot(state: viewModel.syncState)
+              SyncStatusDot(state: viewModel.syncState, offline: isOffline)
             }
           }
 
@@ -430,10 +435,26 @@ struct TransactionListView: View {
     }
   }
 
-  /// The info row's right side: what the sync is doing, when it last finished, or
-  /// that it failed. The failure opens the connection details.
+  /// The info row's right side: what the sync is doing, when it last finished, that
+  /// it failed, or that the phone is offline. A failure and Offline open the
+  /// connection details.
   @ViewBuilder
   private var syncStatus: some View {
+    if isOffline, !viewModel.syncState.isSyncing {
+      Button(action: { showConnectionStatus = true }) {
+        Text("Offline")
+          .font(.hbLabel(11))
+          .foregroundStyle(Color.hbTextSecondary)
+      }
+      .accessibilityHint("Shows the connection details")
+      .accessibilityIdentifier("offline")
+    } else {
+      syncStateStatus
+    }
+  }
+
+  @ViewBuilder
+  private var syncStateStatus: some View {
     switch viewModel.syncState {
     case let .syncing(phase):
       Text(phase.statusText(progress: viewModel.syncProgress))

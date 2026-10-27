@@ -62,6 +62,17 @@ enum Constants {
   /// How often the open wallet syncs on its own, and how recent a sync has to be for
   /// opening a wallet (a cold start, a switch to it, a return to the app) to skip one
   static let autoSyncInterval: TimeInterval = 30 * 60
+  /// How long an Electrum connection waits on the TCP connect, or on any read or write,
+  /// before the call fails
+  static let electrumTimeoutSeconds: UInt8 = 15
+  /// How many times a failed Electrum call reconnects and tries again, after a 2 s wait
+  static let electrumRetries: UInt8 = 1
+  /// How long connecting may take before a sync, check, fee estimate or broadcast gives
+  /// up: DNS, the connect, TLS, and for a sync the ping and the chain tip
+  static let electrumConnectSeconds: TimeInterval = 30
+  /// How long the network has to stay back before a sync starts on its own. A path
+  /// can report a route a moment before traffic flows.
+  static let backOnlineSettleSeconds: Double = 2
 
   static func derivationPath(for network: BitcoinNetwork) -> String {
     "m/48'/\(network.coinType)'/0'/2'"
