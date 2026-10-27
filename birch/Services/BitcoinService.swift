@@ -1492,9 +1492,11 @@ final class BitcoinService {
     #endif
     let sourceRaw = UserDefaults.standard.string(forKey: Constants.feeSourceKey) ?? FeeSource.electrum.rawValue
     let source = FeeSource(rawValue: sourceRaw) ?? .electrum
+    let generation = walletGeneration
 
+    let fees: RecommendedFees
     do {
-      let fees: RecommendedFees = switch source {
+      fees = switch source {
       case .mempoolSpace:
         try await fetchMempoolFees()
       case .electrum:
@@ -1502,14 +1504,20 @@ final class BitcoinService {
       case .fixed:
         .fixed
       }
-      logger.info(
-        "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB",
-      )
-      return fees
     } catch {
       logger.error("Fee estimation from \(source.rawValue) failed: \(error)")
       throw error
     }
+    // The rates came from this wallet's network and server, so they must not reach
+    // the Send or Bump Fee screen of a wallet loaded while they were fetched
+    guard walletGeneration == generation else {
+      logger.info("Discarded fee estimates from \(source.rawValue): the wallet changed while they were fetched")
+      throw CancellationError()
+    }
+    logger.info(
+      "Fee estimates from \(source.rawValue): fast \(fees.fast), medium \(fees.medium), slow \(fees.slow) sat/vB",
+    )
+    return fees
   }
 
   private func fetchMempoolFees() async throws -> RecommendedFees {

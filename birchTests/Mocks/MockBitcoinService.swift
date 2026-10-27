@@ -10,6 +10,7 @@ final class MockBitcoinService: BitcoinServiceProtocol {
   var currentNetwork: BitcoinNetwork? = .testnet4
   var requiredSignatures: Int = 2
   var totalCosigners: Int = 2
+  var currentWalletID: UUID? = UUID()
 
   // MARK: - Configurable Results
 

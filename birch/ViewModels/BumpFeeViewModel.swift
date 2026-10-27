@@ -44,6 +44,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   /// Result of the most recent check of `psbtBytes` against wallet state
   var psbtVerification: PSBTVerificationState = .notChecked
 
+  /// The wallet `psbtBytes` belongs to (see PSBTFlowManaging): the wallet holding the
+  /// transaction being bumped
+  var psbtWalletID: UUID?
+
   // Saved PSBT state
   var savedPSBTId: UUID?
   var savedPSBTName: String = ""
@@ -107,6 +111,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     originalFee = transaction.fee ?? 0
     originalFeeRate = transaction.currentFeeRate
     self.bitcoinService = service
+    psbtWalletID = service.currentWalletID
     requiredSignatures = service.requiredSignatures
     totalCosigners = service.totalCosigners
     // Pre-fill custom with the minimum valid bump rate
@@ -140,6 +145,7 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
     }
     savedPSBTId = savedPSBT.id
     savedPSBTName = savedPSBT.name
+    psbtWalletID = savedPSBT.walletID
 
     // Re-check the stored bytes against current wallet state before resuming signing.
     psbtVerification = PSBTVerificationState(
@@ -163,6 +169,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
       await MainActor.run {
         self.recommendedFees = rates
       }
+    } catch is CancellationError {
+      // The wallet changed while the rates were fetched, so they belong to another
+      // wallet; this screen is being reset for the new one
+      logger.info("Ignored fee rates fetched for a wallet that is no longer loaded")
     } catch {
       let fallback = BitcoinService.RecommendedFees.fallback
       logger.error("Failed to fetch fee rates: \(error) — falling back to \(fallback.medium) sat/vB")
@@ -173,6 +183,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   }
 
   func createBumpPSBT() async {
+    guard isPSBTForLoadedWallet else {
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     guard isValidFeeRate else {
       errorMessage = "Fee rate must be higher than the original (\(String(format: "%.1f", originalFeeRate ?? 0)) sat/vB)"
       return
@@ -208,6 +222,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   // handleSignedPSBT provided by PSBTFlowManaging default implementation
 
   func finalizeTx() {
+    guard isPSBTForLoadedWallet else {
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     do {
       _ = try bitcoinService.finalizePSBTBytes(psbtBytes)
     } catch {
@@ -216,6 +234,10 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   }
 
   func broadcast(modelContext: ModelContext? = nil) async {
+    guard isPSBTForLoadedWallet else {
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     isProcessing = true
     do {
       let txid = try await bitcoinService.broadcastPSBT(psbtBytes)
@@ -245,7 +267,11 @@ final class BumpFeeViewModel: Identifiable, PSBTFlowManaging {
   // autoSavePSBT provided by PSBTFlowManaging default implementation
 
   func savePSBT(name: String, context: ModelContext) {
-    guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
+    // Filed under the wallet that holds the transaction, whichever is loaded by now
+    guard let walletID = psbtWalletID else {
+      logger.warning("Not saving a PSBT with no wallet recorded")
+      return
+    }
 
     let trimmedName = String(name.prefix(SavedPSBT.maxNameLength))
     let outpoints = bitcoinService.psbtInputOutpoints(psbtBytes).joined(separator: ",")

@@ -29,6 +29,12 @@ struct WalletInfoView: View {
   @State private var showResetElectrumConfirmation = false
   @State private var showDescriptorPDF = false
 
+  /// Whether this is the wallet BitcoinService has loaded, the only one Sync and a
+  /// server change can act on
+  private var isLoadedWallet: Bool {
+    BitcoinService.shared.currentProfile?.id == wallet.id
+  }
+
   /// The output descriptor rebuilt from the saved cosigners, or nil when one of
   /// their keys is not a valid extended public key.
   private var combinedDescriptor: String? {
@@ -397,7 +403,8 @@ struct WalletInfoView: View {
               .background(Color.hbBrandInk.opacity(0.12))
               .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
-            .disabled(isSyncing)
+            .disabled(isSyncing || !isLoadedWallet)
+            .opacity(isLoadedWallet ? 1 : 0.5)
 
             Text("Checks every address up to the gap limit above. A large wallet can take a minute.")
               .font(.hbBody(12))
@@ -482,7 +489,9 @@ struct WalletInfoView: View {
       initialElectrumConfig = wallet.electrumConfig
     }
     .onDisappear {
-      if let initial = initialElectrumConfig, wallet.electrumConfig != initial {
+      // Only the loaded wallet is reloaded: loading this one in place of another
+      // would swap the wallet the app is showing
+      if let initial = initialElectrumConfig, wallet.electrumConfig != initial, isLoadedWallet {
         logger.info("Electrum settings changed — reloading wallet")
         let service = BitcoinService.shared
         Task {

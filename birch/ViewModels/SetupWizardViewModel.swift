@@ -928,6 +928,8 @@ final class SetupWizardViewModel {
       electrumAllowInsecureSSL: electrumAllowInsecureSSL,
       blockExplorerHost: blockExplorerHost.trimmingCharacters(in: .whitespaces),
     )
+    // A new wallet goes to the bottom of the wallet picker
+    profile.sortOrder = WalletOrdering.nextSortOrder(after: existingWallets)
     #if DEBUG
       // The screenshot tour's wallets keep their identicons from run to run.
       if ScreenshotFixtures.isActive {
