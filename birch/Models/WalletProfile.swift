@@ -19,6 +19,8 @@ final class WalletProfile {
   var blockExplorerHost: String // empty = mempool.space
   var electrumAllowInsecureSSL: Bool = false
   var privacyMode: Bool = false
+  /// Where the wallet sits in the wallet picker, 0 first (see WalletOrdering)
+  var sortOrder: Int = 0
 
   @Relationship(deleteRule: .cascade, inverse: \CosignerInfo.wallet)
   var cosigners: [CosignerInfo]

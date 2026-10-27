@@ -5,7 +5,7 @@ import SwiftUI
 private let logger = AppLog(.app)
 
 struct ContentView: View {
-  @Query private var wallets: [WalletProfile]
+  @Query(sort: WalletOrdering.sortDescriptors) private var wallets: [WalletProfile]
   @AppStorage(Constants.hasCompletedOnboardingKey) private var hasCompletedOnboarding = false
   @AppStorage(Constants.appLockEnabledKey) private var appLockEnabled = false
   @AppStorage(Constants.appLockTimeoutKey) private var lockTimeout = 60
@@ -46,11 +46,17 @@ struct ContentView: View {
       }
     }
     .onAppear {
+      // Wallets saved before the picker could be reordered all share position 0; give
+      // each its own, oldest first, so the order is the same everywhere
+      if WalletOrdering.normalize(wallets) {
+        logger.info("Numbered \(wallets.count) wallets for the picker order")
+        try? modelContext.save()
+      }
       // If wallets exist but none are active (e.g. after a failed delete),
       // activate the first one so the app doesn't fall through to the setup wizard.
       if !wallets.isEmpty, !hasActiveWallet {
         logger.info("No active wallet found — activating first available wallet")
-        let first = wallets[0]
+        let first = WalletOrdering.sorted(wallets)[0]
         first.isActive = true
         UserDefaults.standard.set(first.id.uuidString, forKey: Constants.activeWalletIDKey)
         try? modelContext.save()

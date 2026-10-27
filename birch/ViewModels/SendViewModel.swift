@@ -85,6 +85,9 @@ final class SendViewModel: PSBTFlowManaging {
   /// Result of the most recent check of `psbtBytes` against wallet state
   var psbtVerification: PSBTVerificationState = .notChecked
 
+  /// The wallet `psbtBytes` belongs to (see PSBTFlowManaging)
+  var psbtWalletID: UUID?
+
   /// Where the change output comes back to, for the user to check on the review screen
   var changeVerification: PSBTChangeVerification?
 
@@ -402,6 +405,10 @@ final class SendViewModel: PSBTFlowManaging {
         self.recommendedFees = rates
         applyPreset(selectedFeePreset)
       }
+    } catch is CancellationError {
+      // The wallet changed while the rates were fetched, so they belong to another
+      // wallet; this screen is being reset for the new one
+      logger.info("Ignored fee rates fetched for a wallet that is no longer loaded")
     } catch {
       let fallback = BitcoinService.RecommendedFees.fallback
       logger.error("Failed to fetch fee rates: \(error) — falling back to \(fallback.medium) sat/vB")
@@ -534,6 +541,7 @@ final class SendViewModel: PSBTFlowManaging {
   /// Build a draft PSBT to populate fee/change details, then navigate to review
   private func buildDraftPSBT() async {
     isProcessing = true
+    let walletID = bitcoinService.currentWalletID
     do {
       let result = try await bitcoinService.createPSBT(
         recipients: recipientList,
@@ -541,6 +549,7 @@ final class SendViewModel: PSBTFlowManaging {
         utxos: selectedUTXOOutpoints,
         unspendable: frozenOutpoints,
       )
+      psbtWalletID = walletID
       applyPSBTResult(result)
       currentStep = .review
     } catch {
@@ -562,6 +571,7 @@ final class SendViewModel: PSBTFlowManaging {
     }
 
     isProcessing = true
+    let walletID = bitcoinService.currentWalletID
     do {
       let result = try await bitcoinService.createPSBT(
         recipients: recipientList,
@@ -569,6 +579,7 @@ final class SendViewModel: PSBTFlowManaging {
         utxos: selectedUTXOOutpoints,
         unspendable: frozenOutpoints,
       )
+      psbtWalletID = walletID
       applyPSBTResult(result)
       signaturesCollected = 0
       currentStep = .psbtDisplay
@@ -582,6 +593,10 @@ final class SendViewModel: PSBTFlowManaging {
 
   func finalizeTx() {
     guard finalizedTxBytes.isEmpty else { return }
+    guard isPSBTForLoadedWallet else {
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     do {
       finalizedTxBytes = try bitcoinService.finalizePSBTBytes(psbtBytes)
     } catch {
@@ -590,6 +605,10 @@ final class SendViewModel: PSBTFlowManaging {
   }
 
   func broadcast() async {
+    guard isPSBTForLoadedWallet else {
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     isProcessing = true
     do {
       let txid = try await bitcoinService.broadcastPSBT(psbtBytes)
@@ -619,7 +638,11 @@ final class SendViewModel: PSBTFlowManaging {
   }
 
   func savePSBT(name: String, context: ModelContext) {
-    guard let walletID = BitcoinService.shared.currentProfile?.id else { return }
+    // Filed under the wallet that built it, whichever wallet is loaded by now
+    guard let walletID = psbtWalletID else {
+      logger.warning("Not saving a PSBT with no wallet recorded")
+      return
+    }
 
     let trimmedName = String(name.prefix(SavedPSBT.maxNameLength))
     let recipientData = encodeRecipients()
@@ -722,6 +745,7 @@ final class SendViewModel: PSBTFlowManaging {
     }
     savedPSBTId = saved.id
     savedPSBTName = saved.name
+    psbtWalletID = saved.walletID
 
     // Re-check the stored bytes: the wallet's UTXO set may have moved on since this
     // PSBT was saved.
@@ -747,6 +771,8 @@ final class SendViewModel: PSBTFlowManaging {
   func importPSBT(_ psbtData: Data, source: String, context: ModelContext) {
     do {
       let result = try bitcoinService.validateAndParseImportedPSBT(psbtData, frozenOutpoints: frozenOutpoints)
+      // Validated against the loaded wallet, so it belongs to that one
+      psbtWalletID = bitcoinService.currentWalletID
 
       recipients = result.recipients.map(Recipient.init(from:))
 
@@ -814,6 +840,7 @@ final class SendViewModel: PSBTFlowManaging {
     changeAddress = nil
     inputCount = 0
     psbtVerification = .notChecked
+    psbtWalletID = nil
     changeVerification = nil
     signaturesCollected = 0
     signerStatus = []

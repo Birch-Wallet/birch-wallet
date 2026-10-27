@@ -35,6 +35,11 @@ protocol PSBTFlowManaging: AnyObject {
   /// Result of the most recent check of `psbtBytes` against wallet state.
   var psbtVerification: PSBTVerificationState { get set }
 
+  /// The wallet the PSBT belongs to, captured when it is built, imported or loaded.
+  /// Saving files it under this wallet, and merging or broadcasting it needs this
+  /// wallet to be the one loaded.
+  var psbtWalletID: UUID? { get set }
+
   // MARK: - Saved PSBT State
 
   var savedPSBTId: UUID? { get set }
@@ -69,8 +74,26 @@ extension PSBTFlowManaging {
     "\(signaturesCollected) of \(requiredSignatures) signatures"
   }
 
+  /// Whether the PSBT belongs to the wallet loaded now. A PSBT built, imported or
+  /// loaded for one wallet is never merged with, checked against or broadcast through
+  /// another. One with no wallet recorded can't be told apart, so it passes.
+  var isPSBTForLoadedWallet: Bool {
+    guard let psbtWalletID else { return true }
+    return psbtWalletID == psbtBitcoinService.currentWalletID
+  }
+
+  /// Shown when the loaded wallet isn't the one the PSBT belongs to
+  var otherWalletPSBTMessage: String {
+    "This PSBT belongs to a different wallet than the one loaded. Switch back to that wallet to continue."
+  }
+
   /// Combine a signed PSBT with the current one, update signature status, auto-save, and navigate.
   func handleSignedPSBT(_ signedBytes: Data, modelContext: ModelContext? = nil) async {
+    guard isPSBTForLoadedWallet else {
+      logger.error("Rejected signed PSBT: it belongs to a wallet that is no longer loaded")
+      errorMessage = otherWalletPSBTMessage
+      return
+    }
     isProcessing = true
     let signaturesBefore = signaturesCollected
     do {

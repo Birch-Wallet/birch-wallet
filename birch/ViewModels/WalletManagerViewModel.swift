@@ -243,7 +243,7 @@ final class WalletManagerViewModel {
 
     // If the active wallet was deleted, activate another one before saving
     if wasActive {
-      let remaining = (try? modelContext.fetch(FetchDescriptor<WalletProfile>())) ?? []
+      let remaining = (try? modelContext.fetch(FetchDescriptor<WalletProfile>(sortBy: WalletOrdering.sortDescriptors))) ?? []
       if let next = remaining.first {
         next.isActive = true
       }
@@ -255,7 +255,7 @@ final class WalletManagerViewModel {
 
       // Update UserDefaults only after successful save
       if wasActive {
-        let remaining = (try? modelContext.fetch(FetchDescriptor<WalletProfile>())) ?? []
+        let remaining = (try? modelContext.fetch(FetchDescriptor<WalletProfile>(sortBy: WalletOrdering.sortDescriptors))) ?? []
         if let next = remaining.first(where: { $0.isActive }) {
           UserDefaults.standard.set(next.id.uuidString, forKey: Constants.activeWalletIDKey)
           BitcoinService.shared.unloadWallet()

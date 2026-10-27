@@ -4,7 +4,7 @@ import SwiftUI
 private let logger = AppLog(.transactions)
 
 struct TransactionListView: View {
-  @Query private var wallets: [WalletProfile]
+  @Query(sort: WalletOrdering.sortDescriptors) private var wallets: [WalletProfile]
   @Query private var walletLabels: [WalletLabel]
   @State private var viewModel = TransactionListViewModel()
   @State private var walletManager = WalletManagerViewModel()
@@ -12,11 +12,13 @@ struct TransactionListView: View {
   @State private var walletPickerEditMode = false
   @State private var showAddWallet = false
   @State private var showWalletInfo = false
-  @State private var walletToEdit: WalletProfile?
   @State private var walletToDelete: WalletProfile?
   @State private var showConnectionStatus = false
   @State private var showDashboard = false
   @State private var walletID: UUID?
+  /// One wallet picker row's height without its divider, measured, so the list can
+  /// be sized to its rows
+  @State private var walletPickerRowHeight: CGFloat = 66
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.modelContext) private var modelContext
   @AppStorage(Constants.denominationKey) private var denomination: String = "sats"
@@ -211,10 +213,10 @@ struct TransactionListView: View {
           .presentationSizing(.page)
           .birchSheet()
       }
-      .sheet(isPresented: $showWalletInfo, onDismiss: {
-        walletToEdit = nil
-      }) {
-        if let wallet = walletToEdit ?? wallets.first(where: { $0.isActive }) {
+      // Wallet Settings opens only for the active wallet, the one loaded: closing it
+      // after a server change reloads that wallet, so it must never be another one
+      .sheet(isPresented: $showWalletInfo) {
+        if let wallet = wallets.first(where: { $0.isActive }) {
           NavigationStack {
             WalletInfoView(wallet: wallet)
               .toolbar {
@@ -302,15 +304,6 @@ struct TransactionListView: View {
     generator.impactOccurred()
   }
 
-  /// Closes the wallet picker and opens Wallet Settings for `wallet`, which
-  /// needn't be the active one.
-  private func openWalletSettings(_ wallet: WalletProfile) {
-    walletToEdit = wallet
-    walletPickerEditMode = false
-    withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
-    showWalletInfo = true
-  }
-
   @ViewBuilder
   private var walletPickerOverlay: some View {
     if showWalletPicker {
@@ -353,72 +346,25 @@ struct TransactionListView: View {
 
           HBDivider()
 
-          ScrollView {
-            LazyVStack(spacing: 0) {
-              ForEach(Array(wallets.enumerated()), id: \.element.id) { index, wallet in
-                HStack(spacing: 12) {
-                  if walletPickerEditMode {
-                    Image(systemName: "minus.circle.fill")
-                      .font(.system(size: 20))
-                      .foregroundStyle(Color.hbError)
-                      .onTapGesture {
-                        walletToDelete = wallet
-                      }
-                  }
-
-                  WalletIdenticon(id: wallet.id)
-                    .frame(width: 32, height: 32)
-                  VStack(spacing: 4) {
-                    NetworkBadge(network: wallet.bitcoinNetwork)
-                    Text(wallet.multisigDescription)
-                      .font(.hbLabel())
-                      .foregroundStyle(Color.hbTextSecondary)
-                  }
-                  .fixedSize()
-                  Text(wallet.name)
-                    .font(.hbBody())
-                    .foregroundStyle(Color.hbTextPrimary)
-                  Spacer()
-
-                  Button(action: { openWalletSettings(wallet) }) {
-                    Image(systemName: "slider.horizontal.3")
-                      .font(.system(size: 17))
-                      .foregroundStyle(Color.hbTextSecondary)
-                      .frame(width: 40, height: 36, alignment: .trailing)
-                      .contentShape(Rectangle())
-                  }
-                  .accessibilityLabel("Settings for \(wallet.name)")
-                  .accessibilityIdentifier("walletPickerSettings")
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 15)
-                .background(wallet.isActive ? Color.hbBrand.opacity(0.12) : Color.clear)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                  if walletPickerEditMode {
-                    openWalletSettings(wallet)
-                  } else {
-                    guard !wallet.isActive else {
-                      withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
-                      return
-                    }
-                    viewModel.clearState()
-                    walletManager.setActiveWallet(wallet, allWallets: wallets, modelContext: modelContext)
-                    withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
-                  }
-                }
-                .onLongPressGesture {
-                  walletPickerEditMode = true
-                }
-                if index < wallets.count - 1 {
-                  HBDivider()
-                }
-              }
+          // A List so Edit mode can reorder with the system's drag handles. Rows are
+          // the same height, so the list is sized to them and their 1pt dividers, up
+          // to 310pt.
+          List {
+            ForEach(wallets) { wallet in
+              walletPickerRow(wallet, isLast: wallet.id == wallets.last?.id)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(wallet.isActive ? Color.hbBrand.opacity(0.12) : Color.clear)
             }
+            // Only Edit mode reorders, so a long press outside it still enters Edit mode
+            .onMove(perform: walletPickerEditMode ? moveWallets : nil)
           }
+          .listStyle(.plain)
+          .scrollContentBackground(.hidden)
           .scrollBounceBehavior(.basedOnSize)
           .scrollIndicators(.visible)
-          .frame(maxHeight: 310)
+          .environment(\.editMode, .constant(walletPickerEditMode ? .active : .inactive))
+          .frame(height: min(walletPickerRowHeight * CGFloat(wallets.count) + CGFloat(max(wallets.count - 1, 0)), 310))
         }
         .background(Color.hbFloating)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -432,6 +378,73 @@ struct TransactionListView: View {
         insertion: .scale(scale: 0.9, anchor: .top).combined(with: .opacity),
         removal: .scale(scale: 0.95, anchor: .top).combined(with: .opacity),
       ))
+    }
+  }
+
+  /// One wallet in the picker. A tap switches to it outside Edit mode; in Edit mode
+  /// the red minus deletes it and the handle moves it.
+  private func walletPickerRow(_ wallet: WalletProfile, isLast: Bool) -> some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 12) {
+        if walletPickerEditMode {
+          Image(systemName: "minus.circle.fill")
+            .font(.system(size: 20))
+            .foregroundStyle(Color.hbError)
+            .onTapGesture {
+              walletToDelete = wallet
+            }
+            .accessibilityLabel("Delete \(wallet.name)")
+            .accessibilityAddTraits(.isButton)
+        }
+
+        WalletIdenticon(id: wallet.id)
+          .frame(width: 32, height: 32)
+        VStack(spacing: 4) {
+          NetworkBadge(network: wallet.bitcoinNetwork)
+          Text(wallet.multisigDescription)
+            .font(.hbLabel())
+            .foregroundStyle(Color.hbTextSecondary)
+        }
+        .fixedSize()
+        Text(wallet.name)
+          .font(.hbBody())
+          .foregroundStyle(Color.hbTextPrimary)
+        Spacer()
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 15)
+      .onGeometryChange(for: CGFloat.self, of: \.size.height) { walletPickerRowHeight = $0 }
+
+      if !isLast {
+        HBDivider()
+      }
+    }
+    .contentShape(Rectangle())
+    .onTapGesture {
+      // In Edit mode a tap does nothing: Wallet Settings opens only for the loaded
+      // wallet, from the header
+      guard !walletPickerEditMode else { return }
+      guard !wallet.isActive else {
+        withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
+        return
+      }
+      viewModel.clearState()
+      walletManager.setActiveWallet(wallet, allWallets: wallets, modelContext: modelContext)
+      withAnimation(.spring(duration: 0.25, bounce: 0.15)) { showWalletPicker = false }
+    }
+    .onLongPressGesture {
+      walletPickerEditMode = true
+    }
+  }
+
+  /// Saves the picker order after a drag in Edit mode
+  private func moveWallets(from source: IndexSet, to destination: Int) {
+    WalletOrdering.move(wallets, fromOffsets: source, toOffset: destination)
+    do {
+      try modelContext.save()
+      logger.info("Wallet order: \(WalletOrdering.sorted(wallets).map(\.name).joined(separator: ", "))")
+    } catch {
+      logger.error("Failed to save the wallet order: \(error.localizedDescription)")
     }
   }
 

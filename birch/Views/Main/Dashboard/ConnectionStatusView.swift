@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ConnectionStatusView: View {
   @Environment(\.dismiss) private var dismiss
-  @Query private var wallets: [WalletProfile]
+  @Query(sort: WalletOrdering.sortDescriptors) private var wallets: [WalletProfile]
   @State private var testResult: String?
   @State private var isTesting = false
   @State private var isSyncing = false

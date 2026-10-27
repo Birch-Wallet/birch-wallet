@@ -8,6 +8,8 @@ protocol BitcoinServiceProtocol {
   var currentNetwork: BitcoinNetwork? { get }
   var requiredSignatures: Int { get }
   var totalCosigners: Int { get }
+  /// The loaded wallet's profile id, nil when none is loaded
+  var currentWalletID: UUID? { get }
 
   /// PSBT operations
   func createPSBT(
@@ -60,6 +62,10 @@ protocol BitcoinServiceProtocol {
 // MARK: - BitcoinService Conformance
 
 extension BitcoinService: BitcoinServiceProtocol {
+  var currentWalletID: UUID? {
+    currentProfile?.id
+  }
+
   func finalizePSBTBytes(_ psbtData: Data) throws -> Data {
     let (_, tx) = try finalizePSBT(psbtData)
     return Data(tx.serialize())
