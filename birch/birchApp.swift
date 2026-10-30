@@ -22,7 +22,9 @@ struct birchApp: App {
     #endif
 
     do {
-      let schema = Schema([WalletProfile.self, CosignerInfo.self, WalletLabel.self, FrozenUTXO.self, SavedPSBT.self])
+      let schema = Schema([
+        WalletProfile.self, CosignerInfo.self, WalletLabel.self, FrozenUTXO.self, SavedPSBT.self, ElectrumServer.self,
+      ])
       #if DEBUG
         let isUITesting = CommandLine.arguments.contains("-UITesting")
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isUITesting)
@@ -31,6 +33,8 @@ struct birchApp: App {
       #endif
       modelContainer = try ModelContainer(for: schema, configurations: [config])
       BitcoinService.shared.modelContainer = modelContainer
+      // Before any wallet loads, so each one has a server to connect to
+      ElectrumServerMigration.run(in: modelContainer.mainContext)
     } catch {
       fatalError("Failed to create ModelContainer: \(error)")
     }

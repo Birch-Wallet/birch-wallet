@@ -1,214 +1,29 @@
+import SwiftData
 import SwiftUI
 
+/// The Electrum server the new wallet will sync from, on Multisig configuration and
+/// Import descriptor. Each network starts on the user's own server chosen last, or
+/// else a public one at random (SetupWizardViewModel.ensureElectrumServer).
 struct ElectrumServerSetupSection: View {
   @Bindable var viewModel: SetupWizardViewModel
-  var initiallyExpanded: Bool = true
-
-  /// Scroll target for a flagged Host field: the whole section, which is
-  /// there even while it is still expanding to show the field
-  static let scrollID = "electrum-server"
-
-  @State private var isExpanded: Bool = true
-  @State private var showInsecureSSLAlert = false
-  @State private var isTestingConnection = false
-  @State private var connectionTestResult: String?
-
-  private var isSSLSelected: Bool {
-    switch viewModel.electrumSSL {
-    case 1: false
-    case 2: true
-    default: viewModel.network.usesSSL
-    }
-  }
+  @Query(sort: \ElectrumServer.createdAt) private var servers: [ElectrumServer]
 
   var body: some View {
-    VStack(spacing: 12) {
-      Button(action: { withAnimation(.spring(duration: 0.25, bounce: 0.15)) { isExpanded.toggle() } }) {
-        HStack {
-          Image(systemName: "chevron.right")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color.hbTextSecondary)
-            .rotationEffect(.degrees(isExpanded ? 90 : 0))
-          Text("Electrum Server")
-            .font(.hbLabel())
-            .foregroundStyle(Color.hbTextSecondary)
-          Spacer()
-        }
-      }
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Electrum Server")
+        .font(.hbLabel())
+        .foregroundStyle(Color.hbTextSecondary)
 
-      if isExpanded {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Host")
-            .font(.hbLabel(11))
-            .foregroundStyle(Color.hbTextSecondary)
-          TextField(viewModel.network.defaultElectrumHost ?? "Enter server host", text: $viewModel.electrumHost)
-            .font(.hbMono(14))
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .padding(10)
-            .birchCard(.nested)
-            .foregroundStyle(Color.hbTextPrimary)
-            .hbFieldError(viewModel.electrumHostError)
-        }
-
-        HStack(spacing: 12) {
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Port")
-              .font(.hbLabel(11))
-              .foregroundStyle(Color.hbTextSecondary)
-            TextField(String(viewModel.network.defaultElectrumPort), text: $viewModel.electrumPort)
-              .font(.hbMono(14))
-              .keyboardType(.numberPad)
-              .padding(10)
-              .birchCard(.nested)
-              .foregroundStyle(Color.hbTextPrimary)
-              .onChange(of: viewModel.electrumPort) { old, new in
-                let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxPort)
-                if accepted != new {
-                  // Not a port number — ignore the keystroke
-                  viewModel.electrumPort = accepted
-                }
-              }
-          }
-
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Protocol")
-              .font(.hbLabel(11))
-              .foregroundStyle(Color.hbTextSecondary)
-            Picker("Protocol", selection: Binding(
-              get: {
-                switch viewModel.electrumSSL {
-                case 1: 1
-                case 2: 2
-                default: viewModel.network.usesSSL ? 2 : 1
-                }
-              },
-              set: {
-                viewModel.electrumSSL = $0
-                if $0 != 2 {
-                  viewModel.electrumAllowInsecureSSL = false
-                }
-              },
-            )) {
-              Text("TCP").tag(1)
-              Text("SSL").tag(2)
-            }
-            .pickerStyle(.segmented)
-          }
-        }
-
-        if isSSLSelected {
-          Toggle(isOn: Binding(
-            get: { viewModel.electrumAllowInsecureSSL },
-            set: { newValue in
-              if newValue {
-                showInsecureSSLAlert = true
-              } else {
-                viewModel.electrumAllowInsecureSSL = false
-              }
-            },
-          )) {
-            Text("Allow insecure SSL")
-              .font(.hbBody(13))
-              .foregroundStyle(Color.hbTextPrimary)
-          }
-          .tint(Color.hbToggle)
-        }
-
-        if viewModel.network.defaultElectrumHost != nil {
-          Text("Leave blank to use defaults for \(viewModel.network.displayName)")
-            .font(.hbBody(11))
-            .foregroundStyle(Color.hbTextSecondary)
-        } else {
-          Text("Electrum Server config is required for \(viewModel.network.displayName)")
-            .font(.hbBody(11))
-            .foregroundStyle(Color.hbWarning)
-        }
-
-        if let result = connectionTestResult {
-          Text(result)
-            .font(.hbBody(13))
-            .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbWarning : Color.hbError)
-        }
-
-        Button(action: testConnection) {
-          HStack(spacing: 6) {
-            if isTestingConnection {
-              ProgressView().tint(Color.hbInfo)
-            } else {
-              Image(systemName: "antenna.radiowaves.left.and.right")
-            }
-            Text(isTestingConnection ? "Testing..." : "Test Connection")
-              .font(.hbBody(14))
-          }
-          .foregroundStyle(Color.hbInfo)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 12)
-          .background(Color.hbInfo.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .disabled(isTestingConnection)
-      }
+      ElectrumServerRow(network: viewModel.network, selection: $viewModel.electrumServerChoice)
     }
     .hbCard()
-    .id(Self.scrollID)
-    .onAppear {
-      isExpanded = initiallyExpanded || viewModel.electrumHostError != nil
-    }
-    .onChange(of: viewModel.network) {
-      connectionTestResult = nil
-      if viewModel.network == .mainnet {
-        withAnimation(.spring(duration: 0.25, bounce: 0.15)) { isExpanded = true }
+    .onAppear { viewModel.ensureElectrumServer(customServers: servers) }
+    .onChange(of: viewModel.network) { viewModel.ensureElectrumServer(customServers: servers) }
+    // The chosen server was deleted on the picker: the network's default takes its place
+    .onChange(of: viewModel.electrumServerChoice) {
+      if viewModel.electrumServerChoice == nil {
+        viewModel.ensureElectrumServer(customServers: servers)
       }
-    }
-    .onChange(of: viewModel.electrumHost) {
-      viewModel.electrumHostError = nil
-    }
-    .onChange(of: viewModel.electrumHostError) {
-      // A flagged Host field has to be in sight
-      if viewModel.electrumHostError != nil, !isExpanded {
-        withAnimation(.spring(duration: 0.25, bounce: 0.15)) { isExpanded = true }
-      }
-    }
-    .alert("Allow Insecure SSL?", isPresented: $showInsecureSSLAlert) {
-      Button("Cancel", role: .cancel) {}
-      Button("Allow", role: .destructive) {
-        viewModel.electrumAllowInsecureSSL = true
-      }
-    } message: {
-      Text("This removes the requirement to verify that the server is who it claims to be. The connection will still be encrypted, but self-signed, expired, or invalid certificates will be accepted.")
-    }
-  }
-
-  private var electrumConfig: ElectrumConfig {
-    let host = viewModel.electrumHost.trimmingCharacters(in: .whitespaces)
-    let port = UInt16(viewModel.electrumPort) ?? viewModel.network.defaultElectrumPort
-    let resolvedHost = host.isEmpty ? (viewModel.network.defaultElectrumHost ?? "") : host
-    return ElectrumConfig(host: resolvedHost, port: port, useSSL: isSSLSelected, allowInsecureSSL: viewModel.electrumAllowInsecureSSL)
-  }
-
-  private func testConnection() {
-    isTestingConnection = true
-    connectionTestResult = nil
-    let config = electrumConfig
-    let expectedNetwork = viewModel.network
-    Task {
-      do {
-        let height = try await BitcoinService.shared.testElectrumConnection(config: config)
-        // Verify network for mainnet, testnet3, testnet4 (skip signet)
-        if expectedNetwork != .signet,
-           let detected = try? await BitcoinService.shared.detectElectrumNetwork(config: config),
-           detected != expectedNetwork
-        {
-          connectionTestResult = "Warning: Server is \(detected.displayName), expected \(expectedNetwork.displayName)"
-          isTestingConnection = false
-          return
-        }
-        connectionTestResult = "Success — Chain Tip Height \(height)"
-      } catch {
-        connectionTestResult = "Failed: \(error.localizedDescription)"
-      }
-      isTestingConnection = false
     }
   }
 }

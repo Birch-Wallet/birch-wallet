@@ -28,10 +28,10 @@ import Foundation
     /// the locktime of the tour's transaction.
     static let chainTipHeight: UInt32 = 156_712
 
-    /// The Electrum server to sync `network` from instead of its default, for a
-    /// machine the public server throttles: `BIRCH_TOUR_ELECTRUM_TESTNET4=ssl://host:port`
+    /// The Electrum server to sync a wallet on `network`'s public server from instead,
+    /// for a machine the public server throttles: `BIRCH_TOUR_ELECTRUM_TESTNET4=ssl://host:port`
     /// in the git-ignored fastlane/.env, which the Fastfile and ScreenshotTests pass
-    /// through. Nil, and the default server, when it isn't set. Only the connection
+    /// through. Nil, and the public server, when it isn't set. Only the connection
     /// uses it; every screen still shows the wallet's own server.
     static func electrumServer(for network: BitcoinNetwork) -> ElectrumConfig? {
       let key = "BIRCH_TOUR_ELECTRUM_\(String(describing: network).uppercased())"

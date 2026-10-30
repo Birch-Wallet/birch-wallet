@@ -99,13 +99,16 @@ After cloning, run `git submodule update --init` (or clone with `--recurse-submo
 
 ### Layers
 
-**Services:** `BitcoinService` and `FiatPriceService` are singletons reached through `.shared`. `URService`, `LabelService`, `DescriptorPDFGenerator` and `QRVideoExporter` are namespaces of static functions. None are injected through the SwiftUI environment.
+**Services:** `BitcoinService` and `FiatPriceService` are singletons reached through `.shared`. `URService`, `LabelService`, `DescriptorPDFGenerator`, `QRVideoExporter`, `ElectrumServerCatalog`, `ElectrumServerMigration` and `TLSCertificateInspector` are namespaces of static functions. None are injected through the SwiftUI environment.
 - `BitcoinService` — core BDK wallet instance, Electrum sync, PSBT creation/broadcast, auto-sync timer, fee estimation
 - `BitcoinServiceProtocol` — the PSBT operations `SendViewModel` and `BumpFeeViewModel` call, so tests can substitute `MockBitcoinService`
 - `FiatPriceService` — multi-source fiat price fetching and BTC/sat conversion
 - `URService` — UR encoding/decoding for PSBTs, descriptors, and cosigner QR interchange. BBQR is encoded and decoded in the views with the Bbqr package (`BBQRDisplayView`, `URScannerSheet`, `PSBTDisplayView`)
 - `LabelService` — label propagation between transactions, UTXOs and addresses, and BIP-329 import/export (backed by the `WalletLabel` SwiftData model)
-- `ElectrumConfig` — an Electrum server's host, port and SSL settings, and its connection URL
+- `ElectrumConfig` — where a connection goes: host, port, SSL, how the certificate is trusted (system, pinned, or pinned on first use), and the connection URL
+- `ElectrumServerCatalog` — the public Electrum servers Birch ships for each network (read-only, in code, with stable ids), the signets it can name by their block 1 hash, `ElectrumServerChoice` (a public server or one of the user's), and the server a new wallet starts on: the user's own one chosen last, else a public one at random
+- `ElectrumServerMigration` — at launch, moves wallets saved with their own host/port fields onto a public server or one of the user's `ElectrumServer`s
+- `TLSCertificateInspector` — reads an SSL server's certificate before BDK connects, for pinning and the Add Server sheet's "Trust this certificate?"
 - `DescriptorPDFGenerator` — the wallet descriptor backup PDF
 - `QRVideoExporter` — exports an animated QR code as an MP4
 
@@ -116,7 +119,8 @@ After cloning, run `git submodule update --init` (or clone with `--recurse-submo
 - Plus single-purpose VMs for transactions, UTXOs, addresses, receive, wallet management
 
 **Models** (SwiftData `@Model`):
-- `WalletProfile` — primary wallet entity: descriptor strings, network, Electrum config, active cosigner set
+- `WalletProfile` — primary wallet entity: descriptor strings, network, its Electrum server (`electrumServer` for one of the user's, or `builtInElectrumServerID` for a public one; neither means none), active cosigner set
+- `ElectrumServer` — an Electrum server the user added for one network, shared by any wallet on it, with its pinned certificate and a signet's block 1 hash
 - `CosignerInfo` — cosigner xpub + fingerprint
 - `WalletLabel` — address/UTXO labels
 - `FrozenUTXO` — UTXOs excluded from coin selection (uses BDK's native unspendable)
@@ -130,9 +134,9 @@ Views/
     Send/            — multi-step send wizard (recipients → fee → review → PSBT QR → broadcast), saved PSBTs, PSBT inspector
     Receive/         — address list + address detail with QR
     Transactions/    — TX list, TX detail, wallet dashboard (total balance, UTXO stats), bump fee
-    Settings/        — Settings, Wallet Settings (WalletInfoView), UTXO list/detail/filter, descriptor export PDF
+    Settings/        — Settings, Wallet Settings (WalletInfoView), Electrum server picker and Add/Edit Server sheet, UTXO list/detail/filter, descriptor export PDF
   Setup/             — onboarding wizard steps
-  Components/        — QR display/scan (UR + BBQR), Theme.swift, PIN pad, seedling loader, PSBT verification badge, cosigner card, character-wrapping text
+  Components/        — QR display/scan (UR + BBQR), Theme.swift, PIN pad, seedling loader, PSBT verification badge, cosigner card, Electrum server row, character-wrapping text
 ```
 
 ### Key Patterns
@@ -141,7 +145,7 @@ Views/
 
 **Wallet initialization:** `WalletProfile` holds the output descriptor. `BitcoinService.loadWallet()` creates the BDK `Wallet` instance; call `sync()` to update the balance/UTXO set.
 
-**Multi-network:** `BitcoinNetwork` enum (mainnet/testnet3/testnet4/signet) is stored on `WalletProfile` and drives address validation, default Electrum endpoints, and BDK network selection.
+**Multi-network:** `BitcoinNetwork` enum (mainnet/testnet3/testnet4/signet) is stored on `WalletProfile` and drives address validation, which Electrum servers a wallet can use, and BDK network selection. A server's network is read from its genesis block (`BitcoinNetwork(genesisNonce:)`); every signet shares one, so signets are told apart by block 1.
 
 **App lock:** `ContentView` gates access via `AppLockViewModel` which supports Face ID/Touch ID + optional PIN. Configurable inactivity timeout (default 60s) re-locks when returning from background. Progressive lockout on failed PIN attempts (escalating from 60s to 24h). Data wipe capability after repeated failures.
 

@@ -14,6 +14,7 @@ struct TransactionListView: View {
   @State private var showWalletInfo = false
   @State private var walletToDelete: WalletProfile?
   @State private var showConnectionStatus = false
+  @State private var showServerPicker = false
   @State private var showDashboard = false
   @State private var walletID: UUID?
   /// One wallet picker row's height without its divider, measured, so the list can
@@ -36,6 +37,11 @@ struct TransactionListView: View {
   /// The phone has no network, so no sync can connect
   private var isOffline: Bool {
     NetworkMonitor.shared.state.isOffline
+  }
+
+  /// The active wallet's server was deleted, so it can't sync until one is chosen
+  private var hasNoServer: Bool {
+    wallets.first(where: { $0.isActive }).map { $0.electrumServerChoice == nil } ?? false
   }
 
   private var activeWalletName: String {
@@ -96,7 +102,7 @@ struct TransactionListView: View {
 
             // Connection status
             Button(action: { showConnectionStatus = true }) {
-              SyncStatusDot(state: viewModel.syncState, offline: isOffline)
+              SyncStatusDot(state: viewModel.syncState, offline: isOffline || hasNoServer)
             }
           }
 
@@ -191,6 +197,35 @@ struct TransactionListView: View {
         ConnectionStatusView()
           .birchSheet()
           .birchResizableSheet()
+      }
+      // The server for a wallet whose server was deleted. Choosing one syncs from it.
+      .sheet(isPresented: $showServerPicker) {
+        if let wallet = wallets.first(where: { $0.isActive }) {
+          NavigationStack {
+            ElectrumServerPickerView(
+              network: wallet.bitcoinNetwork,
+              selection: Binding(
+                get: { wallet.electrumServerChoice },
+                set: { choice in
+                  wallet.setElectrumServer(choice)
+                  try? modelContext.save()
+                },
+              ),
+              signetHistory: wallet.signetHistory,
+              onServerChanged: { clearingDatabase in
+                Task { await BitcoinService.shared.serverChanged(for: wallet, clearingDatabase: clearingDatabase) }
+              },
+            )
+            .toolbar {
+              ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { showServerPicker = false }
+                  .buttonStyle(HBBarButtonStyle())
+              }
+              .hbHidesGlassBackground()
+            }
+          }
+          .birchSheet()
+        }
       }
       .sheet(isPresented: $showDashboard) {
         WalletDashboardView()
@@ -453,7 +488,15 @@ struct TransactionListView: View {
   /// connection details.
   @ViewBuilder
   private var syncStatus: some View {
-    if isOffline, !viewModel.syncState.isSyncing {
+    if hasNoServer, !viewModel.syncState.isSyncing {
+      Button(action: { showServerPicker = true }) {
+        Text("No server")
+          .font(.hbLabel(11))
+          .foregroundStyle(Color.hbWarning)
+      }
+      .accessibilityHint("Chooses an Electrum server for this wallet")
+      .accessibilityIdentifier("noServer")
+    } else if isOffline, !viewModel.syncState.isSyncing {
       Button(action: { showConnectionStatus = true }) {
         Text("Offline")
           .font(.hbLabel(11))

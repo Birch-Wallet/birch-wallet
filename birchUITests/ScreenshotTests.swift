@@ -156,8 +156,15 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: 35 - Descriptor Import (empty)
 
-    // Before anything is entered: the field's placeholder and Import disabled
+    // Before anything is entered: the field's placeholder and Import disabled, on
+    // Mainnet with a public server
     snapshot("35-DescriptorImport-Empty")
+
+    // The tour's wallet is on Testnet4. A new wallet starts on Mainnet, so choose it
+    // before the testnet descriptor goes in.
+    let testnet4Button = app.segmentedControls.firstMatch.buttons["Testnet4"]
+    XCTAssertTrue(testnet4Button.waitForExistence(timeout: 5), "Testnet4 segment button should exist")
+    testnet4Button.tap()
 
     let testDescriptor = "wsh(sortedmulti(1,[7a13a7b1/48'/1'/0'/2']tpubDETciRzaZyqww2dSAyT2j6tWgzREyiZEY2iZDPKDtqNpSEqqFS31DZUFFTFnayx7wLUVYx3V1R2AWhhWbFrnCukKZ1kmnn83Fn2xSf7hEaH/<0;1>/*,[30a36b52/48'/1'/0'/2']tpubDF6MPv2vWsbCo8c7rk4X32BPa5yuj4niem5Pr6isrd9cSdCkYETcGUmBSFY4ekTR1CRFmjn4eoYGrwPU19FffwEpX7Tda6BBmg91aiHKpmE/<0;1>/*))"
 
@@ -189,11 +196,6 @@ final class ScreenshotTests: XCTestCase {
     // MARK: 03 - Descriptor Import (filled)
 
     snapshot("03-DescriptorImport")
-
-    let testnet4Button = app.buttons["Testnet4"]
-    if testnet4Button.waitForExistence(timeout: 5) {
-      testnet4Button.tap()
-    }
 
     // Name the wallet after the shot, so 03 shows the field's placeholder.
     // Return dismisses the keyboard.
@@ -402,10 +404,14 @@ final class ScreenshotTests: XCTestCase {
     XCTAssertTrue(createNewCard.waitForExistence(timeout: 3), "Creation choice should show 'Create New Wallet' option")
     createNewCard.tap()
 
-    // MARK: 15 - Multisig Configuration (Testnet4 default)
+    // MARK: 15 - Multisig Configuration (Testnet4)
 
     let multisigTitle = app.staticTexts["Multisig Configuration"]
     XCTAssertTrue(multisigTitle.waitForExistence(timeout: 5), "Multisig Configuration screen should appear")
+    // A new wallet starts on Mainnet; 15 shows Testnet4 and 16 Mainnet
+    let testnet4FirstBtn = app.segmentedControls.firstMatch.buttons["Testnet4"]
+    XCTAssertTrue(testnet4FirstBtn.waitForExistence(timeout: 3), "Testnet4 segment button should exist")
+    testnet4FirstBtn.tap()
     settle()
     snapshot("15-MultisigConfig-Testnet4")
 
@@ -415,7 +421,7 @@ final class ScreenshotTests: XCTestCase {
     mainnetSegBtn.tap()
     settle()
 
-    // MARK: 16 - Multisig Configuration (Mainnet)
+    // MARK: 16 - Multisig Configuration (Mainnet, a public server and the warning to use your own node)
 
     snapshot("16-MultisigConfig-Mainnet")
 

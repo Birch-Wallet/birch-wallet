@@ -61,11 +61,16 @@ final class SetupWizardViewModel {
   var firstReceiveAddress: String = ""
   var addressDerivationError: String?
 
-  // Electrum server
-  var electrumHost: String = ""
-  var electrumPort: String = ""
-  var electrumSSL: Int = 0 // 0 = network default, 1 = TCP, 2 = SSL
-  var electrumAllowInsecureSSL: Bool = false
+  /// The Electrum server chosen for each network, so moving between networks and back
+  /// keeps each choice. A network gets its default the first time it's shown
+  /// (ensureElectrumServer).
+  var electrumServerChoices: [BitcoinNetwork: ElectrumServerChoice] = [:]
+
+  /// The server the wallet will sync from, on the chosen network
+  var electrumServerChoice: ElectrumServerChoice? {
+    get { electrumServerChoices[network] }
+    set { electrumServerChoices[network] = newValue }
+  }
 
   /// Returns an error message if the descriptor contains keys that don't match the selected network, nil otherwise.
   var descriptorNetworkMismatchError: String? {
@@ -84,18 +89,6 @@ final class SetupWizardViewModel {
     return nil
   }
 
-  var isElectrumHostRequired: Bool {
-    network.defaultElectrumHost == nil
-  }
-
-  var isElectrumHostValid: Bool {
-    !isElectrumHostRequired || !electrumHost.trimmingCharacters(in: .whitespaces).isEmpty
-  }
-
-  /// Set when Next or Import finds no host for a network that needs one; shown
-  /// on the Host field and cleared when the host or the network changes
-  var electrumHostError: String?
-
   // Advanced settings
   var blockExplorerHost: String = ""
   var addressGapLimit: String = "\(Constants.defaultAddressGap)"
@@ -104,7 +97,7 @@ final class SetupWizardViewModel {
   var errorMessage: String?
   var importDescriptorError: String?
   var isProcessing: Bool = false
-  var network: BitcoinNetwork = .testnet4
+  var network: BitcoinNetwork = Constants.defaultNetwork
   /// Set to true after the wallet has been created during the import flow.
   var walletCreated: Bool = false
 
@@ -210,7 +203,6 @@ final class SetupWizardViewModel {
     let crosses = Self.crossesKeyFormat(from: network, to: newNetwork)
     logger.info("Network: \(network.displayName) -> \(newNetwork.displayName)\(crosses && hasEnteredKeys ? ", clearing cosigner keys" : "")")
     network = newNetwork
-    electrumHostError = nil
     if crosses {
       clearKeysForNetworkChange()
     }
@@ -223,6 +215,15 @@ final class SetupWizardViewModel {
     cosignerFingerprints = cosignerFingerprints.map { _ in "" }
     cosignerDerivationPaths = cosignerDerivationPaths.map { _ in Constants.derivationPath(for: network) }
     cosignerErrors = [:]
+  }
+
+  /// Gives the chosen network its default server the first time it's shown: the
+  /// user's own server for it chosen last, or else a public one at random
+  func ensureElectrumServer(customServers: [ElectrumServer]) {
+    guard electrumServerChoices[network] == nil,
+          let choice = ElectrumServerCatalog.defaultChoice(for: network, customServers: customServers) else { return }
+    electrumServerChoices[network] = choice
+    logger.info("Electrum server for \(network.displayName): \(choice.displayName) (\(choice.config.url))")
   }
 
   /// Every field of the cosigner that fails validation, with the reason
@@ -838,10 +839,6 @@ final class SetupWizardViewModel {
         currentStep = .descriptorImport
       }
     case .multisigConfig:
-      guard isElectrumHostValid else {
-        electrumHostError = "An Electrum server host is required for \(network.displayName)"
-        return false
-      }
       resizeCosigners()
       visitedCosigners.insert(currentCosignerIndex)
       currentStep = .cosignerImport
@@ -851,10 +848,6 @@ final class SetupWizardViewModel {
       currentStep = .verify
     case .descriptorImport:
       importDescriptorError = nil
-      guard isElectrumHostValid else {
-        electrumHostError = "An Electrum server host is required for \(network.displayName)"
-        return false
-      }
       guard parseImportedDescriptor() else {
         importDescriptorError = errorMessage
         errorMessage = nil
@@ -891,10 +884,6 @@ final class SetupWizardViewModel {
   // MARK: - Save
 
   func saveWallet(modelContext: ModelContext) throws {
-    guard isElectrumHostValid else {
-      throw AppError.electrumConnectionFailed("An Electrum server host is required for \(network.displayName)")
-    }
-
     // Validate descriptors with BDK before saving — catch parse errors early
     let bdkNetworkKind = BitcoinService.shared.bdkNetworkKind(from: network)
     do {
@@ -922,10 +911,6 @@ final class SetupWizardViewModel {
       network: network,
       isActive: true,
       addressGapLimit: Int(addressGapLimit) ?? Constants.defaultAddressGap,
-      electrumHost: electrumHost.trimmingCharacters(in: .whitespaces),
-      electrumPort: Int(electrumPort) ?? 0,
-      electrumSSL: electrumSSL,
-      electrumAllowInsecureSSL: electrumAllowInsecureSSL,
       blockExplorerHost: blockExplorerHost.trimmingCharacters(in: .whitespaces),
     )
     // A new wallet goes to the bottom of the wallet picker
@@ -938,6 +923,10 @@ final class SetupWizardViewModel {
     #endif
 
     modelContext.insert(profile)
+    profile.setElectrumServer(electrumServerChoice)
+    if case let .custom(server) = electrumServerChoice {
+      server.lastUsedAt = .now
+    }
 
     // Create cosigner records
     for i in 0 ..< totalCosigners {
@@ -960,7 +949,8 @@ final class SetupWizardViewModel {
       try modelContext.save()
       logger.info(
         "Saved new \(requiredSignatures)-of-\(totalCosigners) wallet '\(profile.name)' (\(profile.id)) "
-          + "on \(network.displayName) via \(creationMode == .createNew ? "new wallet" : "descriptor import")",
+          + "on \(network.displayName) via \(creationMode == .createNew ? "new wallet" : "descriptor import"), "
+          + "Electrum server \(electrumServerChoice.map { "\($0.displayName) (\($0.config.url))" } ?? "none")",
       )
     } catch {
       // Rollback UserDefaults if save fails

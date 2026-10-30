@@ -5,7 +5,7 @@ import Testing
 
 struct WalletProfileTests {
   private func createTestContainer() throws -> ModelContainer {
-    let schema = Schema([WalletProfile.self, CosignerInfo.self])
+    let schema = Schema([WalletProfile.self, CosignerInfo.self, ElectrumServer.self])
     let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [config])
   }
@@ -115,26 +115,83 @@ struct WalletProfileTests {
     #expect(wallet.multisigDescription == "2-of-3")
   }
 
-  private func profile(electrumPort: Int = 0, addressGapLimit: Int = 20) -> WalletProfile {
+  private func profile(addressGapLimit: Int = 20) -> WalletProfile {
     WalletProfile(
       name: "Test", requiredSignatures: 2, totalCosigners: 3,
       externalDescriptor: "", internalDescriptor: "",
-      network: .testnet4, addressGapLimit: addressGapLimit, electrumPort: electrumPort,
+      network: .testnet4, addressGapLimit: addressGapLimit,
     )
   }
 
-  /// A stored port that is not a port number must not trap: the wallet is loaded
-  /// on every launch, so a trap there would make the app impossible to open.
-  @Test(arguments: [65536, 500_022, -1, Int.max, Int.min])
-  func `out of range port falls back to the default`(port: Int) {
-    #expect(profile(electrumPort: port).electrumConfig.port == BitcoinNetwork.testnet4.defaultElectrumPort)
+  private func server(port: Int) -> ElectrumServer {
+    ElectrumServer(name: "", host: "electrum.example.com", port: port, useSSL: true, network: .testnet4)
   }
 
-  @Test func `custom port is used when it is A port number`() {
-    #expect(profile(electrumPort: 1).electrumConfig.port == 1)
-    #expect(profile(electrumPort: 12345).electrumConfig.port == 12345)
-    #expect(profile(electrumPort: 65535).electrumConfig.port == 65535)
-    #expect(profile(electrumPort: 0).electrumConfig.port == BitcoinNetwork.testnet4.defaultElectrumPort)
+  /// A stored port that is not a port number must not trap: every connection reads
+  /// it, so a trap there would make the wallet impossible to open.
+  @Test(arguments: [65536, 500_022, 0, -1, Int.max, Int.min])
+  func `out of range port falls back to the default`(port: Int) {
+    #expect(server(port: port).config.port == BitcoinNetwork.testnet4.defaultElectrumPort)
+  }
+
+  @Test func `A server's port is used when it is A port number`() {
+    #expect(server(port: 1).config.port == 1)
+    #expect(server(port: 12345).config.port == 12345)
+    #expect(server(port: 65535).config.port == 65535)
+  }
+
+  // MARK: - Electrum server
+
+  @Test func `A wallet uses its own server, then A public one, then none`() throws {
+    let container = try createTestContainer()
+    let context = ModelContext(container)
+    let wallet = profile()
+    context.insert(wallet)
+    #expect(wallet.electrumServerChoice == nil)
+    #expect(wallet.electrumConfig == nil)
+
+    let mempool = try #require(ElectrumServerCatalog.server(id: "testnet4.mempool"))
+    wallet.setElectrumServer(.builtIn(mempool))
+    #expect(wallet.electrumServerChoice == .builtIn(mempool))
+    #expect(wallet.electrumConfig?.url == "ssl://testnet4.mempool.space:40002")
+
+    let own = server(port: 50002)
+    context.insert(own)
+    wallet.setElectrumServer(.custom(own))
+    #expect(wallet.electrumServerChoice == .custom(own))
+    #expect(wallet.builtInElectrumServerID.isEmpty)
+    #expect(wallet.electrumConfig?.url == "ssl://electrum.example.com:50002")
+
+    wallet.setElectrumServer(nil)
+    #expect(wallet.electrumServerChoice == nil)
+  }
+
+  /// The wallets on a deleted server are left with none, not moved to another
+  @Test func `deleting A server leaves its wallets with none`() throws {
+    let container = try createTestContainer()
+    let context = ModelContext(container)
+    let own = server(port: 50002)
+    context.insert(own)
+    let first = profile()
+    let second = profile()
+    context.insert(first)
+    context.insert(second)
+    first.setElectrumServer(.custom(own))
+    second.setElectrumServer(.custom(own))
+    try context.save()
+    #expect(own.wallets.count == 2)
+
+    context.delete(own)
+    try context.save()
+    #expect(first.electrumServerChoice == nil)
+    #expect(second.electrumServerChoice == nil)
+    #expect(try context.fetch(FetchDescriptor<WalletProfile>()).count == 2)
+  }
+
+  /// A wallet made now has nothing to carry over; one saved before servers were
+  /// shared reads false from the store until the migration runs
+  @Test func `A new wallet needs no migration`() {
+    #expect(profile().electrumServerMigrated)
   }
 
   /// New wallets scan 50 unused addresses past the last used one. A gap of 50 costs
