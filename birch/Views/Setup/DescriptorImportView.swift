@@ -114,7 +114,7 @@ struct DescriptorImportView: View {
   @ViewBuilder
   private var settings: some View {
     WalletNameNetworkCard(viewModel: viewModel)
-    ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
+    ElectrumServerSetupSection(viewModel: viewModel)
     WalletAdvancedSetupSection(viewModel: viewModel)
   }
 
@@ -170,18 +170,11 @@ struct DescriptorImportView: View {
       onImport()
       return
     }
-    let flagged: (id: String, message: String)? = if let hostError = viewModel.electrumHostError {
-      (ElectrumServerSetupSection.scrollID, hostError)
-    } else if let importError = viewModel.importDescriptorError {
-      (Self.descriptorFieldID, importError)
-    } else {
-      nil
-    }
-    guard let flagged else { return }
+    guard let importError = viewModel.importDescriptorError else { return }
     withAnimation {
-      proxy.scrollTo(flagged.id, anchor: .top)
+      proxy.scrollTo(Self.descriptorFieldID, anchor: .top)
     }
-    AccessibilityNotification.Announcement(flagged.message).post()
+    AccessibilityNotification.Announcement(importError).post()
   }
 
   private func dismissKeyboard() {

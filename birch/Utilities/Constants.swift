@@ -4,7 +4,8 @@ enum Constants {
   // MARK: - App
 
   static let appName = "Birch"
-  static let defaultNetwork: BitcoinNetwork = .testnet4
+  /// The network a new or imported wallet starts on
+  static let defaultNetwork: BitcoinNetwork = .mainnet
 
   // MARK: - BIP48 P2WSH
 

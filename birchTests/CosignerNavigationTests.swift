@@ -68,18 +68,13 @@ struct CosignerNavigationTests {
     #expect(vm.currentStep == .multisigConfig)
   }
 
-  /// Mainnet has no default Electrum server
-  @Test func `multisig needs A host on mainnet`() {
+  /// Every network has public Electrum servers, so no step waits for a host
+  @Test func `a new wallet starts on mainnet and needs no host`() {
     let vm = SetupWizardViewModel()
-    vm.network = .mainnet
+    #expect(vm.network == .mainnet)
     vm.currentStep = .multisigConfig
-    #expect(!vm.goToNext())
-    #expect(vm.currentStep == .multisigConfig)
-    #expect(vm.electrumHostError != nil)
-    #expect(vm.errorMessage == nil, "The Host field is flagged instead of an alert")
-
-    vm.changeNetwork(to: .testnet4)
-    #expect(vm.electrumHostError == nil)
+    #expect(vm.goToNext())
+    #expect(vm.currentStep == .cosignerImport)
   }
 
   // MARK: - Completeness
@@ -185,7 +180,6 @@ struct CosignerNavigationTests {
 
   @Test func `next finishes once every cosigner is complete`() {
     let vm = Self.wizard()
-    Self.useUnreachableElectrumServer(vm)
     for index in 0 ..< 3 {
       Self.fill(vm, index)
     }
@@ -285,11 +279,5 @@ struct CosignerNavigationTests {
     vm.changeNetwork(to: .signet)
     #expect(vm.cosignerXpubs[0] == Self.keys[0].xpub)
     #expect(vm.cosignerFingerprints[0] == Self.keys[0].fingerprint)
-  }
-
-  /// A closed local port, so nothing leaves the machine
-  private static func useUnreachableElectrumServer(_ vm: SetupWizardViewModel) {
-    vm.electrumHost = "127.0.0.1"
-    vm.electrumPort = "1"
   }
 }

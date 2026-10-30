@@ -47,7 +47,7 @@ struct CosignerEditTests {
   private static let cosignerC: Edit = (label: "Coldcard", xpub: keyC, fingerprint: "effda333", derivationPath: path)
 
   private func createTestContainer() throws -> ModelContainer {
-    let schema = Schema([WalletProfile.self, CosignerInfo.self, WalletLabel.self, FrozenUTXO.self, SavedPSBT.self])
+    let schema = Schema([WalletProfile.self, CosignerInfo.self, WalletLabel.self, FrozenUTXO.self, SavedPSBT.self, ElectrumServer.self])
     let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
     return try ModelContainer(for: schema, configurations: [config])
   }
@@ -543,7 +543,9 @@ struct CosignerEditTests {
     let container = try createTestContainer()
     let context = ModelContext(container)
     let wallet = try makeWallet(in: context)
-    wallet.electrumHost = "electrum.example.com"
+    let server = ElectrumServer(name: "Home Node", host: "electrum.example.com", port: 50002, useSSL: true, network: .testnet4)
+    context.insert(server)
+    wallet.setElectrumServer(.custom(server))
     wallet.blockExplorerHost = "mempool.example.com"
     wallet.addressGapLimit = 75
     wallet.privacyMode = true
@@ -559,7 +561,7 @@ struct CosignerEditTests {
     #expect(wallet.bitcoinNetwork == .testnet4)
     #expect(wallet.requiredSignatures == 2)
     #expect(wallet.totalCosigners == 2)
-    #expect(wallet.electrumHost == "electrum.example.com")
+    #expect(wallet.electrumServer?.id == server.id)
     #expect(wallet.blockExplorerHost == "mempool.example.com")
     #expect(wallet.addressGapLimit == 75)
     #expect(wallet.privacyMode)

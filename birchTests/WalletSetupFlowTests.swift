@@ -26,11 +26,11 @@ struct WalletSetupFlowTests {
     return (receive, change)
   }
 
-  /// A closed local port, so loading the wallet never leaves the machine
+  /// One of the user's own servers, on a closed local port, so nothing leaves the
+  /// machine. expectSavedWalletLoads inserts it, as the picker would have.
   private static func useUnreachableElectrumServer(_ vm: SetupWizardViewModel) {
-    vm.electrumHost = "127.0.0.1"
-    vm.electrumPort = "1"
-    vm.electrumSSL = 1 // TCP
+    let server = ElectrumServer(name: "Closed port", host: "127.0.0.1", port: 1, useSSL: false, network: vm.network)
+    vm.electrumServerChoice = .custom(server)
   }
 
   /// saveWallet marks the new wallet as the app's active one in UserDefaults.
@@ -52,11 +52,14 @@ struct WalletSetupFlowTests {
   private func expectSavedWalletLoads(
     _ vm: SetupWizardViewModel, core: (receive: [String], change: [String]),
   ) async throws {
-    let schema = Schema([WalletProfile.self, CosignerInfo.self])
+    let schema = Schema([WalletProfile.self, CosignerInfo.self, ElectrumServer.self])
     let container = try ModelContainer(
       for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)],
     )
     let context = ModelContext(container)
+    if case let .custom(server) = vm.electrumServerChoice {
+      context.insert(server)
+    }
 
     try Self.saveRestoringAppDefaults(vm, context: context)
 
@@ -69,6 +72,15 @@ struct WalletSetupFlowTests {
     #expect(profile.totalCosigners == 2)
     #expect(profile.externalDescriptor == vm.externalDescriptor)
     #expect(profile.internalDescriptor == vm.internalDescriptor)
+
+    // It syncs from the server the wizard showed, and a server of the user's own
+    // becomes the one chosen last
+    let choice = try #require(vm.electrumServerChoice)
+    #expect(profile.electrumServerChoice == choice)
+    if case let .custom(server) = choice {
+      #expect(server.lastUsedAt != nil)
+      #expect(server.wallets.map(\.id) == [profile.id])
+    }
 
     let cosigners = profile.cosigners.sorted { $0.orderIndex < $1.orderIndex }
     #expect(cosigners.map(\.xpub) == vm.cosignerXpubs)
@@ -139,7 +151,9 @@ struct WalletSetupFlowTests {
     let vm = SetupWizardViewModel()
     vm.creationMode = .importDescriptor
     vm.network = .testnet4
-    Self.useUnreachableElectrumServer(vm)
+    // The network's public server, as setup shows it without one of the user's own
+    vm.ensureElectrumServer(customServers: [])
+    #expect(vm.electrumServerChoice?.id == "builtin:testnet4.mempool")
     vm.importedDescriptorText = "wsh(sortedmulti(2,"
       + Self.keys.map { "[\($0.fingerprint)/48h/1h/0h/2h]\($0.xpub)/<0;1>/*" }.joined(separator: ",")
       + "))"

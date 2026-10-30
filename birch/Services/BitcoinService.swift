@@ -194,16 +194,19 @@ final class BitcoinService {
   @ObservationIgnored private var syncPendingOnline = false
 
   var electrumURL: String? {
-    guard let profile = currentProfile else { return nil }
-    return profile.electrumConfig.url
+    currentProfile?.electrumConfig?.url
   }
 
-  /// The server to connect `profile` to: its own, unless the screenshot tour
-  /// names a local one for a wallet left on the network's default
+  /// What a sync, check, fee estimate or broadcast says for a wallet with no server:
+  /// the user deleted the one it used
+  static let noServerMessage = "This wallet has no Electrum server. Choose one in Wallet Settings."
+
+  /// The server to connect `profile` to, or nil when it has none: its own, unless
+  /// the screenshot tour names a local one for a wallet on a public server
   /// (ScreenshotFixtures.electrumServer)
-  private func connectionConfig(for profile: WalletProfile) -> ElectrumConfig {
+  private func connectionConfig(for profile: WalletProfile) -> ElectrumConfig? {
     #if DEBUG
-      if ScreenshotFixtures.isActive, profile.electrumHost.isEmpty,
+      if ScreenshotFixtures.isActive, profile.electrumServerChoice?.isPublic == true,
          let server = ScreenshotFixtures.electrumServer(for: profile.bitcoinNetwork)
       {
         return server
@@ -218,6 +221,9 @@ final class BitcoinService {
     // Birch's own connection errors already say what happened
     if case let AppError.electrumConnectionFailed(detail) = error {
       return detail
+    }
+    if let problem = error as? CertificateProblem {
+      return problem.errorDescription ?? "\(problem)"
     }
     let msg = "\(error)"
     if msg.contains("InvalidCertificate") || msg.contains("CertificateRequired")
@@ -245,8 +251,13 @@ final class BitcoinService {
 
   /// The arguments `makeElectrumClient` passes, for the Action row and the log
   private static func clientCall(_ config: ElectrumConfig) -> String {
-    "ElectrumClient(url: \(config.url), timeout: \(Constants.electrumTimeoutSeconds), "
-      + "retry: \(Constants.electrumRetries), validateDomain: \(!config.allowInsecureSSL))"
+    let pin = switch config.trust {
+    case .system: ""
+    case let .pinned(fingerprint): ", after checking the pinned certificate \(CertificateInfo.format(fingerprint))"
+    case .trustOnFirstUse: ", after reading the certificate to pin"
+    }
+    return "ElectrumClient(url: \(config.url), timeout: \(Constants.electrumTimeoutSeconds), "
+      + "retry: \(Constants.electrumRetries), validateDomain: \(config.validatesDomain))\(pin)"
   }
 
   /// Runs a blocking Electrum call while connecting to `config`'s server, which has
@@ -264,17 +275,38 @@ final class BitcoinService {
   }
 
   /// What a sync, check, test or fee estimate says when connecting runs out of time
-  private nonisolated static func connectTimedOut(host: String, port: UInt16) -> AppError {
+  nonisolated static func connectTimedOut(host: String, port: UInt16) -> AppError {
     .electrumConnectionFailed("Couldn't reach \(host):\(port) within \(Int(Constants.electrumConnectSeconds)) seconds")
   }
 
-  /// Opens a new connection to `config`'s server, giving up at `deadline`
-  private nonisolated static func openConnection(to config: ElectrumConfig, until deadline: TimeInterval) async throws -> ElectrumClient {
+  /// Opens a new connection to `config`'s server, giving up at `deadline`. A pinned
+  /// certificate is checked first. The certificate of a server still to be pinned
+  /// comes back with the client, for the caller to pin once the server answers.
+  private nonisolated static func openConnection(
+    to config: ElectrumConfig,
+    until deadline: TimeInterval,
+  ) async throws -> (client: ElectrumClient, certificate: CertificateInfo?) {
+    let certificate = try await checkCertificate(for: config, until: deadline)
     let url = config.url
-    let validateDomain = !config.allowInsecureSSL
-    return try await connecting(to: config, until: deadline) {
+    let validateDomain = config.validatesDomain
+    let client = try await connecting(to: config, until: deadline) {
       try makeElectrumClient(url: url, validateDomain: validateDomain)
     }
+    return (client, certificate)
+  }
+
+  /// Checks a pinned certificate before BDK connects, because BDK can only trust what
+  /// iOS trusts or trust anything. The check reads the certificate on a handshake of
+  /// its own, so BDK's connection itself still isn't checked; closing that gap needs a
+  /// certificate verifier in BDK (the Birch-Wallet/bdk-swift fork). Returns the
+  /// certificate the server presented, nil for system trust and TCP.
+  nonisolated static func checkCertificate(for config: ElectrumConfig, until deadline: TimeInterval) async throws -> CertificateInfo? {
+    guard config.useSSL, config.trust != .system else { return nil }
+    let certificate = try await TLSCertificateInspector.inspect(host: config.host, port: config.port, until: deadline)
+    if case let .pinned(fingerprint) = config.trust, !certificate.matches(fingerprint) {
+      throw CertificateProblem(kind: .changed, certificate: certificate, host: config.host, port: config.port)
+    }
+    return certificate
   }
 
   /// Not private, so a test can load a wallet into a service of its own instead
@@ -473,6 +505,15 @@ final class BitcoinService {
       throw AppError.electrumConnectionFailed(network.message)
     }
 
+    // A wallet whose server was deleted waits for the user to choose another
+    if let profile = currentProfile, connectionConfig(for: profile) == nil {
+      electrumVerified = false
+      electrumConnectionError = Self.noServerMessage
+      addToLog("Sync not started: the wallet has no Electrum server")
+      guard trigger == .user else { return }
+      throw AppError.electrumConnectionFailed(Self.noServerMessage)
+    }
+
     // Capture wallet identity and persister at start — if the wallet is switched
     // or reloaded during sync, we must not apply results or persist to the wrong
     // database. The generation (not the profile id) is the identity check, so a
@@ -517,21 +558,22 @@ final class BitcoinService {
     let utxoCountBefore = utxos.count
 
     do {
-      guard let profile = currentProfile else { throw AppError.walletNotLoaded }
+      guard let profile = currentProfile, let config = connectionConfig(for: profile) else {
+        throw AppError.walletNotLoaded
+      }
 
       // Every sync opens a new connection. One left open since the last sync may have
       // died while idle without either side hearing of it, as when a carrier drops an
       // idle connection, and its first request would wait out the socket timeout.
       // Connecting, the ping and the chain tip share one limit, so a server that can't
       // be reached fails the sync instead of holding the bar under 20%.
-      let config = connectionConfig(for: profile)
       let connectDeadline = Self.uptime + Constants.electrumConnectSeconds
       beginSyncAction(
         "Connecting to \(config.host):\(config.port) (\(config.useSSL ? "TCP and TLS handshake" : "TCP, no TLS"))",
         calls: Self.clientCall(config),
         generation: syncGeneration,
       )
-      let client = try await Self.openConnection(to: config, until: connectDeadline)
+      let (client, certificate) = try await Self.openConnection(to: config, until: connectDeadline)
       guard walletGeneration == syncGeneration else {
         addToLog("Sync cancelled: wallet replaced while connecting")
         return
@@ -570,6 +612,9 @@ final class BitcoinService {
         addToLog("Sync cancelled: wallet replaced during chain tip fetch")
         return
       }
+      await learnServerDetails(
+        from: client, certificate: certificate, config: config, until: connectDeadline, profile: profile, generation: syncGeneration,
+      )
 
       // Without a measured pace yet, a round trip is about one ping
       if learnedSecondsPerUnit <= 0 {
@@ -662,6 +707,7 @@ final class BitcoinService {
       if let profileId = syncProfileId {
         UserDefaults.standard.set(now, forKey: Self.lastSyncKey(profileId))
       }
+      recordSignetChain(of: profile)
       #if DEBUG
         // The screenshot tour's "Synced" age reads the same every run.
         let shownSyncDate = ScreenshotFixtures.isActive ? ScreenshotFixtures.lastSynced : now
@@ -739,18 +785,24 @@ final class BitcoinService {
       addToLog("Connection check not started: \(network.logDescription)")
       return
     }
+    guard let config = connectionConfig(for: profile) else {
+      electrumVerified = false
+      electrumConnectionError = Self.noServerMessage
+      addToLog("Connection check not started: the wallet has no Electrum server")
+      return
+    }
     let generation = walletGeneration
     let tipBefore = chainTipHeight
-    let config = connectionConfig(for: profile)
     let deadline = Self.uptime + Constants.electrumConnectSeconds
     do {
-      let client = try await Self.openConnection(to: config, until: deadline)
+      let (client, certificate) = try await Self.openConnection(to: config, until: deadline)
       guard walletGeneration == generation else { return }
       electrumClient = client
       try await Self.connecting(to: config, until: deadline) { try client.ping() }
       guard try await updateChainTip(from: client, config: config, until: deadline, generation: generation, profileId: profile.id) else {
         return
       }
+      await learnServerDetails(from: client, certificate: certificate, config: config, until: deadline, profile: profile, generation: generation)
       if chainTipHeight != tipBefore {
         updateCachedData()
       }
@@ -792,6 +844,93 @@ final class BitcoinService {
     electrumConnectionError = nil
     addToLog("Chain tip height: \(chainTipHeight)")
     return true
+  }
+
+  /// Saves what a connection to the wallet's own server taught Birch: the certificate
+  /// to pin, for a server carried over from "Allow insecure SSL", and a signet's
+  /// block 1, for a server carried over without it. Each is learned once.
+  private func learnServerDetails(
+    from client: ElectrumClient,
+    certificate: CertificateInfo?,
+    config: ElectrumConfig,
+    until deadline: TimeInterval,
+    profile: WalletProfile,
+    generation: UInt64,
+  ) async {
+    // Only the server the wallet still uses, as it was when the connection opened
+    guard let server = profile.electrumServer, server.config == config else { return }
+    var learned = false
+    if server.trustOnFirstUse, let certificate {
+      server.trustOnFirstUse = false
+      if certificate.systemTrusted {
+        addToLog("\(server.displayName)'s certificate is signed by an authority iOS trusts, so it isn't pinned")
+      } else {
+        server.certificateSHA256 = certificate.sha256
+        addToLog("Pinned \(server.displayName)'s certificate: \(certificate.formattedFingerprint)")
+      }
+      learned = true
+    }
+    if server.bitcoinNetwork == .signet, server.signetBlock1Hash == nil,
+       let block2 = try? await Self.connecting(to: config, until: deadline, { try client.blockHeader(height: 2) }),
+       walletGeneration == generation
+    {
+      // Block 2 names block 1, the block that tells signets apart
+      server.signetBlock1Hash = block2.prevBlockhash.description
+      addToLog("\(server.displayName) is on \(KnownSignet.name(forBlock1Hash: server.signetBlock1Hash) ?? "a signet"), block 1 \(block2.prevBlockhash)")
+      learned = true
+    }
+    if learned {
+      saveProfileChanges(profile)
+    }
+  }
+
+  /// Records the signet a signet wallet's database now holds, so moving it to a
+  /// server on another signet can ask first (ElectrumServerPickerView)
+  private func recordSignetChain(of profile: WalletProfile) {
+    guard profile.bitcoinNetwork == .signet,
+          let chain = profile.electrumServerChoice?.signetBlock1Hash,
+          profile.signetChainID != chain else { return }
+    profile.signetChainID = chain
+    addToLog("Wallet synced from \(KnownSignet.name(forBlock1Hash: chain) ?? "a signet")")
+    saveProfileChanges(profile)
+  }
+
+  /// After `profile`'s server changed (chosen, edited or deleted): reloads it, so a sync
+  /// still running against the old server is dropped, then syncs from the new server
+  /// or shows that there's none. `clearingDatabase` deletes its BDK database first, for
+  /// a signet wallet moved to a server on another signet; the labels, cosigners and
+  /// saved PSBTs are in SwiftData and stay. A wallet that isn't loaded only has its
+  /// database cleared.
+  func serverChanged(for profile: WalletProfile, clearingDatabase: Bool = false) async {
+    let isLoaded = currentProfile?.id == profile.id
+    logger.info(
+      "Electrum server of '\(profile.name)' changed to \(profile.electrumServerChoice.map { "\($0.displayName) (\($0.config.url))" } ?? "none")"
+        + (clearingDatabase ? ", clearing its database for the other signet" : "") + (isLoaded ? ", reloading" : ""),
+    )
+    if isLoaded {
+      unloadWallet()
+    }
+    if clearingDatabase {
+      try? FileManager.default.removeItem(at: Constants.walletDatabasePath(for: profile.id))
+      profile.signetChainID = nil
+      saveProfileChanges(profile)
+    }
+    guard isLoaded else { return }
+    do {
+      try await loadWallet(profile: profile)
+    } catch {
+      logger.error("Failed to reload '\(profile.name)' after its server changed: \(error.localizedDescription)")
+      return
+    }
+    try? await sync()
+  }
+
+  private func saveProfileChanges(_ profile: WalletProfile) {
+    do {
+      try profile.modelContext?.save()
+    } catch {
+      logger.error("Failed to save what the server taught: \(error.localizedDescription)")
+    }
   }
 
   // MARK: - Sync Progress
@@ -1018,27 +1157,74 @@ final class BitcoinService {
     addToLog("Sync pace: \(Self.milliseconds(measured)) per round trip over \(Int(units)); average now \(Self.milliseconds(learned))")
   }
 
-  /// Tests connectivity by fetching the chain tip from the server.
-  /// For SSL connections, validates the certificate first with a native TLS check
-  /// to detect self-signed certs before BDK obscures the error.
-  /// Returns the block height on success.
-  @discardableResult
-  func testElectrumConnection(config: ElectrumConfig) async throws -> UInt32 {
+  /// What a server is, read over a new connection
+  struct ServerInspection: Equatable {
+    /// From its genesis block. Nil for a network Birch doesn't support, such as regtest.
+    let network: BitcoinNetwork?
+    /// A signet's block 1, which tells signets apart (KnownSignet)
+    let signetBlock1Hash: String?
+    let chainTip: UInt32
+    /// The certificate an SSL server presented
+    let certificate: CertificateInfo?
+  }
+
+  /// Connects to `config`'s server and reads its certificate, its network from its
+  /// genesis block, a signet's block 1 and its chain tip, all within one connect
+  /// limit. An SSL certificate iOS doesn't trust, unless it's pinned or still to be
+  /// pinned, or one that isn't the pinned one, throws CertificateProblem: the Add
+  /// Server sheet then offers to trust it.
+  func inspectServer(_ config: ElectrumConfig) async throws -> ServerInspection {
     try Self.requireNetwork()
-    // The certificate check and BDK's connection share one connect limit
     let deadline = Self.uptime + Constants.electrumConnectSeconds
-    // Pre-check SSL certificate before handing off to BDK
-    if config.useSSL, !config.allowInsecureSSL {
-      try await Self.validateTLSCertificate(host: config.host, port: config.port, until: deadline)
+    var certificate: CertificateInfo?
+    if config.useSSL {
+      let presented = try await TLSCertificateInspector.inspect(host: config.host, port: config.port, until: deadline)
+      switch config.trust {
+      case .system where !presented.systemTrusted:
+        throw CertificateProblem(kind: .untrusted, certificate: presented, host: config.host, port: config.port)
+      case let .pinned(fingerprint) where !presented.matches(fingerprint):
+        throw CertificateProblem(kind: .changed, certificate: presented, host: config.host, port: config.port)
+      default:
+        certificate = presented
+      }
     }
 
     let url = config.url
-    let validateDomain = !config.allowInsecureSSL
-    let header = try await Self.connecting(to: config, until: deadline) {
+    let validateDomain = config.validatesDomain
+    let (network, chainTip, signetBlock1Hash) = try await Self.connecting(to: config, until: deadline) {
       let client = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
-      return try client.blockHeadersSubscribe()
+      let network = try BitcoinNetwork(genesisNonce: client.blockHeader(height: 0).nonce)
+      let tip = try client.blockHeadersSubscribe()
+      // Block 2 names block 1, the block that tells signets apart
+      let block1Hash = try network == .signet ? client.blockHeader(height: 2).prevBlockhash.description : nil
+      return (network, UInt32(tip.height), block1Hash)
     }
-    return UInt32(header.height)
+    logger.info(
+      "Inspected \(config.url): \(network?.displayName ?? "unsupported network"), tip \(chainTip)"
+        + (signetBlock1Hash.map { ", block 1 \($0)" } ?? "")
+        + (certificate.map { ", certificate \($0.formattedFingerprint) (\($0.systemTrusted ? "trusted by iOS" : "not trusted by iOS"))" } ?? ""),
+    )
+    return ServerInspection(network: network, signetBlock1Hash: signetBlock1Hash, chainTip: chainTip, certificate: certificate)
+  }
+
+  /// Test Connection's result line for a wallet on `network`: Success, a Warning when
+  /// the server is on another network or signet, or Failed
+  func testConnection(_ config: ElectrumConfig, network: BitcoinNetwork, signetBlock1Hash: String? = nil) async -> String {
+    do {
+      let inspection = try await inspectServer(config)
+      guard let detected = inspection.network, detected == network else {
+        return "Warning: Server is \(inspection.network?.displayName ?? "on a network Birch doesn't support"), expected \(network.displayName)"
+      }
+      if network == .signet, let expected = signetBlock1Hash, let found = inspection.signetBlock1Hash, expected != found {
+        let foundName = KnownSignet.name(forBlock1Hash: found) ?? "another signet"
+        return "Warning: Server is on \(foundName), expected \(KnownSignet.name(forBlock1Hash: expected) ?? "another signet")"
+      }
+      let name = network == .signet ? KnownSignet.name(forBlock1Hash: inspection.signetBlock1Hash) ?? network.displayName : network.displayName
+      return "Success — \(name) Chain Tip Height \(inspection.chainTip)"
+    } catch {
+      logger.error("Electrum connection test of \(config.url) failed: \(error)")
+      return "Failed: \(Self.friendlyElectrumError(error))"
+    }
   }
 
   /// Throws the offline message while the phone has no network, so a connection test
@@ -1047,88 +1233,6 @@ final class BitcoinService {
     let network = NetworkMonitor.shared.state
     if network.isOffline {
       throw AppError.electrumConnectionFailed(network.message)
-    }
-  }
-
-  /// Known genesis block nonces for network verification.
-  private static let genesisNonce: [BitcoinNetwork: UInt32] = [
-    .mainnet: 2_083_236_893,
-    .testnet3: 414_098_458,
-    .testnet4: 393_743_547,
-  ]
-
-  /// Detects which network an Electrum server is on by checking its genesis block nonce.
-  /// Returns nil for unknown networks (e.g. signet).
-  func detectElectrumNetwork(config: ElectrumConfig) async throws -> BitcoinNetwork? {
-    try Self.requireNetwork()
-    // The certificate check and BDK's connection share one connect limit
-    let deadline = Self.uptime + Constants.electrumConnectSeconds
-    if config.useSSL, !config.allowInsecureSSL {
-      try await Self.validateTLSCertificate(host: config.host, port: config.port, until: deadline)
-    }
-
-    let url = config.url
-    let validateDomain = !config.allowInsecureSSL
-    let genesisHeader = try await Self.connecting(to: config, until: deadline) {
-      let client = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
-      return try client.blockHeader(height: 0)
-    }
-
-    for (network, nonce) in Self.genesisNonce where genesisHeader.nonce == nonce {
-      return network
-    }
-    return nil
-  }
-
-  /// Performs a native TLS handshake to validate the server's certificate.
-  /// Throws a clear error if the certificate is self-signed or untrusted, or if the
-  /// server can't be reached by `deadline` (system uptime).
-  private static func validateTLSCertificate(host: String, port: UInt16, until deadline: TimeInterval) async throws {
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-      let queue = DispatchQueue(label: "tls-check")
-      let connection = NWConnection(
-        host: NWEndpoint.Host(host),
-        port: NWEndpoint.Port(rawValue: port)!,
-        using: .tls,
-      )
-      // The handshake and the deadline race, and whichever comes first ends the check
-      let once = ResumeOnce(continuation)
-      let finish: @Sendable (Result<Void, Error>) -> Void = { result in
-        connection.cancel()
-        once.resume(with: result)
-      }
-
-      connection.stateUpdateHandler = { state in
-        switch state {
-        case .ready:
-          finish(.success(()))
-        case let .waiting(error):
-          finish(.failure(tlsCheckError(waiting: error, host: host, port: port)))
-        case let .failed(error):
-          let desc = error.localizedDescription
-          if desc.contains("certificate") || desc.contains("SSL") || desc.contains("trust") {
-            finish(.failure(AppError.electrumConnectionFailed(
-              "SSL certificate rejected for \(host):\(port) — the server may use a self-signed certificate. Try using TCP instead of SSL, or use a server with a CA-signed certificate.",
-            )))
-          } else {
-            finish(.failure(AppError.electrumConnectionFailed(
-              "Connection to \(host):\(port) failed: \(desc)",
-            )))
-          }
-        case .cancelled:
-          break
-        default:
-          break
-        }
-      }
-
-      // Without it, a server that never answers holds the check in .preparing until
-      // the system's TCP connect timeout, about 75 s
-      queue.asyncAfter(deadline: .now() + max(deadline - uptime, 0)) {
-        finish(.failure(connectTimedOut(host: host, port: port)))
-      }
-
-      connection.start(queue: queue)
     }
   }
 
@@ -1649,9 +1753,10 @@ final class BitcoinService {
   private func fetchElectrumFees() async throws -> RecommendedFees {
     guard let profile = currentProfile else { throw AppError.walletNotLoaded }
     try Self.requireNetwork()
-    let config = connectionConfig(for: profile)
-    let url = config.url
-    let validateDomain = !config.allowInsecureSSL
+    // Without a server, Send and Bump Fee use the fallback rates
+    guard let config = connectionConfig(for: profile) else {
+      throw AppError.electrumConnectionFailed(Self.noServerMessage)
+    }
 
     // Electrum returns BTC/kB. To convert to sats/vB:
     // BTC -> sats = * 100,000,000
@@ -1662,8 +1767,9 @@ final class BitcoinService {
     // A new connection, as a sync opens, so one left idle since the last sync can't
     // hold the fee step up. Connecting and the three estimates share the connect limit;
     // past it, Send and Bump Fee use the fallback rates.
-    return try await Self.connecting(to: config, until: Self.uptime + Constants.electrumConnectSeconds) {
-      let electrumClient = try Self.makeElectrumClient(url: url, validateDomain: validateDomain)
+    let deadline = Self.uptime + Constants.electrumConnectSeconds
+    let electrumClient = try await Self.openConnection(to: config, until: deadline).client
+    return try await Self.connecting(to: config, until: deadline) {
       let highRaw = try? electrumClient.estimateFee(number: 1)
       let medRaw = try? electrumClient.estimateFee(number: 6)
       let lowRaw = try? electrumClient.estimateFee(number: 144)
@@ -2135,8 +2241,11 @@ final class BitcoinService {
       throw AppError.electrumConnectionFailed("\(network.message). The transaction wasn't sent.")
     }
 
+    guard let config = connectionConfig(for: profile) else {
+      logger.error("Broadcast not sent: the wallet has no Electrum server")
+      throw AppError.electrumConnectionFailed("\(Self.noServerMessage) The transaction wasn't sent.")
+    }
     let (_, tx) = try finalizePSBT(psbtData)
-    let config = connectionConfig(for: profile)
     // The wallet the transaction was finalized against, so a wallet loaded while it
     // was being sent never has it recorded
     let generation = walletGeneration
@@ -2146,7 +2255,10 @@ final class BitcoinService {
     // hold the broadcast up. Until it's open, nothing has been sent.
     let client: ElectrumClient
     do {
-      client = try await Self.openConnection(to: config, until: Self.uptime + Constants.electrumConnectSeconds)
+      client = try await Self.openConnection(to: config, until: Self.uptime + Constants.electrumConnectSeconds).client
+    } catch let problem as CertificateProblem {
+      logger.error("Broadcast not sent, the certificate didn't match: \(problem)")
+      throw AppError.electrumConnectionFailed("\(problem.errorDescription ?? "") The transaction wasn't sent.")
     } catch {
       logger.error("Broadcast not sent, couldn't connect: \(error)")
       throw AppError.electrumConnectionFailed("Couldn't reach \(config.host):\(config.port). The transaction wasn't sent.")

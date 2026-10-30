@@ -12,11 +12,11 @@ struct MultisigConfigView: View {
   @Environment(\.setupLayout) private var layout
 
   var body: some View {
-    ScrollViewReader { proxy in
+    Group {
       if layout == .twoColumn {
-        twoColumnBody(proxy: proxy)
+        twoColumnBody
       } else {
-        singleColumnBody(proxy: proxy)
+        singleColumnBody
       }
     }
     .alert(
@@ -39,7 +39,7 @@ struct MultisigConfigView: View {
     }
   }
 
-  private func singleColumnBody(proxy: ScrollViewProxy) -> some View {
+  private var singleColumnBody: some View {
     ScrollView {
       VStack(spacing: 28) {
         title
@@ -62,7 +62,7 @@ struct MultisigConfigView: View {
 
           Spacer()
 
-          Button(action: { goNext(proxy: proxy) }) {
+          Button(action: { viewModel.goToNext() }) {
             Text("Next")
               .hbCompactPrimaryButton()
           }
@@ -78,7 +78,7 @@ struct MultisigConfigView: View {
 
   /// Left: the question and the M-of-N answer, with Back at the bottom.
   /// Right: network and server settings, with Next at the bottom.
-  private func twoColumnBody(proxy: ScrollViewProxy) -> some View {
+  private var twoColumnBody: some View {
     SetupTwoColumn {
       VStack(alignment: .leading, spacing: 8) {
         title
@@ -94,7 +94,7 @@ struct MultisigConfigView: View {
       VStack(spacing: 16) {
         settings
         Spacer(minLength: 16)
-        Button(action: { goNext(proxy: proxy) }) {
+        Button(action: { viewModel.goToNext() }) {
           Text("Next")
             .hbPrimaryButton()
         }
@@ -174,7 +174,7 @@ struct MultisigConfigView: View {
     WalletNameNetworkCard(viewModel: viewModel)
 
     // Electrum server
-    ElectrumServerSetupSection(viewModel: viewModel, initiallyExpanded: viewModel.network == .mainnet)
+    ElectrumServerSetupSection(viewModel: viewModel)
 
     // Advanced
     WalletAdvancedSetupSection(viewModel: viewModel)
@@ -185,15 +185,6 @@ struct MultisigConfigView: View {
       Text("Back")
         .hbCompactSecondaryButton()
     }
-  }
-
-  /// Moves on, or scrolls to the flagged Host field and reads out why not
-  private func goNext(proxy: ScrollViewProxy) {
-    guard !viewModel.goToNext(), let hostError = viewModel.electrumHostError else { return }
-    withAnimation {
-      proxy.scrollTo(ElectrumServerSetupSection.scrollID, anchor: .top)
-    }
-    AccessibilityNotification.Announcement(hostError).post()
   }
 
   /// The wheel closed: lowering the count past cosigners with keys entered asks first

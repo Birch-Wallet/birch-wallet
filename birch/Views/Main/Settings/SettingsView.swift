@@ -86,7 +86,7 @@ struct SettingsView: View {
 // MARK: - Section and Rows
 
 /// A titled card of settings rows, the same lifted card as the other screens
-private struct SettingsSection<Content: View>: View {
+struct SettingsSection<Content: View>: View {
   let title: String
   @ViewBuilder let content: Content
 
@@ -114,7 +114,7 @@ private struct SettingsSection<Content: View>: View {
   }
 }
 
-private extension View {
+extension View {
   /// A settings row's height: 8pt above and below, at least 52pt in all
   func settingsRow() -> some View {
     padding(.vertical, 8)

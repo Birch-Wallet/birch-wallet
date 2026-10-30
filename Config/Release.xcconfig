@@ -9,5 +9,7 @@ SWIFT_COMPILATION_MODE = wholemodule
 VALIDATE_PRODUCT = YES
 
 // Reproducibility: remap absolute paths in debug info
-OTHER_SWIFT_FLAGS = $(inherited) -debug-prefix-map $(SRCROOT)=. -debug-prefix-map $(HOME)=~
-OTHER_CFLAGS = $(inherited) -fdebug-prefix-map=$(SRCROOT)=. -fdebug-prefix-map=$(HOME)=~
+// Don't map $(HOME): the SDK's precompiled modules live under it, and
+// dsymutil can't follow a "~/..." path to them when it builds the dSYM.
+OTHER_SWIFT_FLAGS = $(inherited) -debug-prefix-map $(SRCROOT)=.
+OTHER_CFLAGS = $(inherited) -fdebug-prefix-map=$(SRCROOT)=.

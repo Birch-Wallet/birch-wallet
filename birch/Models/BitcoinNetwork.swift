@@ -26,15 +26,8 @@ enum BitcoinNetwork: String, CaseIterable, Codable, Identifiable {
     }
   }
 
-  var defaultElectrumHost: String? {
-    switch self {
-    case .mainnet: nil
-    case .testnet4: "testnet4.mempool.space"
-    case .testnet3: "electrum.blockstream.info"
-    case .signet: "signet.mempool.space"
-    }
-  }
-
+  /// The usual SSL port of the network's Electrum servers, the Add Server sheet's
+  /// placeholder. The public servers are in ElectrumServerCatalog.
   var defaultElectrumPort: UInt16 {
     switch self {
     case .mainnet: 50002
@@ -44,16 +37,22 @@ enum BitcoinNetwork: String, CaseIterable, Codable, Identifiable {
     }
   }
 
-  var usesSSL: Bool {
+  /// The nonce of the network's genesis block, which tells a server's network from
+  /// its block 0. Every signet shares one genesis block, so this says signet but
+  /// not which (KnownSignet tells them apart by block 1).
+  var genesisNonce: UInt32 {
     switch self {
-    default: true
+    case .mainnet: 2_083_236_893
+    case .testnet4: 393_743_547
+    case .testnet3: 414_098_458
+    case .signet: 52_613_770
     }
   }
 
-  var defaultElectrumURL: String? {
-    guard let host = defaultElectrumHost else { return nil }
-    let proto = usesSSL ? "ssl" : "tcp"
-    return "\(proto)://\(host):\(defaultElectrumPort)"
+  /// The network whose genesis block has `nonce`, or nil for one Birch doesn't support (regtest)
+  init?(genesisNonce nonce: UInt32) {
+    guard let network = Self.allCases.first(where: { $0.genesisNonce == nonce }) else { return nil }
+    self = network
   }
 
   var addressPrefix: String {

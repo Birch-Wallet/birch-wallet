@@ -67,6 +67,7 @@ struct DescriptorTests {
 
     // Parse back via the wizard viewmodel
     let vm = SetupWizardViewModel()
+    vm.network = .testnet4
     vm.importedDescriptorText = desc1
     let parsed = vm.parseImportedDescriptor()
 

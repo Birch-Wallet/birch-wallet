@@ -13,6 +13,9 @@ final class WalletProfile {
   var createdAt: Date
   var isActive: Bool
   var addressGapLimit: Int
+  // The server the wallet had before Electrum servers were shared between wallets.
+  // Only ElectrumServerMigration reads these; `electrumServer` and
+  // `builtInElectrumServerID` replaced them.
   var electrumHost: String
   var electrumPort: Int
   var electrumSSL: Int // 0 = network default, 1 = TCP, 2 = SSL
@@ -21,6 +24,19 @@ final class WalletProfile {
   var privacyMode: Bool = false
   /// Where the wallet sits in the wallet picker, 0 first (see WalletOrdering)
   var sortOrder: Int = 0
+  /// The user's own server the wallet syncs from. Nil when it uses a public one.
+  var electrumServer: ElectrumServer?
+  /// The public server the wallet syncs from (ElectrumServerCatalog), when
+  /// `electrumServer` is nil. Empty too means the wallet has no server: the user
+  /// deleted the one it used.
+  var builtInElectrumServerID: String = ""
+  /// The server fields above have been carried over to `electrumServer` or
+  /// `builtInElectrumServerID`. False only for a wallet saved before servers were
+  /// shared, until the migration runs.
+  var electrumServerMigrated: Bool = false
+  /// The signet the wallet's BDK database last synced from: its block 1 hash. Moving
+  /// to a server on another signet clears the database first.
+  var signetChainID: String?
 
   @Relationship(deleteRule: .cascade, inverse: \CosignerInfo.wallet)
   var cosigners: [CosignerInfo]
@@ -35,10 +51,6 @@ final class WalletProfile {
     network: BitcoinNetwork = .testnet4,
     isActive: Bool = false,
     addressGapLimit: Int = Constants.defaultAddressGap,
-    electrumHost: String = "",
-    electrumPort: Int = 0,
-    electrumSSL: Int = 0,
-    electrumAllowInsecureSSL: Bool = false,
     blockExplorerHost: String = "",
     privacyMode: Bool = false,
   ) {
@@ -53,24 +65,19 @@ final class WalletProfile {
     createdAt = .displayNow
     self.isActive = isActive
     self.addressGapLimit = addressGapLimit
-    self.electrumHost = electrumHost
-    self.electrumPort = electrumPort
-    self.electrumSSL = electrumSSL
-    self.electrumAllowInsecureSSL = electrumAllowInsecureSSL
+    electrumHost = ""
+    electrumPort = 0
+    electrumSSL = 0
     self.blockExplorerHost = blockExplorerHost
     self.privacyMode = privacyMode
+    // A new wallet has no fields to carry over; it gets its server once it's
+    // inserted (setElectrumServer)
+    electrumServerMigrated = true
     cosigners = []
   }
 
   var bitcoinNetwork: BitcoinNetwork {
     BitcoinNetwork(rawValue: network) ?? .testnet4
-  }
-
-  /// The custom server port, or nil when none is set. A stored value that is not
-  /// a port number counts as not set: this is read on every wallet load, so it
-  /// must never trap.
-  var customElectrumPort: UInt16? {
-    (1 ... InputLimits.maxPort).contains(electrumPort) ? UInt16(electrumPort) : nil
   }
 
   /// The gap limit to scan and list addresses with: the stored value held to
@@ -80,16 +87,32 @@ final class WalletProfile {
     min(max(addressGapLimit, 1), InputLimits.maxGapLimit)
   }
 
-  var electrumConfig: ElectrumConfig {
-    let net = bitcoinNetwork
-    let host = electrumHost.isEmpty ? (net.defaultElectrumHost ?? "") : electrumHost
-    let port = customElectrumPort ?? net.defaultElectrumPort
-    let ssl: Bool = switch electrumSSL {
-    case 1: false // TCP
-    case 2: true // SSL
-    default: net.usesSSL // 0 = network default
+  /// The server the wallet syncs from, or nil when it has none
+  var electrumServerChoice: ElectrumServerChoice? {
+    if let electrumServer {
+      return .custom(electrumServer)
     }
-    return ElectrumConfig(host: host, port: port, useSSL: ssl, allowInsecureSSL: electrumAllowInsecureSSL)
+    return ElectrumServerCatalog.server(id: builtInElectrumServerID).map { .builtIn($0) }
+  }
+
+  /// Where the wallet connects, or nil when it has no server
+  var electrumConfig: ElectrumConfig? {
+    electrumServerChoice?.config
+  }
+
+  /// Moves the wallet to `choice`, or to no server
+  func setElectrumServer(_ choice: ElectrumServerChoice?) {
+    switch choice {
+    case let .builtIn(server):
+      electrumServer = nil
+      builtInElectrumServerID = server.id
+    case let .custom(server):
+      electrumServer = server
+      builtInElectrumServerID = ""
+    case nil:
+      electrumServer = nil
+      builtInElectrumServerID = ""
+    }
   }
 
   var multisigDescription: String {

@@ -82,8 +82,12 @@ struct ConnectionStatusView: View {
         .foregroundStyle(Color.hbTextPrimary)
 
       if let wallet = activeWallet {
-        let config = wallet.electrumConfig
-        InfoRow(label: "Server", value: config.url)
+        if let server = wallet.electrumServerChoice {
+          InfoRow(label: "Server", value: server.displayName)
+          InfoRow(label: "Address", value: server.config.url)
+        } else {
+          InfoRow(label: "Server", value: "None")
+        }
       }
 
       StatusRow(label: "Connected", value: service.isElectrumConnected ? "Yes" : "No",
@@ -335,12 +339,29 @@ struct ConnectionStatusView: View {
 
     // Electrum config from UserDefaults
     if let wallet = activeWallet {
-      let config = wallet.electrumConfig
-      lines.append("\n--- Electrum Config (Wallet) ---")
-      lines.append("URL: \(config.url)")
-      lines.append("Host: \(config.host)")
-      lines.append("Port: \(config.port)")
-      lines.append("SSL: \(config.useSSL)")
+      lines.append("\n--- Electrum Server (Wallet) ---")
+      if let server = wallet.electrumServerChoice {
+        let config = server.config
+        lines.append("Server: \(server.displayName) (\(server.isPublic ? "public" : "own"), \(server.id))")
+        lines.append("URL: \(config.url)")
+        lines.append("Host: \(config.host)")
+        lines.append("Port: \(config.port)")
+        lines.append("SSL: \(config.useSSL)")
+        let trust = switch config.trust {
+        case .system: "system"
+        case let .pinned(fingerprint): "pinned \(CertificateInfo.format(fingerprint))"
+        case .trustOnFirstUse: "pins on next connection"
+        }
+        lines.append("Certificate: \(trust)")
+        if let signet = server.signetBlock1Hash {
+          lines.append("Signet block 1: \(signet) (\(KnownSignet.name(forBlock1Hash: signet) ?? ""))")
+        }
+      } else {
+        lines.append("Server: none")
+      }
+      if let chain = wallet.signetChainID {
+        lines.append("Wallet synced from signet block 1: \(chain)")
+      }
     }
 
     UIPasteboard.general.string = lines.joined(separator: "\n")
@@ -356,25 +377,16 @@ struct ConnectionStatusView: View {
       testResult = "No wallet configured"
       return
     }
+    guard let config = wallet.electrumConfig else {
+      testResult = "Failed: \(BitcoinService.noServerMessage)"
+      return
+    }
     isTesting = true
     testResult = nil
+    let network = wallet.bitcoinNetwork
+    let signetChain = wallet.electrumServerChoice?.signetBlock1Hash
     Task {
-      let config = wallet.electrumConfig
-      do {
-        let height = try await service.testElectrumConnection(config: config)
-        let network = wallet.bitcoinNetwork
-        if network != .signet,
-           let detected = try? await service.detectElectrumNetwork(config: config),
-           detected != network
-        {
-          testResult = "Warning: Server is \(detected.displayName), expected \(network.displayName)"
-          isTesting = false
-          return
-        }
-        testResult = "Success — \(network.displayName) Chain Tip Height \(height)"
-      } catch {
-        testResult = "Failed: \(BitcoinService.friendlyElectrumError(error))"
-      }
+      testResult = await service.testConnection(config, network: network, signetBlock1Hash: signetChain)
       isTesting = false
     }
   }

@@ -50,12 +50,10 @@ final class birchUITests: XCTestCase {
     textEditor.tap()
     textEditor.typeText(testDescriptor)
 
-    // Select "Testnet4" in the network segmented picker (should already be selected as default,
-    // but tap it to be explicit)
-    let testnet4Button = app.buttons["Testnet4"]
-    if testnet4Button.waitForExistence(timeout: 2) {
-      testnet4Button.tap()
-    }
+    // Select "Testnet4" in the network segmented picker: a new wallet starts on Mainnet
+    let testnet4Button = app.segmentedControls.firstMatch.buttons["Testnet4"]
+    XCTAssertTrue(testnet4Button.waitForExistence(timeout: 3), "Testnet4 segment button should exist")
+    testnet4Button.tap()
 
     // Name the wallet in the Wallet Name field on the same screen; Return
     // dismisses its keyboard

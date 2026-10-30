@@ -17,22 +17,33 @@ struct WalletInfoView: View {
   @State private var isEditingName = false
   @State private var editedName: String = ""
   @FocusState private var nameFieldFocused: Bool
-  @State private var electrumHostText: String = ""
-  @State private var electrumPortText: String = ""
   @State private var isTestingConnection = false
   @State private var connectionTestResult: String?
   @State private var blockExplorerText: String = ""
-  @State private var initialElectrumConfig: ElectrumConfig?
-  @State private var showInsecureSSLAlert = false
   @State private var showDescriptorQR = false
   @State private var showDeleteConfirmation = false
-  @State private var showResetElectrumConfirmation = false
   @State private var showDescriptorPDF = false
 
   /// Whether this is the wallet BitcoinService has loaded, the only one Sync and a
   /// server change can act on
   private var isLoadedWallet: Bool {
     BitcoinService.shared.currentProfile?.id == wallet.id
+  }
+
+  /// The wallet's server, as the picker chooses it
+  private var serverSelection: Binding<ElectrumServerChoice?> {
+    Binding(
+      get: { wallet.electrumServerChoice },
+      set: { choice in
+        wallet.setElectrumServer(choice)
+        do {
+          try modelContext.save()
+        } catch {
+          logger.error("Failed to save the wallet's Electrum server: \(error.localizedDescription)")
+        }
+        connectionTestResult = nil
+      },
+    )
   }
 
   /// The output descriptor rebuilt from the saved cosigners, or nil when one of
@@ -183,93 +194,25 @@ struct WalletInfoView: View {
             .foregroundStyle(Color.hbTextPrimary)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Host")
-              .font(.hbLabel())
-              .foregroundStyle(Color.hbTextSecondary)
-            TextField(wallet.bitcoinNetwork.defaultElectrumHost ?? "Enter server host", text: $electrumHostText)
-              .font(.hbMono(14))
-              .textInputAutocapitalization(.never)
-              .autocorrectionDisabled()
-              .padding(10)
-              .birchCard(.nested)
-              .foregroundStyle(Color.hbTextPrimary)
-              .onChange(of: electrumHostText) {
-                wallet.electrumHost = electrumHostText.trimmingCharacters(in: .whitespaces)
-              }
-          }
-
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Port")
-              .font(.hbLabel())
-              .foregroundStyle(Color.hbTextSecondary)
-            TextField(String(wallet.bitcoinNetwork.defaultElectrumPort), text: $electrumPortText)
-              .font(.hbMono(14))
-              .keyboardType(.numberPad)
-              .padding(10)
-              .birchCard(.nested)
-              .foregroundStyle(Color.hbTextPrimary)
-              .onChange(of: electrumPortText) { old, new in
-                let accepted = InputLimits.sanitizeCount(new, old: old, max: InputLimits.maxPort)
-                if accepted != new {
-                  // Not a port number — ignore the keystroke
-                  electrumPortText = accepted
-                  return
-                }
-                wallet.electrumPort = Int(accepted) ?? 0
-              }
-          }
-
-          VStack(alignment: .leading, spacing: 6) {
-            Text("Protocol")
-              .font(.hbLabel())
-              .foregroundStyle(Color.hbTextSecondary)
-            Picker("Protocol", selection: Binding(
-              get: {
-                switch wallet.electrumSSL {
-                case 1: 1 // TCP
-                case 2: 2 // SSL
-                default: wallet.bitcoinNetwork.usesSSL ? 2 : 1
-                }
-              },
-              set: {
-                wallet.electrumSSL = $0
-                if $0 != 2 {
-                  wallet.electrumAllowInsecureSSL = false
-                }
-              },
-            )) {
-              Text("TCP").tag(1)
-              Text("SSL").tag(2)
-            }
-            .pickerStyle(.segmented)
-          }
-
-          if wallet.electrumSSL == 2 || (wallet.electrumSSL == 0 && wallet.bitcoinNetwork.usesSSL) {
-            Toggle(isOn: Binding(
-              get: { wallet.electrumAllowInsecureSSL },
-              set: { newValue in
-                if newValue {
-                  showInsecureSSLAlert = true
-                } else {
-                  wallet.electrumAllowInsecureSSL = false
-                }
-              },
-            )) {
-              Text("Allow insecure SSL")
-                .font(.hbBody(13))
-                .foregroundStyle(Color.hbTextPrimary)
-            }
-            .tint(Color.hbToggle)
-          }
+          ElectrumServerRow(
+            network: wallet.bitcoinNetwork,
+            selection: serverSelection,
+            signetHistory: wallet.signetHistory,
+            onServerChanged: { clearingDatabase in
+              let wallet = wallet
+              Task { await BitcoinService.shared.serverChanged(for: wallet, clearingDatabase: clearingDatabase) }
+            },
+          )
 
           if let result = connectionTestResult {
             Text(result)
               .font(.hbBody(13))
               .foregroundStyle(result.starts(with: "Success") ? Color.hbSuccess : result.starts(with: "Warning") ? Color.hbWarning : Color.hbError)
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
 
-          HStack(spacing: 12) {
+          // Nothing to test until a server is chosen
+          if wallet.electrumConfig != nil {
             Button(action: testElectrumConnection) {
               HStack(spacing: 6) {
                 if isTestingConnection {
@@ -287,29 +230,9 @@ struct WalletInfoView: View {
               .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .disabled(isTestingConnection)
-
-            Button(action: { showResetElectrumConfirmation = true }) {
-              HStack(spacing: 6) {
-                Image(systemName: "arrow.counterclockwise")
-                Text("Reset")
-                  .font(.hbBody(14))
-              }
-              .foregroundStyle(Color.hbTextSecondary)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 12)
-              .birchCard(.nested)
-            }
           }
         }
         .hbCard()
-        .alert("Reset Electrum Server?", isPresented: $showResetElectrumConfirmation) {
-          Button("Cancel", role: .cancel) {}
-          Button("Reset", role: .destructive) {
-            resetElectrumDefaults()
-          }
-        } message: {
-          Text("This will clear custom host, port, and protocol settings and revert to network defaults.")
-        }
 
         // Block Explorer
         VStack(spacing: 12) {
@@ -483,31 +406,7 @@ struct WalletInfoView: View {
     .navigationTitle("Wallet Settings")
     .onAppear {
       gapLimitText = "\(wallet.scanGapLimit)"
-      electrumHostText = wallet.electrumHost
-      electrumPortText = wallet.customElectrumPort.map { "\($0)" } ?? ""
       blockExplorerText = wallet.blockExplorerHost
-      initialElectrumConfig = wallet.electrumConfig
-    }
-    .onDisappear {
-      // Only the loaded wallet is reloaded: loading this one in place of another
-      // would swap the wallet the app is showing
-      if let initial = initialElectrumConfig, wallet.electrumConfig != initial, isLoadedWallet {
-        logger.info("Electrum settings changed — reloading wallet")
-        let service = BitcoinService.shared
-        Task {
-          service.unloadWallet()
-          try? await service.loadWallet(profile: wallet)
-          try? await service.sync()
-        }
-      }
-    }
-    .alert("Allow Insecure SSL?", isPresented: $showInsecureSSLAlert) {
-      Button("Cancel", role: .cancel) {}
-      Button("Allow", role: .destructive) {
-        wallet.electrumAllowInsecureSSL = true
-      }
-    } message: {
-      Text("This removes the requirement to verify that the server is who it claims to be. The connection will still be encrypted, but self-signed, expired, or invalid certificates will be accepted.")
     }
     .sheet(isPresented: $showEditCosigners) {
       EditCosignersView(wallet: wallet)
@@ -524,42 +423,16 @@ struct WalletInfoView: View {
   }
 
   private func testElectrumConnection() {
+    guard let config = wallet.electrumConfig else { return }
     isTestingConnection = true
     connectionTestResult = nil
-    let config = wallet.electrumConfig
     logger.info("Testing Electrum connection to \(config.url)")
+    let network = wallet.bitcoinNetwork
+    let signetChain = wallet.electrumServerChoice?.signetBlock1Hash
     Task {
-      do {
-        let height = try await BitcoinService.shared.testElectrumConnection(config: config)
-        logger.info("Electrum connection test succeeded")
-        let network = wallet.bitcoinNetwork
-        if network != .signet {
-          if let detected = try? await BitcoinService.shared.detectElectrumNetwork(config: config),
-             detected != network
-          {
-            connectionTestResult = "Warning: Server is \(detected.displayName), expected \(network.displayName)"
-            isTestingConnection = false
-            return
-          }
-        }
-        connectionTestResult = "Success — \(network.displayName) Chain Tip Height \(height)"
-      } catch {
-        logger.error("Electrum connection test failed: \(error)")
-        connectionTestResult = "Failed: \(error.localizedDescription)"
-      }
+      connectionTestResult = await BitcoinService.shared.testConnection(config, network: network, signetBlock1Hash: signetChain)
       isTestingConnection = false
     }
-  }
-
-  private func resetElectrumDefaults() {
-    logger.info("Electrum config reset to defaults")
-    wallet.electrumHost = ""
-    wallet.electrumPort = 0
-    wallet.electrumSSL = 0
-    wallet.electrumAllowInsecureSSL = false
-    electrumHostText = ""
-    electrumPortText = ""
-    connectionTestResult = nil
   }
 
   private func saveName() {
